@@ -4,7 +4,7 @@ from flask import (
 from werkzeug.exceptions import abort
 
 from pytarjas.auth import login_required
-from pytarjas.db import get_db
+from pytarjas.dbs import get_db
 
 bp = Blueprint('blog', __name__)
 
