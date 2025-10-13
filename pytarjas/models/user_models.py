@@ -71,7 +71,7 @@ class User(db.Model):
 
     # Role field for polymorphic inheritance
     role: Mapped[str] = mapped_column(
-        String(10),
+        String(20),
         nullable=False,
     )
 
@@ -79,7 +79,7 @@ class User(db.Model):
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
-        default=lambda: datetime.now(timezone.utc)
+        default=lambda: datetime.now(timezone.utc),
     )
     updated_at: Mapped[datetime | None] = mapped_column(
         DateTime,
