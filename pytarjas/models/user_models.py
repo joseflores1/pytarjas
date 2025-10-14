@@ -180,6 +180,7 @@ class Admin(User):
             password: Plain text password to hash and store
         """
         user.password_hash=generate_password_hash(password)
+        user.updated_at=datetime.now(timezone.utc)
 
     def update_user_info(
             self, user: User, new_email: str | None = None, new_username: str | None = None,

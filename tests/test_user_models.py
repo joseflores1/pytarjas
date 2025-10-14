@@ -16,8 +16,9 @@ Fixtures are defined at the module level for user model testing.
 import pytest
 from datetime import datetime 
 from pytarjas.models.user_models import db, User, Admin, Worker, Planner, Client #noqa
+from helper import is_valid_uuid4
 from werkzeug.security import generate_password_hash
-from sqlalchemy.exc import SAWarning
+from sqlalchemy.exc import SAWarning, IntegrityError
 
 
 # ============================================================================
@@ -113,7 +114,7 @@ def client_user(app, _db):
             email="client@test.com",
             role="client"
         )
-        client.password_hash = generate_password_hash("client123")
+        client.password_hash = generate_password_hash("client_test")
         _db.session.add(client)
         _db.session.commit()
         _db.session.refresh(client)
@@ -135,7 +136,7 @@ class TestUserInitialization:
                 email="newadmin@test.com",
                 role="admin"
             )
-            admin.password_hash = generate_password_hash("password123")
+            admin.password_hash = generate_password_hash("new_admin")
             _db.session.add(admin)
             _db.session.commit()
             
@@ -159,14 +160,20 @@ class TestUserInitialization:
                 email="newworker@test.com",
                 role="worker"
             )
-            worker.password_hash = generate_password_hash("password123")
+            worker.password_hash = generate_password_hash("new_worker")
             _db.session.add(worker)
             _db.session.commit()
-            
             assert worker.id is not None
             assert worker.username == "new_worker"
+            assert worker.email == "newworker@test.com"
             assert worker.role == "worker"
-    
+            assert worker.password_hash is not None
+            assert worker.created_at is not None
+            assert isinstance(worker.created_at, datetime)
+            # updated_at and login_at should be None initially
+            assert worker.updated_at is None
+            assert worker.login_at is None
+            
     def test_create_planner(self, app, _db):
         """Test creating a planner user."""
         with app.app_context():
@@ -175,14 +182,21 @@ class TestUserInitialization:
                 email="newplanner@test.com",
                 role="planner"
             )
-            planner.password_hash = generate_password_hash("password123")
+            planner.password_hash = generate_password_hash("new_planner")
             _db.session.add(planner)
             _db.session.commit()
             
             assert planner.id is not None
             assert planner.username == "new_planner"
+            assert planner.email == "newplanner@test.com"
             assert planner.role == "planner"
-    
+            assert planner.password_hash is not None
+            assert planner.created_at is not None
+            assert isinstance(planner.created_at, datetime)
+            # updated_at and login_at should be None initially
+            assert planner.updated_at is None
+            assert planner.login_at is None
+   
     def test_create_client(self, app, _db):
         """Test creating a client user."""
         with app.app_context():
@@ -191,14 +205,21 @@ class TestUserInitialization:
                 email="newclient@test.com",
                 role="client"
             )
-            client.password_hash = generate_password_hash("password123")
+            client.password_hash = generate_password_hash("new_client")
             _db.session.add(client)
             _db.session.commit()
             
             assert client.id is not None
             assert client.username == "new_client"
+            assert client.email == "newclient@test.com"
             assert client.role == "client"
-    
+            assert client.password_hash is not None
+            assert client.created_at is not None
+            assert isinstance(client.created_at, datetime)
+            # updated_at and login_at should be None initially
+            assert client.updated_at is None
+            assert client.login_at is None
+ 
     def test_uuid_generation(self, app, _db):
         """Test that UUIDs are automatically generated and unique."""
         with app.app_context():
@@ -218,6 +239,10 @@ class TestUserInitialization:
             # IDs should be 36 characters (UUID format with hyphens)
             assert len(user1.id) == 36
             assert len(user2.id) == 36         
+
+            # Should be valid UUIDs
+            assert is_valid_uuid4(user1.id)
+            assert is_valid_uuid4(user2.id)
     
     def test_unique_username_constraint(self, app, _db, admin_user):
         """Test that usernames must be unique."""
@@ -231,7 +256,7 @@ class TestUserInitialization:
             _db.session.add(duplicate)
             
             # Should raise IntegrityError due to unique constraint
-            with pytest.raises(Exception):  # SQLAlchemy will raise IntegrityError
+            with pytest.raises(IntegrityError):  # SQLAlchemy will raise IntegrityError
                 _db.session.commit()
             
             # Rollback to clean up
@@ -249,7 +274,7 @@ class TestUserInitialization:
             _db.session.add(duplicate)
             
             # Should raise IntegrityError due to unique constraint
-            with pytest.raises(Exception):
+            with pytest.raises(IntegrityError):
                 _db.session.commit()
             
             # Rollback to clean up
@@ -296,6 +321,7 @@ class TestPasswordMethods:
         with app.app_context():
             planner = _db.session.get(Planner, planner_user.id)
             old_hash = planner.password_hash
+            old_updated_at = planner.updated_at
             
             # Change password
             result = planner.change_password("planner123", "newplanner456")
@@ -307,6 +333,8 @@ class TestPasswordMethods:
             assert planner.check_password("newplanner456") is True
             assert planner.check_password("planner123") is False
             assert planner.updated_at is not None
+            if old_updated_at:
+                assert planner.updated_at > old_updated_at
     
     def test_change_password_with_incorrect_old_password(self, app, _db, planner_user):
         """Test that change_password fails with incorrect old password."""
@@ -334,7 +362,7 @@ class TestPasswordMethods:
             # Password hash should not equal plain password
             assert user.password_hash != "plainpassword"
             # Hash should start with algorithm identifier (scrypt or pbkdf2)
-            assert user.password_hash.startswith("scrypt:") or user.password_hash.startswith("pbkdf2:")
+            assert user.password_hash.startswith("scrypt:")
 
 
 class TestUserMethods:
@@ -386,7 +414,8 @@ class TestAdminMethods:
             # Verify password was changed
             assert worker.password_hash != old_hash
             assert worker.check_password("newworkerpass") is True
-    
+            assert worker.updated_at is not None 
+
     def test_update_user_info_email(self, app, _db, admin_user, worker_user):
         """Test admin updating user's email."""
         with app.app_context():
@@ -500,6 +529,8 @@ class TestAdminMethods:
             assert new_admin.username == "created_admin"
             assert new_admin.email == "created_admin@test.com"
             assert new_admin.role == "admin"
+            assert new_admin.created_at is not None
+            assert new_admin.password_hash is not None
             assert isinstance(new_admin, Admin)
             assert new_admin.check_password("adminpass123") is True
     
@@ -581,7 +612,7 @@ class TestPolymorphicInheritance:
     def test_query_all_users(self, app, _db, admin_user, worker_user, planner_user, client_user):
         """Test querying all users returns all types."""
         with app.app_context():
-            all_users = User.query.all()
+            all_users = _db.session.query(User).all() 
             
             # Should have at least 4 users
             assert len(all_users) >= 4
@@ -597,7 +628,7 @@ class TestPolymorphicInheritance:
         """Test querying specific user type."""
         with app.app_context():
             # Query only workers
-            workers = Worker.query.all()
+            workers = _db.session.query(Worker).all()
             
             # All results should be Worker type
             for worker in workers:

@@ -56,10 +56,6 @@ def app():
     # Create the app with test configuration
     app = create_app(test_config)
     
-    # Create all tables in the test database
-    with app.app_context():
-        db.create_all()  # Creates tables based on your models
-    
     yield app  # Tests run here
     
     # Cleanup after ALL tests complete

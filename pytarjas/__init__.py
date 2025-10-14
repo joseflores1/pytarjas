@@ -47,7 +47,7 @@ def create_app(test_config=None):
     
     # Import all models so SQLAlchemy knows about them
     # This MUST happen after db.init_app() but before db.create_all()
-    from .models import user_models, docs_model #noqa
+    from .models import user_models, docs_models #noqa
 
     # Create database tables
     with app.app_context():
