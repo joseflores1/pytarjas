@@ -41,7 +41,7 @@ class User(db.Model):
     """
 
     # Set the table name to: user
-    __tablename__="user"
+    __tablename__="users"
 
     # Primary key - using UUID as string for PostgreSQL compatibility
     id: Mapped[str]= mapped_column(
@@ -92,7 +92,7 @@ class User(db.Model):
 
     # Polymorphic configuration - enables inheritance
     __mapper_args__={
-        "polymorphic_identity": "user",
+        "polymorphic_identity": "users",
         "polymorphic_on": role,
     }
 

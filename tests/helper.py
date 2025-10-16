@@ -12,7 +12,7 @@ def is_valid_uuid4(uuid: str) -> bool:
     Args:
         - uuid: the string to be checked
 
-    Return:
+    Returns:
         - True if the string arg is a valid uuid 4 version, else False
     """
     uuid_v4_regex=re.compile(

@@ -1,0 +1,53 @@
+{
+  "name": "HGT Data Collector",
+  "short_name": "HGT Collector",
+  "description": "Aplicación para recolectar datos faenas en tiempo real",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#212a37",
+  "background_color": "#ff6600",
+  "icons": [
+    {
+      "src": "/static/icons/HGT-Logo-greyblue-orange-RGB.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }, 
+    {
+      "src": "/static/icons/HGT-Logo-white-orange-RGB.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    } 
+     
+    ],
+  "categories": ["productivity", "business"],
+  "shortcuts": [
+    {
+      "name": "Nueva Faena",
+      "short_name": "Nueva",
+      "description": "Crear nueva entrada de faena",
+      "url": "/fieldwork/new",
+      "icons": [
+        {
+          "src": "/static/icons/shortcut-new.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Mis Faenas",
+      "short_name": "Faenas",
+      "description": "Ver mis faenas guardadas",
+      "url": "/fieldwork/list",
+      "icons": [
+        {
+          "src": "/static/icons/shortcut-list.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ]
+}

@@ -214,7 +214,7 @@ class Planification(db.Model):
    # Foreign keys
     planner_id: Mapped[str]=mapped_column(
         String(36),
-        ForeignKey("user.id", ondelete="CASCADE"),
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -456,7 +456,7 @@ class Document(db.Model):
     )
     worker_id: Mapped[str | None] = mapped_column(
         String(36),
-        ForeignKey("user.id", ondelete="SET NULL"),  # Keep document if worker is deleted
+        ForeignKey("users.id", ondelete="SET NULL"),  # Keep document if worker is deleted
         nullable=True,
         index=True,
     )
