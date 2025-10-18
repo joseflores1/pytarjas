@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit User{% endblock %}
+
+{% block header %}
+  <h1>Edit User: {{ user.username }}</h1>
+{% endblock %}
+
+{% block content %}
+  <form method="post">
+    <label for="username">Username *</label>
+    <input name="username" id="username" value="{{ user.username }}" required>
+    
+    <label for="email">Email *</label>
+    <input type="email" name="email" id="email" value="{{ user.email }}" required>
+    
+    <label for="role">Role *</label>
+    <select name="role" id="role" required 
+            {% if user.id == g.user.id %}disabled title="You cannot change your own role"{% endif %}>
+      <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+      <option value="worker" {% if user.role == 'worker' %}selected{% endif %}>Worker</option>
+      <option value="planner" {% if user.role == 'planner' %}selected{% endif %}>Planner</option>
+      <option value="client" {% if user.role == 'client' %}selected{% endif %}>Client</option>
+    </select>
+    {% if user.id == g.user.id %}
+      <input type="hidden" name="role" value="{{ user.role }}">
+      <p class="help-text">⚠️ You cannot change your own role.</p>
+    {% endif %}
+    
+    <label for="password">New Password (leave blank to keep current)</label>
+    <input type="password" name="password" id="password" placeholder="Leave blank to keep current password">
+    
+    <div class="form-actions">
+      <input type="submit" value="Update User">
+      <a href="{{ url_for('admin.list_users') }}" class="button-secondary">Cancel</a>
+    </div>
+  </form>
+  
+  <div class="user-info">
+    <h3>User Information</h3>
+    <p><strong>Created:</strong> {{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+    {% if user.login_at %}
+      <p><strong>Last Login:</strong> {{ user.login_at.strftime('%Y-%m-%d %H:%M') }}</p>
+    {% else %}
+      <p><strong>Last Login:</strong> Never</p>
+    {% endif %}
+  </div>
+{% endblock %}

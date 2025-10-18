@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %}Create User{% endblock %}
+
+{% block header %}
+  <h1>Create New User</h1>
+{% endblock %}
+
+{% block content %}
+  <form method="post">
+    <label for="username">Username *</label>
+    <input name="username" id="username" required>
+    
+    <label for="email">Email *</label>
+    <input type="email" name="email" id="email" required>
+    
+    <label for="password">Password *</label>
+    <input type="password" name="password" id="password" required>
+    
+    <label for="role">Role *</label>
+    <select name="role" id="role" required>
+      <option value="">-- Select Role --</option>
+      <option value="admin">Admin</option>
+      <option value="worker">Worker</option>
+      <option value="planner">Planner</option>
+      <option value="client">Client</option>
+    </select>
+    
+    <div class="form-actions">
+      <input type="submit" value="Create User">
+      <a href="{{ url_for('admin.list_users') }}" class="button-secondary">Cancel</a>
+    </div>
+  </form>
+  
+  <div class="help-text">
+    <h3>Role Descriptions:</h3>
+    <ul>
+      <li><strong>Admin:</strong> Full access, can manage users and system settings</li>
+      <li><strong>Worker:</strong> Field workers who collect data</li>
+      <li><strong>Planner:</strong> Can view and plan field work</li>
+      <li><strong>Client:</strong> External clients with limited access</li>
+    </ul>
+  </div>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block header %}
+  <h1>Admin Dashboard</h1>
+{% endblock %}
+
+{% block content %}
+  <div class="dashboard-cards">
+    <div class="dashboard-card">
+      <h3>Total Users</h3>
+      <div class="dashboard-number">{{ user_count }}</div>
+      <a href="{{ url_for('admin.list_users') }}">View All →</a>
+    </div>
+    
+    <div class="dashboard-card">
+      <h3>Admins</h3>
+      <div class="dashboard-number">{{ admin_count }}</div>
+      <a href="{{ url_for('admin.list_users', role='admin') }}">View →</a>
+    </div>
+    
+    <div class="dashboard-card">
+      <h3>Workers</h3>
+      <div class="dashboard-number">{{ worker_count }}</div>
+      <a href="{{ url_for('admin.list_users', role='worker') }}">View →</a>
+    </div>
+    
+    <div class="dashboard-card">
+      <h3>Planners</h3>
+      <div class="dashboard-number">{{ planner_count }}</div>
+      <a href="{{ url_for('admin.list_users', role='planner') }}">View →</a>
+    </div>
+    
+    <div class="dashboard-card">
+      <h3>Clients</h3>
+      <div class="dashboard-number">{{ client_count }}</div>
+      <a href="{{ url_for('admin.list_users', role='client') }}">View →</a>
+    </div>
+  </div>
+  
+  <div class="quick-actions">
+    <h2>Quick Actions</h2>
+    <a href="{{ url_for('admin.create_user') }}" class="action-button">
+      + Create New User
+    </a>
+    <a href="{{ url_for('admin.list_users') }}" class="action-button">
+      📋 Manage Users
+    </a>
+  </div>
+{% endblock %}
