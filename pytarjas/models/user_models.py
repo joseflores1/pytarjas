@@ -180,7 +180,8 @@ class Admin(User):
             password: Plain text password to hash and store
         """
         user.password_hash=generate_password_hash(password)
-        user.updated_at=datetime.now(timezone.utc)
+        if user.created_at:
+            user.updated_at=datetime.now(timezone.utc)
 
     def update_user_info(
             self, user: User, new_email: str | None = None, new_username: str | None = None,
@@ -199,17 +200,14 @@ class Admin(User):
             new_username: New username (optional)
             new_role: New role (optional)
         """
-        if not (new_email or new_username or new_role):
-            return
-
         if new_email:
             user.email=new_email
         if new_username:
             user.username=new_username
         if new_role:
             user.role=new_role
-
-        user.updated_at=datetime.now(timezone.utc)
+        if new_email or new_username or new_role:
+            user.updated_at=datetime.now(timezone.utc)
 
     def create_user(
             self,
@@ -259,6 +257,7 @@ class Admin(User):
             role=role,
         )
         self.set_user_password(user, password)
+        user.created_at=datetime.now(timezone.utc)
         return user
 
     def __repr__(self):

@@ -40,6 +40,7 @@
           <th>Role</th>
           <th>Created</th>
           <th>Last Login</th>
+          <th>Last Update</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -56,6 +57,13 @@
           <td>
             {% if user.login_at %}
               {{ user.login_at.strftime('%Y-%m-%d %H:%M') }}
+            {% else %}
+              <span class="text-muted">Never</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if user.updated_at %}
+              {{user.updated_at.strftime("%Y-%m-%d %H:%M")}}
             {% else %}
               <span class="text-muted">Never</span>
             {% endif %}
