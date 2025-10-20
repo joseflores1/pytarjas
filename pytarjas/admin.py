@@ -90,7 +90,7 @@ def create_user():
         elif not role or role not in ["admin", "worker", "planner", "client"]:
             error = "Valid role is required."
         elif session.query(User).filter_by(username=username).first() is not None:
-            error = f"User {username} already exists."
+            error = f"User {username} is already registered."
         elif session.query(User).filter_by(email=email).first() is not None:
             error = f"Email {email} is already registered."
 
@@ -137,6 +137,8 @@ def edit_user(user_id):
         new_password = request.form.get("password")  # Optional
         error = None
 
+        found_by_username = session.query(User).filter_by(username=username).first()
+        found_by_email= session.query(User).filter_by(email=email).first()
         # Validation
         if not username:
             error = "Username is required."
@@ -145,14 +147,14 @@ def edit_user(user_id):
         elif not role or role not in ["admin", "worker", "planner", "client"]:
             error = "Valid role is required."
         # Check if username is taken by another user
-        elif (session.query(User).filter_by(username=username).first() is not None):
-            error = f"Username {username} is already taken."
-        elif session.query(User).filter_by(username=username).first().id != user_id:
+        elif (found_by_username is not None) and (found_by_username.id != user_id):
+            error = f"Username {username} is already registered."
+        elif (found_by_username is not None) and (found_by_username.id == user_id): 
             error="New username is the same as old username."
         # Check if email is taken by another user
-        elif session.query(User).filter_by(email=email).first() is not None: 
-            error = f"Email {email} is already taken."
-        elif  session.query(User).filter_by(email=email).first().id != user_id:
+        elif (found_by_email is not None) and (found_by_email.id != user_id):
+            error = f"Email {email} is alredy registered."
+        elif (found_by_email is not None) and (found_by_email.id == user_id):  
             error="New email is the same as old email."
 
         if error is None:

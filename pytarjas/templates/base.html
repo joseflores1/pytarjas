@@ -1,24 +1,60 @@
 <!doctype html>
-<title>{% block title %}{% endblock %} - Pytarjas</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-<nav>
-  <h1>Pytarjas</h1>
-  <ul>
-    {% if g.user %}
-      <li><span>{{ g.user['username'] }}</span>
-      <li><a href="{{ url_for('auth.logout') }}">Log Out</a>
-    {% else %}
-      <li><a href="{{ url_for('auth.register') }}">Register</a>
-      <li><a href="{{ url_for('auth.login') }}">Log In</a>
-    {% endif %}
-  </ul>
-</nav>
-<section class="content">
-  <header>
-    {% block header %}{% endblock %}
-  </header>
-  {% for message in get_flashed_messages() %}
-    <div class="flash">{{ message }}</div>
-  {% endfor %}
-  {% block content %}{% endblock %}
-</section>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{% endblock %} - HGT Data Collector</title>
+  
+  <link rel="manifest" href="/manifest.json">
+  
+  <!-- Theme color -->
+  <meta name="theme-color" content="#2563eb">
+  
+  <!-- iOS meta tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="HGT Collector">
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <nav>
+    <h1><a href="{{ url_for('index') }}">HGT Data Collector</a></h1>
+    <ul>
+      {% if g.user %}
+        <!-- Show admin link only for admins -->
+        {% if g.user.role == 'admin' %}
+          <li><a href="{{ url_for('admin.index') }}">⚙️ Admin</a></li>
+        {% endif %}
+        
+        <!-- Show username and role -->
+        <li><span>{{ g.user.username }} ({{ g.user.role }})</span></li>
+        
+        <!-- Logout -->
+        <li><a href="{{ url_for('auth.logout') }}">Log Out</a></li>
+      {% else %}
+        <!-- Only login for non-authenticated users (no register) -->
+        <li><a href="{{ url_for('auth.login') }}">Log In</a></li>
+      {% endif %}
+    </ul>
+  </nav>
+  
+  <section class="content">
+    <header>
+      {% block header %}{% endblock %}
+    </header>
+    
+    <!-- Flash messages -->
+    {% for message in get_flashed_messages() %}
+      <div class="flash">{{ message }}</div>
+    {% endfor %}
+    
+    <!-- Main content -->
+    {% block content %}{% endblock %}
+  </section>
+  
+  <!-- Service Worker Registration (will add later) -->
+  <!-- <script src="{{ url_for('static', filename='js/app.js') }}"></script> -->
+</body>
+</html>

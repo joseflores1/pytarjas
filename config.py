@@ -181,7 +181,7 @@ class DevelopmentConfig(Config):
     DEBUG = True
     
     # Show SQL queries in console (helpful for debugging)
-    SQLALCHEMY_ECHO = True
+    SQLALCHEMY_ECHO = False 
     
     # Disable HTTPS requirement for session cookies (local development)
     SESSION_COOKIE_SECURE = False
