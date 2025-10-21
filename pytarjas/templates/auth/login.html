@@ -1,15 +1,271 @@
+{# pytarjas/templates/auth/login.html #}
+{#
+Login page for HGT Data Collector PWA.
+
+This page uses the new CSS architecture:
+- Centered layout using layout.css classes
+- Form styling from forms.css
+- Card component from components.css
+
+The form submits to POST /auth/login which:
+1. Validates credentials
+2. Creates a session
+3. Redirects based on user role (admin, worker, planner, client)
+#}
+
 {% extends 'base.html' %}
 
-{% block header %}
-  <h1>{% block title %}Log In{% endblock %}</h1>
+{% block title %}Iniciar Sesión{% endblock %}
+
+{% block extra_css %}
+    {# Load forms.css for form styling #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
 {% endblock %}
 
 {% block content %}
-  <form method="post">
-    <label for="username">Username</label>
-    <input name="username" id="username" required>
-    <label for="password">Password</label>
-    <input type="password" name="password" id="password" required>
-    <input type="submit" value="Log In">
-  </form>
+{# Centered layout - Perfect for login forms #}
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; padding: var(--space-lg);">
+    <div class="card" style="max-width: 450px; width: 100%; margin-bottom: var(--space-xl);">
+        {# Card Header with Logo #}
+        <div class="card-header" style="text-align: center; padding: var(--space-xl);">
+            <img src="{{ url_for('static', filename='icons/HGT-Logo-greyblue-orange-RGB.svg') }}" 
+                 alt="HGT Logo" 
+                 style="height: 60px; margin-bottom: var(--space-md);">
+            <h1 class="card-title" style="margin-bottom: var(--space-xs);">HGT Data Collector</h1>
+            <p class="card-subtitle">Inicie sesión para continuar</p>
+        </div>
+        
+        {# Card Body with Login Form #}
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('auth.login') }}" id="loginForm">
+                {# Username Field #}
+                <div class="form-group">
+                    <label for="username" class="form-label form-label-required">
+                        Usuario
+                    </label>
+                    <input 
+                        type="text" 
+                        name="username" 
+                        id="username" 
+                        class="form-control"
+                        placeholder="Ingrese su usuario"
+                        autocomplete="username"
+                        autofocus
+                        required>
+                    <small class="form-help">
+                        Su nombre de usuario asignado por el sistema
+                    </small>
+                </div>
+                
+                {# Password Field #}
+                <div class="form-group">
+                    <label for="password" class="form-label form-label-required">
+                        Contraseña
+                    </label>
+                    <input 
+                        type="password" 
+                        name="password" 
+                        id="password" 
+                        class="form-control"
+                        placeholder="Ingrese su contraseña"
+                        autocomplete="current-password"
+                        required>
+                </div>
+                
+                {# Remember Me Checkbox (optional future feature) #}
+                <div class="form-group">
+                    <div class="form-check">
+                        <input 
+                            type="checkbox" 
+                            name="remember" 
+                            id="remember" 
+                            class="form-check-input">
+                        <label for="remember" class="form-check-label">
+                            Recordar mi sesión
+                        </label>
+                    </div>
+                </div>
+                
+                {# Submit Button #}
+                <div class="form-group" style="margin-bottom: 0;">
+                    <button 
+                        type="submit" 
+                        class="btn btn-primary btn-block btn-lg"
+                        id="submitBtn">
+                        <span id="submitText">Iniciar Sesión</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        {# Card Footer with Help Links #}
+        <div class="card-footer" style="text-align: center;">
+            <p class="text-secondary text-sm">
+                ¿Olvidó su contraseña? 
+                <a href="#" style="color: var(--color-primary); font-weight: var(--font-weight-medium);">
+                    Contacte al administrador
+                </a>
+            </p>
+        </div>
+    </div>
+</div>
+
+{# Info Section Below Login Card #}
+<div class="container container-sm" style="margin-top: var(--space-xl); margin-bottom: var(--space-2xl);">
+    <div class="card">
+        <div class="card-body">
+            <div class="alert alert-info">
+                <div class="alert-icon">💡</div>
+                <div class="alert-content">
+                    <div class="alert-title">Aplicación Web Progresiva (PWA)</div>
+                    <div class="alert-message">
+                        Esta aplicación funciona sin conexión. Una vez que inicie sesión, 
+                        puede agregar esta página a su pantalla de inicio para acceso rápido.
+                    </div>
+                </div>
+            </div>
+            
+            {# Feature List #}
+            <div style="margin-top: var(--space-lg);">
+                <h3 style="font-size: var(--font-size-lg); margin-bottom: var(--space-md);">Características:</h3>
+                <div class="stack stack-sm">
+                    <div class="flex items-center gap-sm">
+                        <span style="font-size: var(--font-size-xl);">✅</span>
+                        <span>Funciona sin conexión a internet</span>
+                    </div>
+                    <div class="flex items-center gap-sm">
+                        <span style="font-size: var(--font-size-xl);">📱</span>
+                        <span>Optimizado para tablets Android</span>
+                    </div>
+                    <div class="flex items-center gap-sm">
+                        <span style="font-size: var(--font-size-xl);">🔄</span>
+                        <span>Sincronización automática al reconectar</span>
+                    </div>
+                    <div class="flex items-center gap-sm">
+                        <span style="font-size: var(--font-size-xl);">🔒</span>
+                        <span>Datos seguros y encriptados</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // ===== FORM SUBMISSION HANDLING =====
+    const loginForm = document.getElementById('loginForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const submitText = document.getElementById('submitText');
+    
+    loginForm.addEventListener('submit', function(e) {
+        // Add loading state to button
+        submitBtn.classList.add('btn-loading');
+        submitBtn.disabled = true;
+        submitText.textContent = 'Iniciando sesión...';
+    });
+    
+    // ===== OFFLINE LOGIN WARNING =====
+    if (!navigator.onLine) {
+        // Show warning if offline
+        window.showToast(
+            'Sin conexión a internet. No puede iniciar sesión mientras está desconectado.', 
+            'warning',
+            5000
+        );
+        
+        // Disable form
+        submitBtn.disabled = true;
+        submitBtn.classList.add('btn-secondary');
+        submitBtn.classList.remove('btn-primary');
+        submitText.textContent = 'Sin conexión';
+    }
+    
+    // Listen for online/offline events
+    window.addEventListener('online', function() {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('btn-secondary');
+        submitBtn.classList.add('btn-primary');
+        submitText.textContent = 'Iniciar Sesión';
+        window.showToast('Conexión restaurada. Puede iniciar sesión.', 'success');
+    });
+    
+    window.addEventListener('offline', function() {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('btn-secondary');
+        submitBtn.classList.remove('btn-primary');
+        submitText.textContent = 'Sin conexión';
+        window.showToast('Sin conexión. No puede iniciar sesión.', 'warning');
+    });
+    
+    // ===== FORM VALIDATION ENHANCEMENT =====
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    
+    // Add real-time validation feedback
+    usernameInput.addEventListener('blur', function() {
+        if (this.value.trim() === '') {
+            this.classList.add('is-invalid');
+        } else {
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        }
+    });
+    
+    passwordInput.addEventListener('blur', function() {
+        if (this.value.trim() === '') {
+            this.classList.add('is-invalid');
+        } else {
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        }
+    });
+    
+    // ===== KEYBOARD SHORTCUTS =====
+    // Press Enter in username field to focus password
+    usernameInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            passwordInput.focus();
+        }
+    });
+    
+    // ===== PWA INSTALL PROMPT (OPTIONAL) =====
+    let deferredPrompt;
+    
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent the mini-infobar from appearing on mobile
+        e.preventDefault();
+        // Stash the event so it can be triggered later
+        deferredPrompt = e;
+        
+        // Show a custom install button/banner (you can implement this)
+        console.log('PWA install prompt available');
+    });
+    
+    // ===== CHECK IF ALREADY LOGGED IN =====
+    // This prevents users from seeing login page if they're already logged in
+    fetch('/auth/session')
+        .then(response => response.json())
+        .then(data => {
+            if (data.authenticated) {
+                // User is already logged in, redirect based on role
+                const role = data.user.role;
+                if (role === 'admin') {
+                    window.location.href = '/admin/';
+                } else if (role === 'worker') {
+                    window.location.href = '/worker/';
+                } else if (role === 'planner') {
+                    window.location.href = '/planner/';
+                } else if (role === 'client') {
+                    window.location.href = '/client/';
+                }
+            }
+        })
+        .catch(error => {
+            // Not logged in or error checking - stay on login page
+            console.log('Not logged in');
+        });
+</script>
 {% endblock %}

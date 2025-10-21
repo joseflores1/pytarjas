@@ -1,60 +1,344 @@
-<!doctype html>
+{# pytarjas/templates/base.html #}
+{# 
+Base template for HGT Data Collector PWA application.
+
+This template has been updated to use the new CSS architecture:
+- base.css: Variables, resets, typography
+- components.css: Buttons, cards, alerts, badges
+- layout.css: Grid systems, flexbox, spacing
+- offline.css: PWA offline indicators
+- forms.css: Form controls (loaded per-page)
+
+All pages should extend this template.
+#}
+<!DOCTYPE html>
 <html lang="es">
 <head>
+  <!-- ============================================
+       META TAGS - Essential for PWA & Mobile
+       ============================================ -->
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="description" content="HGT Data Collector - Offline-capable data collection for field workers">
+  
+  {# Page title - override in child templates #}
   <title>{% block title %}{% endblock %} - HGT Data Collector</title>
   
+  <!-- ============================================
+       PWA CONFIGURATION
+       ============================================ -->
+  {# PWA Manifest for installable app #}
   <link rel="manifest" href="/manifest.json">
   
-  <!-- Theme color -->
-  <meta name="theme-color" content="#2563eb">
+  {# Theme color - using your dark blue-gray #212a37 #}
+  <meta name="theme-color" content="#212a37">
   
-  <!-- iOS meta tags -->
+  {# iOS-specific PWA meta tags #}
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="HGT Collector">
   
-  <!-- Stylesheets -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <!-- ============================================
+       ICONS & FAVICONS
+       ============================================ -->
+  {# Favicon - uses your logo #}
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/HGT-Logo-white-orange-RGB.svg') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='HGT-Logo-greyblue-orange-RGB.svg') }}">
+  
+  <!-- ============================================
+       CSS FILES - Load in correct order
+       ============================================ -->
+  {# 1. Base styles - Variables, resets, typography #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+  
+  {# 2. Components - Buttons, cards, alerts, etc. #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+  
+  {# 3. Layout - Grid systems, spacing, responsive #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+  
+  {# 4. Offline indicators - PWA-specific UI #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/offline.css') }}">
+  
+  {# 5. Page-specific CSS (e.g., forms.css) #}
+  {% block extra_css %}{% endblock %}
+
 </head>
 <body>
-  <nav>
-    <h1><a href="{{ url_for('admin.index') }}">HGT Data Collector</a></h1>
-    <ul>
-      {% if g.user %}
-        <!-- Show admin link only for admins -->
-        {% if g.user.role == 'admin' %}
-          <li><a href="{{ url_for('admin.index') }}">⚙️ Admin</a></li>
+  <!-- ============================================
+       SKIP TO MAIN CONTENT - Accessibility
+       ============================================ -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  
+  <!-- ============================================
+       OFFLINE BANNER - Shows when connection lost
+       ============================================ -->
+  <div id="offlineBanner" class="offline-banner" style="display: none;">
+    <span class="offline-banner-icon">⚠️</span>
+    <span>Sin conexión. Los datos se sincronizarán al reconectar.</span>
+    <button class="offline-banner-close" onclick="this.parentElement.style.display='none'">×</button>
+  </div>
+  
+  <!-- ============================================
+       ONLINE BANNER - Shows when connection restored
+       ============================================ -->
+  <div id="onlineBanner" class="online-banner auto-hide" style="display: none;">
+    <span class="online-banner-icon">✓</span>
+    <span>¡Conexión restaurada! Sincronizando datos...</span>
+  </div>
+  
+  <!-- ============================================
+       NAVBAR - Role-based navigation
+       ============================================ -->
+  <nav class="navbar">
+    <div class="navbar-container container">
+      {# Logo and Brand - FIXED: Now goes to auth.login #}
+      <a href="{{ url_for('auth.login') }}" class="navbar-brand">
+        <img src="{{ url_for('static', filename='icons/HGT-Logo-white-orange-RGB.svg') }}" 
+             alt="HGT Logo" 
+             style="height: 32px; margin-right: 12px;">
+        <span>HGT Data Collector</span>
+      </a>
+      
+      {# Mobile menu toggle #}
+      <button class="navbar-toggle" id="navbarToggle" aria-label="Toggle navigation">
+        ☰
+      </button>
+      
+      {# Navigation Links - Role-based #}
+      <ul class="navbar-nav" id="navbarNav">
+        {% if g.user %}
+          {# Admin Navigation #}
+          {% if g.user.role == 'admin' %}
+            <li><a href="{{ url_for('admin.index') }}" class="{% if request.endpoint == 'admin.index' %}active{% endif %}">📊 Dashboard</a></li>
+            <li><a href="{{ url_for('admin.list_users') }}" class="{% if request.endpoint == 'admin.list_users' %}active{% endif %}">👥 Users</a></li>
+          {% endif %}
+          
+          {# Worker Navigation #}
+          {% if g.user.role == 'worker' %}
+            <li><a href="{{ url_for('worker.index') }}" class="{% if request.endpoint == 'worker.index' %}active{% endif %}">🏠 Home</a></li>
+            <li><a href="{{ url_for('tasks.list_tasks') }}" class="{% if request.endpoint and 'tasks' in request.endpoint %}active{% endif %}">📋 Tasks</a></li>
+          {% endif %}
+          
+          {# Connection status indicator #}
+          <li>
+            <span class="connection-status online" id="connectionStatus">
+              <span class="connection-status-dot"></span>
+              <span id="connectionText">Online</span>
+            </span>
+          </li>
+          
+          {# User info #}
+          <li style="display: flex; align-items: center; gap: 8px;">
+            <span style="color: var(--color-text-secondary);">{{ g.user.username }}</span>
+            <span class="badge badge-primary">{{ g.user.role }}</span>
+          </li>
+          
+          {# Logout #}
+          <li><a href="{{ url_for('auth.logout') }}" class="btn btn-secondary btn-sm">Cerrar Sesión</a></li>
+        
+        {% else %}
+          {# Not logged in - show login link #}
+          <li><a href="{{ url_for('auth.login') }}" class="btn btn-primary">Iniciar Sesión</a></li>
         {% endif %}
-        
-        <!-- Show username and role -->
-        <li><span>{{ g.user.username }} ({{ g.user.role }})</span></li>
-        
-        <!-- Logout -->
-        <li><a href="{{ url_for('auth.logout') }}">Log Out</a></li>
-      {% else %}
-        <!-- Only login for non-authenticated users (no register) -->
-        <li><a href="{{ url_for('auth.login') }}">Log In</a></li>
-      {% endif %}
-    </ul>
+      </ul>
+    </div>
   </nav>
   
-  <section class="content">
-    <header>
-      {% block header %}{% endblock %}
-    </header>
+  <!-- ============================================
+       MAIN CONTENT AREA
+       ============================================ -->
+  <main id="main-content" class="layout-content">
+    {# Page header - child templates can override #}
+    {% block header %}{% endblock %}
     
-    <!-- Flash messages -->
+    {# Flash messages - for displaying success/error notifications #}
     {% for message in get_flashed_messages() %}
-      <div class="flash">{{ message }}</div>
+      <div class="container" style="margin-top: var(--space-lg);">
+        <div class="alert alert-info">
+          <div class="alert-content">
+            <div class="alert-message">{{ message }}</div>
+          </div>
+          <button class="alert-close" onclick="this.parentElement.parentElement.remove()">×</button>
+        </div>
+      </div>
     {% endfor %}
     
-    <!-- Main content -->
+    {# Main content - child templates override this #}
     {% block content %}{% endblock %}
-  </section>
+  </main>
   
-  <!-- Service Worker Registration (will add later) -->
-  <!-- <script src="{{ url_for('static', filename='js/app.js') }}"></script> -->
+  <!-- ============================================
+       FOOTER
+       ============================================ -->
+  <footer class="layout-footer" style="background-color: var(--color-bg-secondary); padding: var(--space-xl) 0; margin-top: var(--space-2xl); border-top: 1px solid var(--color-border);">
+    <div class="container">
+      <div class="grid grid-cols-1 gap-lg" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
+        {# Company Info #}
+        <div>
+          <h4 style="margin-bottom: var(--space-md); color: var(--color-text-primary);">HGT Inland Services</h4>
+          <p class="text-secondary text-sm">Professional cargo handling and logistics solutions</p>
+        </div>
+        
+        {# Contact #}
+        <div>
+          <h4 style="margin-bottom: var(--space-md); color: var(--color-text-primary);">Contact</h4>
+          <p class="text-secondary text-sm">Email: <a href="mailto:info@hgt.cl" style="color: var(--color-primary);">info@hgt.cl</a></p>
+          <p class="text-secondary text-sm">Phone: +56 32 XXX XXXX</p>
+        </div>
+        
+        {# Quick Links #}
+        <div>
+          <h4 style="margin-bottom: var(--space-md); color: var(--color-text-primary);">Quick Links</h4>
+          <ul style="list-style: none; padding: 0;">
+            {% if g.user %}
+              <li><a href="{{ url_for('worker.help_page') }}" class="text-secondary text-sm" style="text-decoration: none;">Help & Support</a></li>
+              <li><a href="{{ url_for('worker.profile') }}" class="text-secondary text-sm" style="text-decoration: none;">My Profile</a></li>
+            {% else %}
+              <li><a href="{{ url_for('auth.login') }}" class="text-secondary text-sm" style="text-decoration: none;">Login</a></li>
+            {% endif %}
+          </ul>
+        </div>
+      </div>
+      
+      <div class="flex justify-between items-center flex-wrap gap-md" style="margin-top: var(--space-lg); padding-top: var(--space-lg); border-top: 1px solid var(--color-border);">
+        <p class="text-secondary text-sm">© 2025 HGT Inland Services. All rights reserved.</p>
+        <p class="text-secondary text-sm">Version 1.0.0</p>
+      </div>
+    </div>
+  </footer>
+  
+  <!-- ============================================
+       SYNC STATUS PANEL - Shows pending syncs
+       ============================================ -->
+  <div id="syncStatus" class="sync-status" style="display: none;">
+    <div class="sync-status-header">
+      <div class="sync-status-title">
+        <span>🔄</span>
+        Sincronizando Datos
+      </div>
+      <button class="sync-status-close" onclick="this.parentElement.parentElement.style.display='none'">×</button>
+    </div>
+    <div id="syncItems">
+      <!-- Sync items will be added here by JavaScript -->
+    </div>
+  </div>
+  
+  <!-- ============================================
+       TOAST NOTIFICATIONS CONTAINER
+       ============================================ -->
+  <div id="toastContainer" class="toast-container">
+    <!-- Toast notifications will be added here by JavaScript -->
+  </div>
+  
+  <!-- ============================================
+       JAVASCRIPT
+       ============================================ -->
+  <script>
+    // ===== SERVICE WORKER REGISTRATION =====
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+          .then(registration => {
+            console.log('Service Worker registered:', registration.scope);
+          })
+          .catch(error => {
+            console.log('Service Worker registration failed:', error);
+          });
+      });
+    }
+    
+    // ===== ONLINE/OFFLINE DETECTION =====
+    window.addEventListener('online', () => {
+      const offlineBanner = document.getElementById('offlineBanner');
+      const onlineBanner = document.getElementById('onlineBanner');
+      const connectionStatus = document.getElementById('connectionStatus');
+      const connectionText = document.getElementById('connectionText');
+      
+      if (offlineBanner) offlineBanner.style.display = 'none';
+      if (onlineBanner) {
+        onlineBanner.style.display = 'flex';
+        setTimeout(() => {
+          onlineBanner.style.display = 'none';
+        }, 3000);
+      }
+      
+      if (connectionStatus) {
+        connectionStatus.classList.remove('offline');
+        connectionStatus.classList.add('online');
+      }
+      if (connectionText) connectionText.textContent = 'Online';
+      
+      console.log('Connection restored');
+    });
+    
+    window.addEventListener('offline', () => {
+      const offlineBanner = document.getElementById('offlineBanner');
+      const onlineBanner = document.getElementById('onlineBanner');
+      const connectionStatus = document.getElementById('connectionStatus');
+      const connectionText = document.getElementById('connectionText');
+      
+      if (onlineBanner) onlineBanner.style.display = 'none';
+      if (offlineBanner) offlineBanner.style.display = 'flex';
+      
+      if (connectionStatus) {
+        connectionStatus.classList.remove('online');
+        connectionStatus.classList.add('offline');
+      }
+      if (connectionText) connectionText.textContent = 'Offline';
+      
+      console.log('Connection lost');
+    });
+    
+    // ===== MOBILE NAVIGATION TOGGLE =====
+    const navbarToggle = document.getElementById('navbarToggle');
+    const navbarNav = document.getElementById('navbarNav');
+    
+    if (navbarToggle && navbarNav) {
+      navbarToggle.addEventListener('click', () => {
+        navbarNav.classList.toggle('active');
+      });
+    }
+    
+    // ===== TOAST NOTIFICATION FUNCTION =====
+    function showToast(message, type = 'info', duration = 3000) {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      
+      const icons = {
+        success: '✓',
+        error: '✕',
+        warning: '⚠',
+        info: 'ℹ'
+      };
+      
+      toast.innerHTML = `
+        <div class="toast-icon">${icons[type] || icons.info}</div>
+        <div class="toast-content">
+          <div class="toast-message">${message}</div>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+      `;
+      
+      container.appendChild(toast);
+      
+      if (duration > 0) {
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          setTimeout(() => toast.remove(), 300);
+        }, duration);
+      }
+    }
+    
+    // Make showToast globally available
+    window.showToast = showToast;
+  </script>
+  
+  {# Page-specific JavaScript #}
+  {% block extra_js %}{% endblock %}
+  
 </body>
 </html>

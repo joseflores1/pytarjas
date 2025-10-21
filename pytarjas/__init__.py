@@ -91,10 +91,13 @@ def create_app(test_config=None):
     
     from . import admin
     app.register_blueprint(admin.bp)
-    # from . import blog
-    # app.register_blueprint(blog.bp)
-    # app.add_url_rule("/", endpoint="index")
     
+    from . import tasks
+    app.register_blueprint(tasks.bp)
+
+    from . import worker
+    app.register_blueprint(worker.bp)
+
     # TODO: Register PWA routes (manifest.json, service-worker.js)
     # We'll add these in the next step
     

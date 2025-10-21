@@ -1,51 +1,251 @@
+{# pytarjas/templates/admin/index.html #}
+{#
+Admin Dashboard - Main landing page for administrators
+
+Purpose:
+- Displays user statistics (total users by role)
+- Provides quick action buttons for common admin tasks
+- Touch-optimized for Android tablets
+
+Features:
+- Uses new CSS component architecture (cards, buttons, layout)
+- Responsive grid layout for statistics cards
+- PWA-compatible and works offline (stats loaded from server)
+
+Dependencies:
+- base.html (parent template)
+- CSS: base.css, components.css, layout.css (loaded in base.html)
+
+Variables passed from admin.index():
+- user_count: Total number of users
+- admin_count: Number of admins
+- worker_count: Number of workers  
+- planner_count: Number of planners
+- client_count: Number of clients
+#}
+
 {% extends 'base.html' %}
 
-{% block title %}Admin Dashboard{% endblock %}
+{# Page title - appears in browser tab #}
+{% block title %}Panel de Administración{% endblock %}
 
+{# Page header - appears at top of content area #}
 {% block header %}
-  <h1>Admin Dashboard</h1>
+  <div class="container">
+    <h1 style="margin-top: var(--space-lg);">Panel de Administración</h1>
+    <p style="color: var(--color-text-secondary); margin-bottom: var(--space-lg);">
+      Gestiona usuarios y consulta estadísticas del sistema
+    </p>
+  </div>
 {% endblock %}
 
+{# Main content #}
 {% block content %}
-  <div class="dashboard-cards">
-    <div class="dashboard-card">
-      <h3>Total Users</h3>
-      <div class="dashboard-number">{{ user_count }}</div>
-      <a href="{{ url_for('admin.list_users') }}">View All →</a>
-    </div>
+  <div class="container">
     
-    <div class="dashboard-card">
-      <h3>Admins</h3>
-      <div class="dashboard-number">{{ admin_count }}</div>
-      <a href="{{ url_for('admin.list_users', role='admin') }}">View →</a>
-    </div>
+    {# ============================================
+         STATISTICS CARDS SECTION
+         Shows user counts by role in grid layout
+         ============================================ #}
+    <section style="margin-bottom: var(--space-2xl);">
+      <h2 style="margin-bottom: var(--space-lg); color: var(--color-text-primary);">
+        Estadísticas de Usuarios
+      </h2>
+      
+      {# 
+      Grid layout using CSS Grid
+      - Responsive: adapts from 1 column (mobile) to 5 columns (desktop)
+      - Cards use .card component from components.css
+      - Touch-friendly hover effects
+      #}
+      <div style="
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: var(--space-lg);
+        margin-bottom: var(--space-2xl);
+      ">
+        
+        {# Total Users Card #}
+        <a href="{{ url_for('admin.list_users') }}" class="card card-clickable" style="text-decoration: none; color: inherit;">
+          <div class="card-body" style="text-align: center;">
+            {# Icon placeholder - you can add SVG icon here #}
+            <div style="font-size: 2rem; margin-bottom: var(--space-md); color: var(--color-primary);">
+              👥
+            </div>
+            
+            {# Card title #}
+            <h3 class="card-title" style="font-size: var(--font-size-base); margin-bottom: var(--space-sm);">
+              Total de Usuarios
+            </h3>
+            
+            {# Large number display #}
+            <div style="font-size: 3rem; font-weight: var(--font-weight-bold); color: var(--color-primary); margin: var(--space-md) 0; line-height: 1;">
+              {{ user_count }}
+            </div>
+            
+            {# Link text #}
+            <span style="color: var(--color-primary); text-decoration: none; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium);">
+              Ver todos →
+            </span>
+          </div>
+        </a>
+        
+        {# Admins Card #}
+        <a href="{{ url_for('admin.list_users', role='admin') }}" class="card card-clickable" style="text-decoration: none; color: inherit;">
+          <div class="card-body" style="text-align: center;">
+            <div style="font-size: 2rem; margin-bottom: var(--space-md); color: #dc2626;">
+              🛡️
+            </div>
+            <h3 class="card-title" style="font-size: var(--font-size-base); margin-bottom: var(--space-sm);">
+              Administradores
+            </h3>
+            <div style="font-size: 3rem; font-weight: var(--font-weight-bold); color: #dc2626; margin: var(--space-md) 0; line-height: 1;">
+              {{ admin_count }}
+            </div>
+            <span style="color: #dc2626; text-decoration: none; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium);">
+              Ver administradores →
+            </span>
+          </div>
+        </a>
+        
+        {# Workers Card #}
+        <a href="{{ url_for('admin.list_users', role='worker') }}" class="card card-clickable" style="text-decoration: none; color: inherit;">
+          <div class="card-body" style="text-align: center;">
+            <div style="font-size: 2rem; margin-bottom: var(--space-md); color: var(--color-secondary);">
+              🔧
+            </div>
+            <h3 class="card-title" style="font-size: var(--font-size-base); margin-bottom: var(--space-sm);">
+              Trabajadores
+            </h3>
+            <div style="font-size: 3rem; font-weight: var(--font-weight-bold); color: var(--color-secondary); margin: var(--space-md) 0; line-height: 1;">
+              {{ worker_count }}
+            </div>
+            <span style="color: var(--color-secondary); text-decoration: none; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium);">
+              Ver trabajadores →
+            </span>
+          </div>
+        </a>
+        
+        {# Planners Card #}
+        <a href="{{ url_for('admin.list_users', role='planner') }}" class="card card-clickable" style="text-decoration: none; color: inherit;">
+          <div class="card-body" style="text-align: center;">
+            <div style="font-size: 2rem; margin-bottom: var(--space-md); color: #8b5cf6;">
+              📋
+            </div>
+            <h3 class="card-title" style="font-size: var(--font-size-base); margin-bottom: var(--space-sm);">
+              Planificadores
+            </h3>
+            <div style="font-size: 3rem; font-weight: var(--font-weight-bold); color: #8b5cf6; margin: var(--space-md) 0; line-height: 1;">
+              {{ planner_count }}
+            </div>
+            <span style="color: #8b5cf6; text-decoration: none; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium);">
+              Ver planificadores →
+            </span>
+          </div>
+        </a>
+        
+      {# Clients Card #}
+      <a href="{{ url_for('admin.list_users', role='client') }}" class="card card-clickable" style="text-decoration: none; color: inherit;">
+        <div class="card-body" style="text-align: center;">
+          <div style="font-size: 2rem; margin-bottom: var(--space-md); color: #f59e0b;">
+            🏢
+          </div>
+          <h3 class="card-title" style="font-size: var(--font-size-base); margin-bottom: var(--space-sm);">
+            Clientes
+          </h3>
+          <div style="font-size: 3rem; font-weight: var(--font-weight-bold); color: #f59e0b; margin: var(--space-md) 0; line-height: 1;">
+            {{ client_count }}
+          </div>
+          <span style="color: #f59e0b; text-decoration: none; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium);">
+            Ver clientes →
+          </span>
+        </div>
+      </a>
+            
+      </div>
+    </section>
     
-    <div class="dashboard-card">
-      <h3>Workers</h3>
-      <div class="dashboard-number">{{ worker_count }}</div>
-      <a href="{{ url_for('admin.list_users', role='worker') }}">View →</a>
-    </div>
+    {# ============================================
+         QUICK ACTIONS SECTION
+         Common admin tasks as prominent buttons
+         ============================================ #}
+    <section style="margin-bottom: var(--space-2xl);">
+      <h2 style="margin-bottom: var(--space-lg); color: var(--color-text-primary);">
+        Acciones Rápidas
+      </h2>
+      
+      {# 
+      Button group with flex layout
+      - Wraps on smaller screens
+      - Uses .btn classes from components.css
+      - Touch-friendly 44px minimum height
+      #}
+      <div style="display: flex; flex-wrap: wrap; gap: var(--space-md); margin-bottom: var(--space-xl);">
+        
+        {# Create New User Button #}
+        <a href="{{ url_for('admin.create_user') }}" class="btn btn-primary btn-lg">
+          <span style="font-size: 1.2em; margin-right: var(--space-xs);">+</span>
+          Crear Nuevo Usuario
+        </a>
+        
+        {# Manage Users Button #}
+        <a href="{{ url_for('admin.list_users') }}" class="btn btn-secondary btn-lg">
+          <span style="font-size: 1.2em; margin-right: var(--space-xs);">📋</span>
+          Gestionar Usuarios
+        </a>
+        
+      </div>
+    </section>
     
-    <div class="dashboard-card">
-      <h3>Planners</h3>
-      <div class="dashboard-number">{{ planner_count }}</div>
-      <a href="{{ url_for('admin.list_users', role='planner') }}">View →</a>
-    </div>
+    {# ============================================
+         SYSTEM INFO SECTION (OPTIONAL)
+         Additional information or recent activity
+         ============================================ #}
+    <section>
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Información del Sistema</h3>
+        </div>
+        <div class="card-body">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--space-lg);">
+            {# System info items #}
+            <div>
+              <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-xs);">
+                Total de usuarios registrados
+              </div>
+              <div style="font-size: var(--font-size-xl); font-weight: var(--font-weight-semibold); color: var(--color-text-primary);">
+                {{ user_count }} usuarios
+              </div>
+            </div>
+            
+            <div>
+              <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-xs);">
+                Distribución por roles
+              </div>
+              <div style="font-size: var(--font-size-base); color: var(--color-text-primary); line-height: 1.6;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-xs);">
+                  <span>Trabajadores:</span>
+                  <span class="badge badge-success">{{ worker_count }}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-xs);">
+                  <span>Planificadores:</span>
+                  <span class="badge badge-info">{{ planner_count }}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-xs);">
+                  <span>Administradores:</span>
+                  <span class="badge badge-danger">{{ admin_count }}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span>Clientes:</span>
+                  <span class="badge badge-warning">{{ client_count }}</span>
+                </div>
+              </div>
+            </div>
+            
+          </div>
+        </div>
+      </div>
+    </section>
     
-    <div class="dashboard-card">
-      <h3>Clients</h3>
-      <div class="dashboard-number">{{ client_count }}</div>
-      <a href="{{ url_for('admin.list_users', role='client') }}">View →</a>
-    </div>
-  </div>
-  
-  <div class="quick-actions">
-    <h2>Quick Actions</h2>
-    <a href="{{ url_for('admin.create_user') }}" class="action-button">
-      + Create New User
-    </a>
-    <a href="{{ url_for('admin.list_users') }}" class="action-button">
-      📋 Manage Users
-    </a>
   </div>
 {% endblock %}

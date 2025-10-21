@@ -1,90 +1,402 @@
+{# pytarjas/templates/admin/list_users.html #}
+{#
+List Users Page - Admin interface for viewing and managing all users
+
+Purpose:
+- Display all users in a responsive table
+- Filter users by role (admin, worker, planner, client)
+- Quick actions: Edit and Delete users
+- Prevent self-deletion for safety
+
+Features:
+- Responsive table that adapts to mobile/tablet
+- Role-based filtering with active state indicators
+- Color-coded role badges
+- Touch-optimized action buttons
+- Confirmation dialog before deletion
+- Empty state when no users found
+
+Dependencies:
+- base.html (parent template)
+- components.css (badges, buttons, filters)
+- layout.css (responsive containers)
+
+Variables from admin.list_users():
+- users: List of User objects
+- role_filter: Current role filter (or None for all)
+#}
+
 {% extends 'base.html' %}
 
-{% block title %}User Management{% endblock %}
+{# Page title #}
+{% block title %}Gestión de Usuarios{% endblock %}
 
+{# Page header #}
 {% block header %}
-  <h1>User Management</h1>
-  <a href="{{ url_for('admin.create_user') }}" class="button-primary">+ Create New User</a>
+  <div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-md); margin-top: var(--space-lg); margin-bottom: var(--space-lg);">
+      <div>
+        <h1 style="margin-bottom: var(--space-xs);">Gestión de Usuarios</h1>
+        <p style="color: var(--color-text-secondary); margin-bottom: 0;">
+          {% if role_filter %}
+            Mostrando usuarios con rol: <strong>{{ role_filter }}</strong>
+          {% else %}
+            Mostrando todos los usuarios del sistema
+          {% endif %}
+        </p>
+      </div>
+      <a href="{{ url_for('admin.create_user') }}" class="btn btn-primary btn-lg">
+        + Crear Nuevo Usuario
+      </a>
+    </div>
+  </div>
 {% endblock %}
 
+{# Main content #}
 {% block content %}
-  <div class="filters">
-    <a href="{{ url_for('admin.list_users') }}" 
-       class="filter-btn {% if not role_filter %}active{% endif %}">
-      All Users
-    </a>
-    <a href="{{ url_for('admin.list_users', role='admin') }}" 
-       class="filter-btn {% if role_filter == 'admin' %}active{% endif %}">
-      Admins
-    </a>
-    <a href="{{ url_for('admin.list_users', role='worker') }}" 
-       class="filter-btn {% if role_filter == 'worker' %}active{% endif %}">
-      Workers
-    </a>
-    <a href="{{ url_for('admin.list_users', role='planner') }}" 
-       class="filter-btn {% if role_filter == 'planner' %}active{% endif %}">
-      Planners
-    </a>
-    <a href="{{ url_for('admin.list_users', role='client') }}" 
-       class="filter-btn {% if role_filter == 'client' %}active{% endif %}">
-      Clients
-    </a>
+  <div class="container">
+    
+    {# ============================================
+         ROLE FILTERS
+         Buttons to filter users by role
+         ============================================ #}
+    <div style="margin-bottom: var(--space-xl);">
+      <div style="display: flex; flex-wrap: wrap; gap: var(--space-sm);">
+        
+        {# All Users Filter #}
+        <a href="{{ url_for('admin.list_users') }}" 
+           class="btn {% if not role_filter %}btn-primary{% else %}btn-secondary{% endif %}"
+           style="min-width: 120px;">
+          <span style="margin-right: var(--space-xs);">👥</span>
+          Todos
+        </a>
+        
+        {# Admin Filter #}
+        <a href="{{ url_for('admin.list_users', role='admin') }}" 
+           class="btn {% if role_filter == 'admin' %}btn-primary{% else %}btn-secondary{% endif %}"
+           style="min-width: 120px;">
+          <span style="margin-right: var(--space-xs);">👑</span>
+          Administradores
+        </a>
+        
+        {# Worker Filter #}
+        <a href="{{ url_for('admin.list_users', role='worker') }}" 
+           class="btn {% if role_filter == 'worker' %}btn-primary{% else %}btn-secondary{% endif %}"
+           style="min-width: 120px;">
+          <span style="margin-right: var(--space-xs);">🔧</span>
+          Trabajadores
+        </a>
+        
+        {# Planner Filter #}
+        <a href="{{ url_for('admin.list_users', role='planner') }}" 
+           class="btn {% if role_filter == 'planner' %}btn-primary{% else %}btn-secondary{% endif %}"
+           style="min-width: 120px;">
+          <span style="margin-right: var(--space-xs);">📋</span>
+          Planificadores
+        </a>
+        
+        {# Client Filter #}
+        <a href="{{ url_for('admin.list_users', role='client') }}" 
+           class="btn {% if role_filter == 'client' %}btn-primary{% else %}btn-secondary{% endif %}"
+           style="min-width: 120px;">
+          <span style="margin-right: var(--space-xs);">🏢</span>
+          Clientes
+        </a>
+        
+      </div>
+    </div>
+    
+    {# ============================================
+         USERS TABLE
+         Responsive table with user data
+         ============================================ #}
+    {% if users %}
+      
+      {# Desktop/Tablet Table View #}
+      <div class="card" style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="background-color: var(--color-bg-secondary); border-bottom: 2px solid var(--color-border);">
+              <th style="padding: var(--space-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-text-primary); white-space: nowrap;">
+                Usuario
+              </th>
+              <th style="padding: var(--space-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-text-primary); white-space: nowrap;">
+                Email
+              </th>
+              <th style="padding: var(--space-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-text-primary); white-space: nowrap;">
+                Rol
+              </th>
+              <th style="padding: var(--space-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-text-primary); white-space: nowrap;">
+                Creado
+              </th>
+              <th style="padding: var(--space-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-text-primary); white-space: nowrap;">
+                Último Login
+              </th>
+              <th style="padding: var(--space-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-text-primary); white-space: nowrap;">
+                Última Actualización
+              </th>
+              <th style="padding: var(--space-md); text-align: center; font-weight: var(--font-weight-semibold); color: var(--color-text-primary); white-space: nowrap;">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for user in users %}
+            <tr style="border-bottom: 1px solid var(--color-border); transition: background-color var(--transition-fast);"
+                onmouseover="this.style.backgroundColor='var(--color-bg-secondary)'"
+                onmouseout="this.style.backgroundColor='transparent'">
+              
+              {# Username Column #}
+              <td style="padding: var(--space-md); color: var(--color-text-primary); font-weight: var(--font-weight-medium);">
+                {{ user.username }}
+                {% if user.id == g.user.id %}
+                  <span class="badge badge-info" style="margin-left: var(--space-xs);">Tú</span>
+                {% endif %}
+              </td>
+              
+              {# Email Column #}
+              <td style="padding: var(--space-md); color: var(--color-text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis;">
+                {{ user.email }}
+              </td>
+              
+              {# Role Column with Color-Coded Badge #}
+              <td style="padding: var(--space-md);">
+                {% if user.role == 'admin' %}
+                  <span class="badge badge-danger" style="display: inline-flex; align-items: center; gap: var(--space-xs);">
+                    <span>👑</span> Admin
+                  </span>
+                {% elif user.role == 'worker' %}
+                  <span class="badge badge-success" style="display: inline-flex; align-items: center; gap: var(--space-xs);">
+                    <span>🔧</span> Worker
+                  </span>
+                {% elif user.role == 'planner' %}
+                  <span class="badge" style="display: inline-flex; align-items: center; gap: var(--space-xs); background-color: #8b5cf6; color: white;">
+                    <span>📋</span> Planner
+                  </span>
+                {% elif user.role == 'client' %}
+                  <span class="badge badge-warning" style="display: inline-flex; align-items: center; gap: var(--space-xs);">
+                    <span>🏢</span> Client
+                  </span>
+                {% endif %}
+              </td>
+              
+              {# Created Date Column #}
+              <td style="padding: var(--space-md); color: var(--color-text-secondary); font-size: var(--font-size-sm); white-space: nowrap;">
+                {{ user.created_at.strftime('%d/%m/%Y') if user.created_at else 'N/A' }}
+              </td>
+              
+              {# Last Login Column #}
+              <td style="padding: var(--space-md); color: var(--color-text-secondary); font-size: var(--font-size-sm); white-space: nowrap;">
+                {% if user.login_at %}
+                  {{ user.login_at.strftime('%d/%m/%Y %H:%M') }}
+                {% else %}
+                  <span style="color: var(--color-text-tertiary); font-style: italic;">Nunca</span>
+                {% endif %}
+              </td>
+              
+              {# Last Updated Column #}
+              <td style="padding: var(--space-md); color: var(--color-text-secondary); font-size: var(--font-size-sm); white-space: nowrap;">
+                {% if user.updated_at %}
+                  {{ user.updated_at.strftime('%d/%m/%Y %H:%M') }}
+                {% else %}
+                  <span style="color: var(--color-text-tertiary); font-style: italic;">N/A</span>
+                {% endif %}
+              </td>
+              
+              {# Actions Column #}
+              <td style="padding: var(--space-md); text-align: center;">
+                <div style="display: flex; gap: var(--space-sm); justify-content: center; flex-wrap: wrap;">
+                  
+                  {# Edit Button #}
+                  <a href="{{ url_for('admin.edit_user', user_id=user.id) }}" 
+                     class="btn btn-sm btn-secondary"
+                     title="Editar usuario">
+                    ✏️ Editar
+                  </a>
+                  
+                  {# Delete Button - Only if not self #}
+                  {% if user.id != g.user.id %}
+                    <form method="POST" 
+                          action="{{ url_for('admin.delete_user', user_id=user.id) }}" 
+                          style="display: inline;"
+                          onsubmit="return confirmDelete('{{ user.username }}');">
+                      <button type="submit" 
+                              class="btn btn-sm btn-danger"
+                              title="Eliminar usuario">
+                        🗑️ Eliminar
+                      </button>
+                    </form>
+                  {% else %}
+                    {# Can't delete yourself #}
+                    <button type="button" 
+                            class="btn btn-sm btn-ghost"
+                            disabled
+                            title="No puede eliminarse a sí mismo"
+                            style="opacity: 0.5; cursor: not-allowed;">
+                      🔒 Eliminar
+                    </button>
+                  {% endif %}
+                  
+                </div>
+              </td>
+              
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      
+      {# User Count Summary #}
+      <div style="margin-top: var(--space-lg); padding: var(--space-md); background-color: var(--color-bg-secondary); border-radius: var(--radius-md); text-align: center;">
+        <span style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+          Mostrando <strong style="color: var(--color-text-primary);">{{ users|length }}</strong> usuario(s)
+        </span>
+      </div>
+      
+    {% else %}
+      
+      {# ============================================
+           EMPTY STATE
+           Shown when no users match the filter
+           ============================================ #}
+      <div class="card">
+        <div class="card-body" style="text-align: center; padding: var(--space-2xl);">
+          <div style="font-size: 4rem; margin-bottom: var(--space-lg); opacity: 0.3;">
+            👤
+          </div>
+          <h3 style="color: var(--color-text-primary); margin-bottom: var(--space-sm);">
+            No se encontraron usuarios
+          </h3>
+          <p style="color: var(--color-text-secondary); margin-bottom: var(--space-lg);">
+            {% if role_filter %}
+              No hay usuarios con el rol "{{ role_filter }}" en el sistema.
+            {% else %}
+              No hay usuarios registrados en el sistema.
+            {% endif %}
+          </p>
+          
+          {% if role_filter %}
+            <a href="{{ url_for('admin.list_users') }}" class="btn btn-secondary">
+              Ver Todos los Usuarios
+            </a>
+          {% else %}
+            <a href="{{ url_for('admin.create_user') }}" class="btn btn-primary">
+              + Crear Primer Usuario
+            </a>
+          {% endif %}
+        </div>
+      </div>
+      
+    {% endif %}
+    
   </div>
 
-  {% if users %}
-    <table class="user-table">
-      <thead>
-        <tr>
-          <th>Username</th>
-          <th>Email</th>
-          <th>Role</th>
-          <th>Created</th>
-          <th>Last Login</th>
-          <th>Last Update</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for user in users %}
-        <tr>
-          <td>
-            {{ user.username }}
-            {% if user.id == g.user.id %}<span class="badge">You</span>{% endif %}
-          </td>
-          <td>{{ user.email }}</td>
-          <td><span class="role-badge role-{{ user.role }}">{{ user.role }}</span></td>
-          <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
-          <td>
-            {% if user.login_at %}
-              {{ user.login_at.strftime('%Y-%m-%d %H:%M') }}
-            {% else %}
-              <span class="text-muted">Never</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if user.updated_at %}
-              {{user.updated_at.strftime("%Y-%m-%d %H:%M")}}
-            {% else %}
-              <span class="text-muted">Never</span>
-            {% endif %}
-          </td>
-          <td class="actions">
-            <a href="{{ url_for('admin.edit_user', user_id=user.id) }}" 
-               class="btn-edit">Edit</a>
-            {% if user.id != g.user.id %}
-              <form method="post" 
-                    action="{{ url_for('admin.delete_user', user_id=user.id) }}" 
-                    style="display:inline;"
-                    onsubmit="return confirm('Are you sure you want to delete user {{ user.username }}?');">
-                <button type="submit" class="btn-delete">Delete</button>
-              </form>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p class="empty-state">No users found.</p>
-  {% endif %}
+  {# ============================================
+       JAVASCRIPT - Delete Confirmation
+       ============================================ #}
+  <script>
+    /**
+     * Confirm user deletion with a dialog
+     * @param {string} username - The username to delete
+     * @returns {boolean} True if confirmed, false otherwise
+     */
+    function confirmDelete(username) {
+      return confirm(
+        '¿Está seguro que desea eliminar al usuario "' + username + '"?\n\n' +
+        'Esta acción no se puede deshacer.\n\n' +
+        'Se eliminarán todos los datos asociados a este usuario.'
+      );
+    }
+
+    /**
+     * Add keyboard shortcuts for quick actions
+     */
+    document.addEventListener('keydown', function(e) {
+      // Ctrl/Cmd + N = New User
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault();
+        window.location.href = "{{ url_for('admin.create_user') }}";
+      }
+    });
+
+    /**
+     * Highlight current user row on page load
+     */
+    document.addEventListener('DOMContentLoaded', function() {
+      const currentUserBadges = document.querySelectorAll('.badge-info');
+      currentUserBadges.forEach(function(badge) {
+        const row = badge.closest('tr');
+        if (row) {
+          row.style.backgroundColor = 'var(--color-primary-light)';
+          row.style.border = '2px solid var(--color-primary)';
+        }
+      });
+    });
+  </script>
+
+  {# ============================================
+       CSS - Mobile Responsive Adjustments
+       ============================================ #}
+  <style>
+    /* Mobile: Stack table cells vertically */
+    @media (max-width: 767px) {
+      table {
+        display: block;
+      }
+      
+      thead {
+        display: none; /* Hide headers on mobile */
+      }
+      
+      tbody {
+        display: block;
+      }
+      
+      tr {
+        display: block;
+        margin-bottom: var(--space-lg);
+        border: 1px solid var(--color-border) !important;
+        border-radius: var(--radius-md);
+        padding: var(--space-md);
+        background-color: var(--color-bg-primary) !important;
+      }
+      
+      td {
+        display: block;
+        text-align: left !important;
+        padding: var(--space-sm) 0 !important;
+        border-bottom: 1px solid var(--color-border);
+      }
+      
+      td:last-child {
+        border-bottom: none;
+      }
+      
+      /* Add labels before each cell on mobile */
+      td:nth-child(1)::before { content: "Usuario: "; font-weight: bold; }
+      td:nth-child(2)::before { content: "Email: "; font-weight: bold; }
+      td:nth-child(3)::before { content: "Rol: "; font-weight: bold; }
+      td:nth-child(4)::before { content: "Creado: "; font-weight: bold; }
+      td:nth-child(5)::before { content: "Último Login: "; font-weight: bold; }
+      td:nth-child(6)::before { content: "Última Actualización: "; font-weight: bold; }
+      td:nth-child(7)::before { content: "Acciones: "; font-weight: bold; display: block; margin-bottom: var(--space-xs); }
+      
+      /* Action buttons full width on mobile */
+      td:nth-child(7) > div {
+        flex-direction: column;
+      }
+      
+      td:nth-child(7) .btn {
+        width: 100%;
+      }
+    }
+    
+    /* Tablet: Reduce padding */
+    @media (min-width: 768px) and (max-width: 1199px) {
+      th, td {
+        padding: var(--space-sm) !important;
+        font-size: var(--font-size-sm);
+      }
+    }
+  </style>
 {% endblock %}

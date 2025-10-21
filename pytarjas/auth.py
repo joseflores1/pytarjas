@@ -111,7 +111,15 @@ def login():
                 else:
                     # HTML redirect for browser clients
                     flash(f"Welcome back, {user.username}!", "success")
-                    return redirect(url_for("admin.index"))
+                    if user.role=="admin":
+                        return redirect(url_for("admin.index"))
+                    if user.role=="worker":
+                        return redirect(url_for("worker.index"))
+                    if user.role=="planner":
+                        return redirect(url_for("planner.index"))
+                    if user.role=="client":
+                        return redirect(url_for("client.index"))
+ 
             except Exception as e:
                 db.session.rollback()
                 error = f"An error occurred: {str(e)}"

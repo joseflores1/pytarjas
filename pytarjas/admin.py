@@ -122,9 +122,9 @@ def list_users():
                     "username": user.username,
                     "email": user.email,
                     "role": user.role,
-                    "created_at": user.created_at.strftime('%Y-%m-%d %H:%M'), 
-                    "updated_at": user.updated_at.strftime('%Y-%m-%d %H:%M') if user.updated_at else None,
-                    "login_at": user.login_at.strftime('%Y-%m-%d %H:%M') if user.login_at else None
+                    "created_at": user.created_at.isoformat() if user.created_at else None,
+                    "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+                    "login_at": user.login_at.isoformat() if user.login_at else None
                 }
                 for user in users
             ],
@@ -179,9 +179,9 @@ def get_user(user_id):
                 "username": user.username,
                 "email": user.email,
                 "role": user.role,
-                "created_at": user.created_at.strftime('%Y-%m-%d %H:%M'), 
-                "updated_at": user.updated_at.strftime('%Y-%m-%d %H:%M') if user.updated_at else None,
-                "login_at": user.login_at.strftime('%Y-%m-%d %H:%M') if user.login_at else None
+                "created_at": user.created_at.isoformat() if user.created_at else None,
+                "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+                "login_at": user.login_at.isoformat() if user.login_at else None
         }
         }), 200
     else:
