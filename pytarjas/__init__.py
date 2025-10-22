@@ -98,6 +98,9 @@ def create_app(test_config=None):
     from . import worker
     app.register_blueprint(worker.bp)
 
+    from . import forms
+    app.register_blueprint(forms.bp)
+
     # TODO: Register PWA routes (manifest.json, service-worker.js)
     # We'll add these in the next step
     

@@ -1,0 +1,431 @@
+{# pytarjas/templates/forms/list_forms.html #}
+{#
+List Forms Page - Interface for viewing and managing form templates
+
+PURPOSE:
+This template displays all form templates available in the system. Forms are
+reusable questionnaires that workers fill during field operations (tarjas).
+Each form contains questions that define what data to collect.
+
+FEATURES:
+- Responsive card-based layout optimized for tablets
+- Filter by form type (consolidado, desconsolidado, seal_verification)
+- Filter by active/inactive status
+- Color-coded status badges
+- Quick actions: View, Edit, Activate/Deactivate
+- Empty state for better UX
+- Touch-optimized buttons for field tablets
+
+WORKFLOW CONTEXT:
+Forms are the foundation of the data collection process:
+1. Admin/Planner creates a Form template with Questions
+2. Planner uploads a Planification and associates it with a Form
+3. System generates Documents based on the Form structure
+4. Workers fill Documents using the Form questions
+5. System generates PDF tarjas from completed Documents
+
+VARIABLES FROM forms.list_forms():
+- forms: List of Form objects to display
+- form_type_filter: Current form_type filter (or None)
+- is_active_filter: Current is_active filter (or None)
+
+REASONING BEHIND THE CODE:
+- Card layout instead of table: Better for touch interfaces on tablets
+- Large touch targets: Field workers use tablets with gloves
+- Status badges: Quick visual indication of form availability
+- Filter buttons: Help users find specific forms quickly
+- Soft delete support: Shows both active and inactive forms
+#}
+
+{% extends 'base.html' %}
+
+{# Page title for browser tab #}
+{% block title %}Plantillas de Formularios{% endblock %}
+
+{# Additional CSS - Load forms.css for form-specific styling #}
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+{% endblock %}
+
+{# Page header with title and create button #}
+{% block header %}
+  <div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-md); margin-top: var(--space-lg); margin-bottom: var(--space-lg);">
+      <div>
+        {# Main heading #}
+        <h1 style="margin-bottom: var(--space-xs);">📋 Plantillas de Formularios</h1>
+        
+        {# Subtitle showing current filters #}
+        <p style="color: var(--color-text-secondary); margin-bottom: 0;">
+          {% if form_type_filter and is_active_filter %}
+            {# Both filters active #}
+            Mostrando formularios de tipo <strong>{{ form_type_filter }}</strong>, 
+            estado: <strong>{{ 'Activos' if is_active_filter == 'true' else 'Inactivos' }}</strong>
+          {% elif form_type_filter %}
+            {# Only type filter active #}
+            Mostrando formularios de tipo: <strong>{{ form_type_filter }}</strong>
+          {% elif is_active_filter %}
+            {# Only status filter active #}
+            Mostrando formularios: <strong>{{ 'Activos' if is_active_filter == 'true' else 'Inactivos' }}</strong>
+          {% else %}
+            {# No filters #}
+            Mostrando todos los formularios del sistema
+          {% endif %}
+        </p>
+      </div>
+      
+      {# Create new form button - prominent call to action #}
+      <a href="{{ url_for('forms.create_form') }}" class="btn btn-primary btn-lg">
+        ➕ Crear Nuevo Formulario
+      </a>
+    </div>
+  </div>
+{% endblock %}
+
+{# Main content area #}
+{% block content %}
+  <div class="container">
+    
+    {# ============================================
+         FILTER SECTION
+         Buttons to filter forms by type and status
+         ============================================ #}
+    <div style="margin-bottom: var(--space-xl);">
+      
+      {# Form Type Filters #}
+      <div style="margin-bottom: var(--space-md);">
+        <h3 style="font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); margin-bottom: var(--space-sm);">
+          Filtrar por Tipo:
+        </h3>
+        <div style="display: flex; flex-wrap: wrap; gap: var(--space-sm);">
+          
+          {# All Types Button #}
+          <a href="{{ url_for('forms.list_forms', is_active=is_active_filter) }}" 
+             class="btn {% if not form_type_filter %}btn-primary{% else %}btn-secondary{% endif %}"
+             style="min-width: 140px;">
+            📋 Todos
+          </a>
+          
+          {# Consolidado Type Button #}
+          <a href="{{ url_for('forms.list_forms', form_type='consolidado', is_active=is_active_filter) }}" 
+             class="btn {% if form_type_filter == 'consolidado' %}btn-primary{% else %}btn-secondary{% endif %}"
+             style="min-width: 140px;">
+            📦 Consolidado
+          </a>
+          
+          {# Desconsolidado Type Button #}
+          <a href="{{ url_for('forms.list_forms', form_type='desconsolidado', is_active=is_active_filter) }}" 
+             class="btn {% if form_type_filter == 'desconsolidado' %}btn-primary{% else %}btn-secondary{% endif %}"
+             style="min-width: 140px;">
+            📤 Desconsolidado
+          </a>
+          
+          {# Seal Verification Type Button #}
+          <a href="{{ url_for('forms.list_forms', form_type='seal_verification', is_active=is_active_filter) }}" 
+             class="btn {% if form_type_filter == 'seal_verification' %}btn-primary{% else %}btn-secondary{% endif %}"
+             style="min-width: 140px;">
+            🔒 Verificación de Sello
+          </a>
+          
+        </div>
+      </div>
+      
+      {# Active Status Filters #}
+      <div>
+        <h3 style="font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); margin-bottom: var(--space-sm);">
+          Filtrar por Estado:
+        </h3>
+        <div style="display: flex; flex-wrap: wrap; gap: var(--space-sm);">
+          
+          {# All Status Button #}
+          <a href="{{ url_for('forms.list_forms', form_type=form_type_filter) }}" 
+             class="btn {% if not is_active_filter %}btn-primary{% else %}btn-secondary{% endif %}"
+             style="min-width: 120px;">
+            🔍 Todos
+          </a>
+          
+          {# Active Only Button #}
+          <a href="{{ url_for('forms.list_forms', form_type=form_type_filter, is_active='true') }}" 
+             class="btn {% if is_active_filter == 'true' %}btn-primary{% else %}btn-secondary{% endif %}"
+             style="min-width: 120px;">
+            ✅ Activos
+          </a>
+          
+          {# Inactive Only Button #}
+          <a href="{{ url_for('forms.list_forms', form_type=form_type_filter, is_active='false') }}" 
+             class="btn {% if is_active_filter == 'false' %}btn-primary{% else %}btn-secondary{% endif %}"
+             style="min-width: 120px;">
+            ⛔ Inactivos
+          </a>
+          
+        </div>
+      </div>
+      
+    </div>
+    
+    {# ============================================
+         FORMS GRID
+         Card-based layout for form templates
+         ============================================ #}
+    {% if forms %}
+      
+      {# Responsive grid: 1 column on mobile, 2 on tablet, 3 on desktop #}
+      <div class="grid grid-cols-1 gap-lg" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
+        
+        {% for form in forms %}
+        {# 
+        REASONING: Each form is a card with:
+        - Header: Name and status badge
+        - Body: Description and metadata
+        - Footer: Action buttons
+        This structure is touch-friendly and scannable.
+        #}
+        <div class="card" style="display: flex; flex-direction: column; height: 100%;">
+          
+          {# Card Header - Form name and status #}
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: start; gap: var(--space-md); padding: var(--space-lg); border-bottom: 1px solid var(--color-border);">
+            <div style="flex: 1; min-width: 0;">
+              {# Form name - truncate if too long #}
+              <h3 style="font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); margin-bottom: var(--space-xs); word-break: break-word;">
+                {{ form.name }}
+              </h3>
+              
+              {# Form type badge #}
+              {% if form.form_type == 'consolidado' %}
+                <span class="badge" style="background-color: #3b82f6; color: white;">📦 Consolidado</span>
+              {% elif form.form_type == 'desconsolidado' %}
+                <span class="badge" style="background-color: #10b981; color: white;">📤 Desconsolidado</span>
+              {% elif form.form_type == 'seal_verification' %}
+                <span class="badge" style="background-color: #f59e0b; color: white;">🔒 Sello</span>
+              {% else %}
+                <span class="badge badge-secondary">{{ form.form_type or 'Sin tipo' }}</span>
+              {% endif %}
+            </div>
+            
+            {# Active status badge #}
+            {% if form.is_active %}
+              <span class="badge badge-success" style="flex-shrink: 0;">✅ Activo</span>
+            {% else %}
+              <span class="badge" style="background-color: #6b7280; color: white; flex-shrink: 0;">⛔ Inactivo</span>
+            {% endif %}
+          </div>
+          
+          {# Card Body - Description and metadata #}
+          <div class="card-body" style="flex: 1; padding: var(--space-lg);">
+            {# Form description #}
+            {% if form.description %}
+              <p style="color: var(--color-text-secondary); margin-bottom: var(--space-md); line-height: 1.6;">
+                {{ form.description[:150] }}{% if form.description|length > 150 %}...{% endif %}
+              </p>
+            {% else %}
+              <p style="color: var(--color-text-tertiary); font-style: italic; margin-bottom: var(--space-md);">
+                Sin descripción
+              </p>
+            {% endif %}
+            
+            {# Metadata section #}
+            <div style="display: flex; flex-direction: column; gap: var(--space-sm); padding: var(--space-md); background-color: var(--color-bg-secondary); border-radius: var(--radius-md);">
+              
+              {# Number of questions #}
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+                  📝 Preguntas:
+                </span>
+                <span style="color: var(--color-text-primary); font-weight: var(--font-weight-semibold);">
+                  {{ form.questions|length }}
+                </span>
+              </div>
+              
+              {# Created date #}
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+                  📅 Creado:
+                </span>
+                <span style="color: var(--color-text-primary); font-size: var(--font-size-sm);">
+                  {{ form.created_at.strftime('%d/%m/%Y') if form.created_at else 'N/A' }}
+                </span>
+              </div>
+              
+              {# Last updated date #}
+              {% if form.updated_at %}
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+                  🔄 Actualizado:
+                </span>
+                <span style="color: var(--color-text-primary); font-size: var(--font-size-sm);">
+                  {{ form.updated_at.strftime('%d/%m/%Y') }}
+                </span>
+              </div>
+              {% endif %}
+              
+            </div>
+          </div>
+          
+          {# Card Footer - Action buttons #}
+          <div class="card-footer" style="padding: var(--space-lg); border-top: 1px solid var(--color-border); background-color: var(--color-bg-secondary);">
+            <div style="display: flex; flex-wrap: wrap; gap: var(--space-sm);">
+              
+              {# View/Edit button - primary action #}
+              <a href="{{ url_for('forms.edit_form', form_id=form.id) }}" 
+                 class="btn btn-primary btn-sm" 
+                 style="flex: 1; min-width: 100px;">
+                ✏️ Editar
+              </a>
+              
+              {# Activate/Deactivate button - secondary action #}
+              {% if form.is_active %}
+                {# Deactivate form button #}
+                <form method="POST" 
+                      action="{{ url_for('forms.delete_form', form_id=form.id) }}" 
+                      style="flex: 1; min-width: 100px;"
+                      onsubmit="return confirmDeactivate('{{ form.name }}');">
+                  <button type="submit" 
+                          class="btn btn-danger btn-sm" 
+                          style="width: 100%;">
+                    ⛔ Desactivar
+                  </button>
+                </form>
+              {% else %}
+                {# Activate form button #}
+                <form method="POST" 
+                      action="{{ url_for('forms.activate_form', form_id=form.id) }}" 
+                      style="flex: 1; min-width: 100px;">
+                  <button type="submit" 
+                          class="btn btn-success btn-sm" 
+                          style="width: 100%;">
+                    ✅ Activar
+                  </button>
+                </form>
+              {% endif %}
+              
+            </div>
+          </div>
+          
+        </div>
+        {% endfor %}
+        
+      </div>
+      
+      {# Forms count summary #}
+      <div style="margin-top: var(--space-xl); padding: var(--space-md); background-color: var(--color-bg-secondary); border-radius: var(--radius-md); text-align: center;">
+        <span style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+          Mostrando <strong style="color: var(--color-text-primary);">{{ forms|length }}</strong> formulario(s)
+        </span>
+      </div>
+      
+    {% else %}
+      
+      {# ============================================
+           EMPTY STATE
+           Shown when no forms match the filters
+           ============================================ #}
+      <div class="card">
+        <div class="card-body" style="text-align: center; padding: var(--space-2xl);">
+          {# Large empty state icon #}
+          <div style="font-size: 5rem; margin-bottom: var(--space-lg); opacity: 0.3;">
+            📋
+          </div>
+          
+          {# Empty state heading #}
+          <h3 style="color: var(--color-text-primary); margin-bottom: var(--space-sm);">
+            No se encontraron formularios
+          </h3>
+          
+          {# Empty state description - context-aware #}
+          <p style="color: var(--color-text-secondary); margin-bottom: var(--space-lg); max-width: 500px; margin-left: auto; margin-right: auto;">
+            {% if form_type_filter or is_active_filter %}
+              {# Filters are active but no results #}
+              No hay formularios que coincidan con los filtros seleccionados.
+              Prueba ajustar o limpiar los filtros.
+            {% else %}
+              {# No forms at all in the system #}
+              Aún no hay formularios en el sistema. Crea tu primer formulario
+              para comenzar a recolectar datos en campo.
+            {% endif %}
+          </p>
+          
+          {# Action buttons based on context #}
+          <div style="display: flex; justify-content: center; gap: var(--space-md); flex-wrap: wrap;">
+            {% if form_type_filter or is_active_filter %}
+              {# Show clear filters button #}
+              <a href="{{ url_for('forms.list_forms') }}" class="btn btn-secondary">
+                🔍 Ver Todos los Formularios
+              </a>
+            {% endif %}
+            
+            {# Always show create button in empty state #}
+            <a href="{{ url_for('forms.create_form') }}" class="btn btn-primary">
+              ➕ Crear Primer Formulario
+            </a>
+          </div>
+        </div>
+      </div>
+      
+    {% endif %}
+    
+  </div>
+{% endblock %}
+
+{# ============================================
+     JAVASCRIPT
+     Confirmation dialogs and keyboard shortcuts
+     ============================================ #}
+{% block extra_js %}
+<script>
+  /**
+   * Confirm form deactivation with a dialog.
+   * 
+   * REASONING: Soft delete is used to preserve data integrity, but we still
+   * want user confirmation to prevent accidental deactivation.
+   * 
+   * @param {string} formName - The name of the form to deactivate
+   * @returns {boolean} True if confirmed, false otherwise
+   */
+  function confirmDeactivate(formName) {
+    return confirm(
+      '¿Está seguro que desea desactivar el formulario "' + formName + '"?\n\n' +
+      'El formulario no se eliminará permanentemente, pero dejará de estar disponible para nuevas planificaciones.\n\n' +
+      'Puede reactivarlo más tarde si es necesario.'
+    );
+  }
+  
+  /**
+   * Keyboard shortcuts for power users.
+   * 
+   * REASONING: Admin users often perform repetitive tasks. Keyboard shortcuts
+   * improve efficiency for desktop users.
+   */
+  document.addEventListener('keydown', function(e) {
+    // Ctrl/Cmd + N = Create new form
+    if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+      e.preventDefault();
+      window.location.href = "{{ url_for('forms.create_form') }}";
+    }
+    
+    // Ctrl/Cmd + F = Focus on first filter (would need to add if filters had inputs)
+    // This is a placeholder for future search functionality
+  });
+  
+  /**
+   * Add visual feedback on card hover for desktop users.
+   * 
+   * REASONING: While tablets are primary, desktop users benefit from
+   * hover states that indicate interactivity.
+   */
+  document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.card');
+    cards.forEach(function(card) {
+      card.addEventListener('mouseenter', function() {
+        this.style.transform = 'translateY(-2px)';
+        this.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+        this.style.transition = 'all 0.2s ease';
+      });
+      
+      card.addEventListener('mouseleave', function() {
+        this.style.transform = 'translateY(0)';
+        this.style.boxShadow = '';
+      });
+    });
+  });
+</script>
+{% endblock %}

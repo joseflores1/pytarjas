@@ -24,69 +24,14 @@ Access hierarchy:
 
 from flask import Blueprint, request, jsonify, render_template, g, abort
 from datetime import datetime, timezone
-from functools import wraps
-from pytarjas.auth import login_required
-from pytarjas.models.user_models import User, db
-from pytarjas.models.docs_models import Document, Record, Planification, Form, Question
-
+from pytarjas.auth import login_required, task_access_required
+from pytarjas.models.user_models import User, db #noqa
+from pytarjas.models.docs_models import Document, Record, Planification, Form, Question #noqa
+from pytarjas.helper import wants_json
 # Create blueprint with URL prefix /tasks
 # This API is shared across worker, planner, and admin interfaces
 bp = Blueprint("tasks", __name__, url_prefix="/tasks")
 
-
-def task_access_required(view):
-    """
-    Decorator to require task access permissions.
-    
-    Prevents clients from accessing task endpoints.
-    Workers, planners, and admins are allowed.
-    
-    Usage:
-        @bp.route('/list')
-        @login_required
-        @task_access_required
-        def list_tasks():
-            return jsonify(...)
-    """
-    @wraps(view)
-    def wrapped_view(**kwargs):
-        # Client role is not allowed to access tasks
-        if g.user.role == "client":
-            # Return appropriate error format based on request type
-            if request.is_json or request.headers.get("Accept") == "application/json":
-                return jsonify({
-                    "success": False,
-                    "error": "Access denied. Clients cannot access task endpoints."
-                }), 403
-            else:
-                # HTML error page
-                abort(403)
-        
-        return view(**kwargs)
-    
-    return wrapped_view
-
-
-def wants_json():
-    """
-    Helper function to determine if the client wants a JSON response.
-    
-    Checks:
-    1. Content-Type header is application/json
-    2. Accept header includes application/json
-    3. request.is_json flag
-    
-    Returns:
-        bool: True if client wants JSON, False if HTML
-        
-    This allows the same endpoint to serve both web browsers (HTML)
-    and API clients/PWA/AJAX (JSON).
-    """
-    return (
-        request.is_json or 
-        request.headers.get("Accept") == "application/json" or
-        "application/json" in request.headers.get("Accept", "")
-    )
 
 
 @bp.route("/", methods=["GET"])
@@ -626,7 +571,7 @@ def sync_status():
         # (not echoing back changes the client just uploaded)
         updated_docs = base_query.filter(
             Document.updated_at > last_sync,
-            Document.is_synced == True  # Only server-side changes
+            Document.is_synced  # Only server-side changes
         ).all()
         
         for doc in updated_docs:

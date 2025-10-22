@@ -1,0 +1,596 @@
+{# pytarjas/templates/forms/create_form.html #}
+{#
+Create Form Page - Interface for creating new form templates
+
+PURPOSE:
+This template allows admins/planners/workers to create new form templates from scratch.
+Forms are the foundation of data collection in the field - they define what questions
+workers must answer when completing tarja documents.
+
+FEATURES:
+- Create form metadata (name, description, type)
+- Dynamic question management (add, edit, reorder, delete questions)
+- Real-time validation
+- Touch-optimized for tablets
+- Save/cancel with confirmation on unsaved changes
+- Question type selector with appropriate field types
+- Pre-populated with one example question to guide users
+
+WORKFLOW CONTEXT:
+Forms define the structure of data collection:
+1. Create Form with metadata (name, type, description)
+2. Add Questions that define what data to collect
+3. Questions have types (text, number, photo, date, select, etc.)
+4. Questions can have validation rules stored in 'options' JSON field
+5. Questions have an 'order' field for sorting
+6. Once created, forms can be associated with Planifications
+
+VARIABLES FROM forms.create_form():
+- None (this is a creation form, starts empty)
+
+REASONING BEHIND THE CODE:
+- Two-section layout: Form metadata + Questions list
+- Starts with one example question to show users the structure
+- Add question button prominently placed
+- Order field allows manual reordering
+- Client-side validation before submission
+- All questions start expanded for better initial UX
+#}
+
+{% extends 'base.html' %}
+
+{# Page title #}
+{% block title %}Crear Formulario{% endblock %}
+
+{# Load forms.css for form controls #}
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+  <style>
+    /* Question card styling for better visual hierarchy */
+    .question-card {
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-md);
+      background-color: var(--color-bg-primary);
+      transition: all var(--transition-fast);
+    }
+    
+    .question-card:hover {
+      border-color: var(--color-primary);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .question-card.collapsed {
+      padding: var(--space-md);
+    }
+    
+    .question-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    
+    .question-body {
+      margin-top: var(--space-lg);
+      padding-top: var(--space-lg);
+      border-top: 1px solid var(--color-border);
+    }
+    
+    .question-card.collapsed .question-body {
+      display: none;
+    }
+    
+    /* Drag handle styling (for future drag-and-drop) */
+    .drag-handle {
+      cursor: grab;
+      padding: var(--space-sm);
+      color: var(--color-text-tertiary);
+      font-size: 1.2rem;
+    }
+    
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+    
+    /* Delete button styling */
+    .delete-question-btn {
+      opacity: 0.7;
+      transition: opacity var(--transition-fast);
+    }
+    
+    .delete-question-btn:hover {
+      opacity: 1;
+    }
+  </style>
+{% endblock %}
+
+{# Page header #}
+{% block header %}
+  <div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-md); margin-top: var(--space-lg); margin-bottom: var(--space-lg);">
+      <div>
+        <h1 style="margin-bottom: var(--space-xs);">➕ Crear Nuevo Formulario</h1>
+        <p style="color: var(--color-text-secondary); margin-bottom: 0;">
+          Definir una plantilla de formulario para recolección de datos en campo
+        </p>
+      </div>
+      <a href="{{ url_for('forms.list_forms') }}" class="btn btn-secondary">
+        ← Volver al Listado
+      </a>
+    </div>
+  </div>
+{% endblock %}
+
+{# Main content #}
+{% block content %}
+  <div class="container" style="max-width: 1000px;">
+    
+    <form method="POST" id="createFormForm">
+      
+      {# ============================================
+           SECTION 1: FORM METADATA
+           Basic form information
+           ============================================ #}
+      <div class="card" style="margin-bottom: var(--space-xl);">
+        <div class="card-header">
+          <h2 class="card-title">📋 Información del Formulario</h2>
+          <p class="card-subtitle">Datos básicos del nuevo formulario</p>
+        </div>
+        
+        <div class="card-body">
+          
+          {# Form Name #}
+          <div class="form-group">
+            <label for="name" class="form-label">
+              Nombre del Formulario <span style="color: var(--color-danger);">*</span>
+            </label>
+            <input 
+              type="text" 
+              name="name" 
+              id="name" 
+              class="form-control"
+              required
+              maxlength="100"
+              placeholder="Ej: Formulario de Consolidado 2025"
+              autofocus>
+            <small class="form-help">
+              Nombre único que identifica este formulario (máximo 100 caracteres)
+            </small>
+          </div>
+          
+          {# Form Description #}
+          <div class="form-group">
+            <label for="description" class="form-label">
+              Descripción
+            </label>
+            <textarea 
+              name="description" 
+              id="description" 
+              class="form-control"
+              rows="4"
+              placeholder="Describe el propósito de este formulario, cuándo debe usarse, y qué datos recolecta..."></textarea>
+            <small class="form-help">
+              Descripción detallada que ayude a los usuarios a entender cuándo usar este formulario
+            </small>
+          </div>
+          
+          {# Form Type #}
+          <div class="form-group">
+            <label for="form_type" class="form-label">
+              Tipo de Formulario <span style="color: var(--color-danger);">*</span>
+            </label>
+            <select name="form_type" id="form_type" class="form-control" required>
+              <option value="">-- Seleccionar tipo --</option>
+              <option value="consolidado">📦 Consolidado</option>
+              <option value="desconsolidado">📤 Desconsolidado</option>
+              <option value="seal_verification">🔒 Verificación de Sello</option>
+            </select>
+            <small class="form-help">
+              Categoría del formulario según el tipo de operación en campo
+            </small>
+          </div>
+          
+          {# Info Box #}
+          <div style="padding: var(--space-md); background-color: var(--color-bg-secondary); border-left: 4px solid var(--color-primary); border-radius: var(--radius-md); margin-top: var(--space-lg);">
+            <div style="display: flex; gap: var(--space-md); align-items: start;">
+              <span style="font-size: 1.5rem;">💡</span>
+              <div>
+                <strong style="color: var(--color-text-primary); display: block; margin-bottom: var(--space-xs);">
+                  Consejo
+                </strong>
+                <small style="color: var(--color-text-secondary);">
+                  Los nuevos formularios se crean activos por defecto. Puedes agregar preguntas ahora o
+                  editarlas más tarde. Te recomendamos agregar al menos una pregunta para validar la estructura.
+                </small>
+              </div>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+      
+      {# ============================================
+           SECTION 2: QUESTIONS MANAGEMENT
+           Dynamic list of form questions
+           ============================================ #}
+      <div class="card" style="margin-bottom: var(--space-xl);">
+        <div class="card-header">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-md);">
+            <div>
+              <h2 class="card-title">❓ Preguntas del Formulario</h2>
+              <p class="card-subtitle">Define las preguntas que aparecerán en el formulario</p>
+            </div>
+            <button type="button" class="btn btn-success" onclick="addNewQuestion()">
+              ➕ Agregar Pregunta
+            </button>
+          </div>
+        </div>
+        
+        <div class="card-body">
+          
+          {# Questions Container - starts empty or with example #}
+          <div id="questionsContainer">
+            {# Empty state - will be replaced when first question is added #}
+            <div id="noQuestionsMessage" style="text-align: center; padding: var(--space-2xl); background-color: var(--color-bg-secondary); border-radius: var(--radius-md);">
+              <div style="font-size: 3rem; margin-bottom: var(--space-md); opacity: 0.3;">
+                ❓
+              </div>
+              <p style="color: var(--color-text-secondary); margin-bottom: var(--space-lg);">
+                Este formulario aún no tiene preguntas. Haz clic en "Agregar Pregunta" para comenzar.
+              </p>
+              <button type="button" class="btn btn-success" onclick="addNewQuestion()">
+                ➕ Agregar Primera Pregunta
+              </button>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+      
+      {# ============================================
+           FORM ACTIONS
+           Save and Cancel buttons
+           ============================================ #}
+      <div class="card">
+        <div class="card-body">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-md);">
+            
+            {# Cancel button #}
+            <a href="{{ url_for('forms.list_forms') }}" 
+               class="btn btn-secondary btn-lg" 
+               id="cancelButton">
+              ✖️ Cancelar
+            </a>
+            
+            {# Save button #}
+            <button type="submit" class="btn btn-primary btn-lg">
+              💾 Crear Formulario
+            </button>
+            
+          </div>
+          
+          <div style="margin-top: var(--space-md); padding: var(--space-md); background-color: var(--color-bg-secondary); border-radius: var(--radius-md);">
+            <small style="color: var(--color-text-secondary);">
+              ⚠️ <strong>Nota:</strong> Puedes crear el formulario sin preguntas y agregarlas más tarde,
+              pero te recomendamos agregar al menos una pregunta para validar la estructura.
+            </small>
+          </div>
+        </div>
+      </div>
+      
+    </form>
+    
+  </div>
+{% endblock %}
+
+{# ============================================
+     JAVASCRIPT
+     Dynamic question management and validation
+     ============================================ #}
+{% block extra_js %}
+<script>
+  // Track form changes for unsaved changes warning
+  let formChanged = false;
+  let questionCounter = 0;
+  
+  /**
+   * Track when form is changed.
+   * REASONING: Warn users before leaving page with unsaved changes.
+   */
+  document.getElementById('createFormForm').addEventListener('input', function() {
+    formChanged = true;
+  });
+  
+  /**
+   * Warn before leaving page with unsaved changes.
+   */
+  window.addEventListener('beforeunload', function(e) {
+    if (formChanged) {
+      e.preventDefault();
+      e.returnValue = 'Tienes cambios sin guardar. ¿Estás seguro que deseas salir?';
+      return e.returnValue;
+    }
+  });
+  
+  /**
+   * Cancel button with confirmation if form changed.
+   */
+  document.getElementById('cancelButton').addEventListener('click', function(e) {
+    if (formChanged) {
+      if (!confirm('Tienes cambios sin guardar. ¿Estás seguro que deseas cancelar?')) {
+        e.preventDefault();
+      }
+    }
+  });
+  
+  /**
+   * Toggle question card expanded/collapsed state.
+   * REASONING: Long forms need collapsible questions for easier navigation.
+   */
+  function toggleQuestionCard(headerElement) {
+    const card = headerElement.closest('.question-card');
+    card.classList.toggle('collapsed');
+  }
+  
+  /**
+   * Add a new question to the form.
+   * REASONING: Dynamic UI allows adding unlimited questions without page reload.
+   */
+  function addNewQuestion() {
+    questionCounter++;
+    const container = document.getElementById('questionsContainer');
+    
+    // Hide "no questions" message if it exists
+    const noQuestionsMsg = document.getElementById('noQuestionsMessage');
+    if (noQuestionsMsg) {
+      noQuestionsMsg.remove();
+    }
+    
+    // Generate unique temporary ID for new questions
+    const tempId = 'new_' + Date.now();
+    
+    // Create new question card HTML
+    const questionHtml = `
+      <div class="question-card" data-question-id="${tempId}">
+        <div class="question-header" onclick="toggleQuestionCard(this)">
+          <div style="display: flex; align-items: center; gap: var(--space-md); flex: 1;">
+            <span class="drag-handle" title="Arrastrar para reordenar">☰</span>
+            <div style="flex: 1;">
+              <div style="font-weight: var(--font-weight-semibold); color: var(--color-text-primary); margin-bottom: var(--space-xs);">
+                Pregunta #<span class="question-number">${questionCounter}</span>
+              </div>
+              <div style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+                Nueva pregunta sin configurar
+              </div>
+            </div>
+            <span class="badge badge-danger">Requerida</span>
+            <span class="badge badge-info">text</span>
+          </div>
+          <button type="button" class="btn btn-sm btn-ghost delete-question-btn" onclick="deleteQuestion(event, '${tempId}')" title="Eliminar pregunta">
+            🗑️
+          </button>
+        </div>
+        
+        <div class="question-body">
+          <input type="hidden" name="question_ids[]" value="${tempId}">
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md);">
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label class="form-label">
+                Texto de la Pregunta <span style="color: var(--color-danger);">*</span>
+              </label>
+              <input 
+                type="text" 
+                name="question_text_${tempId}" 
+                class="form-control"
+                required
+                maxlength="500"
+                placeholder="Ej: ¿Número de contenedor?">
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">
+                Tipo de Pregunta <span style="color: var(--color-danger);">*</span>
+              </label>
+              <select name="question_type_${tempId}" class="form-control" required>
+                <option value="text" selected>📝 Texto Corto</option>
+                <option value="textarea">📄 Texto Largo</option>
+                <option value="number">🔢 Número</option>
+                <option value="date">📅 Fecha</option>
+                <option value="datetime">🕐 Fecha y Hora</option>
+                <option value="photo">📷 Fotografía</option>
+                <option value="boolean">✓ Sí/No</option>
+                <option value="select">📋 Selección Múltiple</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">
+                Orden <span style="color: var(--color-danger);">*</span>
+              </label>
+              <input 
+                type="number" 
+                name="question_order_${tempId}" 
+                class="form-control"
+                value="${questionCounter}" 
+                required
+                min="0"
+                step="1">
+            </div>
+            
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label style="display: flex; align-items: center; gap: var(--space-sm); cursor: pointer;">
+                <input 
+                  type="checkbox" 
+                  name="question_required_${tempId}" 
+                  value="true"
+                  checked
+                  style="width: 20px; height: 20px; cursor: pointer;">
+                <span style="font-weight: var(--font-weight-medium);">
+                  Esta pregunta es obligatoria
+                </span>
+              </label>
+            </div>
+            
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label class="form-label">
+                Opciones Adicionales (JSON)
+              </label>
+              <textarea 
+                name="question_options_${tempId}" 
+                class="form-control"
+                rows="2"
+                placeholder='{"maxlength": 50, "placeholder": "Ingrese valor..."}'
+                style="font-family: monospace; font-size: var(--font-size-sm);"></textarea>
+              <small class="form-help">
+                Configuración adicional en formato JSON (opcional)
+              </small>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Add to container
+    container.insertAdjacentHTML('beforeend', questionHtml);
+    
+    // Mark form as changed
+    formChanged = true;
+    
+    // Scroll to new question
+    const newCard = container.lastElementChild;
+    newCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    
+    // Show toast notification
+    if (window.showToast) {
+      window.showToast('Nueva pregunta agregada. Configúrala antes de guardar.', 'success');
+    }
+  }
+  
+  /**
+   * Delete a question from the form.
+   * REASONING: Allow removing questions, but confirm first to prevent accidents.
+   */
+  function deleteQuestion(event, questionId) {
+    event.stopPropagation(); // Prevent card toggle
+    
+    if (!confirm('¿Estás seguro que deseas eliminar esta pregunta?')) {
+      return;
+    }
+    
+    const card = document.querySelector(`[data-question-id="${questionId}"]`);
+    if (card) {
+      card.remove();
+      formChanged = true;
+      
+      // Update question numbers
+      updateQuestionNumbers();
+      
+      // Show empty state if no questions left
+      const container = document.getElementById('questionsContainer');
+      if (container.children.length === 0) {
+        container.innerHTML = `
+          <div id="noQuestionsMessage" style="text-align: center; padding: var(--space-2xl); background-color: var(--color-bg-secondary); border-radius: var(--radius-md);">
+            <div style="font-size: 3rem; margin-bottom: var(--space-md); opacity: 0.3;">
+              ❓
+            </div>
+            <p style="color: var(--color-text-secondary); margin-bottom: var(--space-lg);">
+              Este formulario no tiene preguntas. Haz clic en "Agregar Pregunta" para comenzar.
+            </p>
+            <button type="button" class="btn btn-success" onclick="addNewQuestion()">
+              ➕ Agregar Primera Pregunta
+            </button>
+          </div>
+        `;
+      }
+      
+      if (window.showToast) {
+        window.showToast('Pregunta eliminada.', 'info');
+      }
+    }
+  }
+  
+  /**
+   * Update question numbers after adding/deleting.
+   */
+  function updateQuestionNumbers() {
+    document.querySelectorAll('.question-card').forEach((card, index) => {
+      const numberSpan = card.querySelector('.question-number');
+      if (numberSpan) {
+        numberSpan.textContent = index + 1;
+      }
+    });
+  }
+  
+  /**
+   * Form submission handler.
+   * REASONING: Validate form before submission and prevent double submission.
+   */
+  document.getElementById('createFormForm').addEventListener('submit', function(e) {
+    // Validate: Form must have a name
+    const formName = document.getElementById('name').value.trim();
+    if (!formName) {
+      e.preventDefault();
+      alert('El nombre del formulario es obligatorio.');
+      document.getElementById('name').focus();
+      return;
+    }
+    
+    // Validate: Form must have a type
+    const formType = document.getElementById('form_type').value;
+    if (!formType) {
+      e.preventDefault();
+      alert('Debes seleccionar un tipo de formulario.');
+      document.getElementById('form_type').focus();
+      return;
+    }
+    
+    // Warning: No questions added
+    const questionCount = document.querySelectorAll('.question-card').length;
+    if (questionCount === 0) {
+      if (!confirm('No has agregado ninguna pregunta al formulario.\n\n¿Deseas crear el formulario sin preguntas? Podrás agregarlas más tarde.')) {
+        e.preventDefault();
+        return;
+      }
+    }
+    
+    // Disable submit button to prevent double submission
+    const submitBtn = this.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = '💾 Creando...';
+    
+    // Allow form submission to proceed
+    formChanged = false; // Prevent beforeunload warning
+  });
+  
+  /**
+   * Keyboard shortcuts for power users.
+   */
+  document.addEventListener('keydown', function(e) {
+    // Ctrl/Cmd + S = Save form
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      document.getElementById('createFormForm').submit();
+    }
+    
+    // Ctrl/Cmd + Q = Add question
+    if ((e.ctrlKey || e.metaKey) && e.key === 'q') {
+      e.preventDefault();
+      addNewQuestion();
+    }
+  });
+  
+  /**
+   * Auto-add first question on page load for better UX.
+   * REASONING: Starting with one example question shows users the structure.
+   */
+  document.addEventListener('DOMContentLoaded', function() {
+    // Optionally, auto-add one question to get users started
+    // Uncomment if you want this behavior:
+    // addNewQuestion();
+  });
+</script>
+{% endblock %}

@@ -94,9 +94,9 @@ All pages should extend this template.
     <div class="navbar-container container">
       {# Logo and Brand - FIXED: Now goes to auth.login #}
       <a href="{{ url_for('auth.login') }}" class="navbar-brand">
-        <img src="{{ url_for('static', filename='icons/HGT-Logo-white-orange-RGB.svg') }}" 
+        <img src="{{ url_for('static', filename='icons/HGT-Logo-greyblue-orange-RGB.svg') }}" 
              alt="HGT Logo" 
-             style="height: 32px; margin-right: 12px;">
+             style="height: 100px; margin-right: 12px;">
         <span>HGT Data Collector</span>
       </a>
       
@@ -112,12 +112,27 @@ All pages should extend this template.
           {% if g.user.role == 'admin' %}
             <li><a href="{{ url_for('admin.index') }}" class="{% if request.endpoint == 'admin.index' %}active{% endif %}">📊 Dashboard</a></li>
             <li><a href="{{ url_for('admin.list_users') }}" class="{% if request.endpoint == 'admin.list_users' %}active{% endif %}">👥 Users</a></li>
+            <li><a href="{{ url_for('forms.list_forms') }}" class="{% if request.endpoint and request.endpoint.startswith('forms.') %}active{% endif %}">📋 Formularios</a></li>
+          {% endif %}
+          
+          {# Planner Navigation #}
+          {% if g.user.role == 'planner' %}
+            <li><a href="{{ url_for('planner.index') }}" class="{% if request.endpoint == 'planner.index' %}active{% endif %}">🏠 Home</a></li>
+            <li><a href="{{ url_for('forms.list_forms') }}" class="{% if request.endpoint and request.endpoint.startswith('forms.') %}active{% endif %}">📋 Formularios</a></li>
+            {# Add planification management links here when available #}
           {% endif %}
           
           {# Worker Navigation #}
           {% if g.user.role == 'worker' %}
             <li><a href="{{ url_for('worker.index') }}" class="{% if request.endpoint == 'worker.index' %}active{% endif %}">🏠 Home</a></li>
-            <li><a href="{{ url_for('tasks.list_tasks') }}" class="{% if request.endpoint and 'tasks' in request.endpoint %}active{% endif %}">📋 Tasks</a></li>
+            <li><a href="{{ url_for('tasks.list_tasks') }}" class="{% if request.endpoint == 'tasks' %}active{% endif %}">📋 Tasks</a></li>
+            <li><a href="{{ url_for('forms.list_forms') }}" class="{% if request.endpoint and request.endpoint.startswith('forms.') %}active{% endif %}">📝 Formularios</a></li>
+          {% endif %}
+          
+          {# Client Navigation - NO FORMS ACCESS #}
+          {% if g.user.role == 'client' %}
+            <li><a href="{{ url_for('client.index') }}" class="{% if request.endpoint == 'client.index' %}active{% endif %}">🏠 Home</a></li>
+            {# Clients only see their documents, not form templates #}
           {% endif %}
           
           {# Connection status indicator #}

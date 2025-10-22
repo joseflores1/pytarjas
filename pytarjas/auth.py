@@ -8,9 +8,9 @@ This dual approach allows:
 - JSON API for Progressive Web App (PWA) and mobile clients
 """
 
-import functools
+from functools import wraps
 from flask import (
-    Blueprint, flash, g, redirect, render_template, request, session, url_for, jsonify
+    Blueprint, flash, g, redirect, render_template, request, session, url_for, jsonify, abort
 )
 from datetime import timezone, datetime
 from pytarjas.models.user_models import db, User
@@ -244,7 +244,7 @@ def login_required(view):
     This allows the same endpoint to work for both browser
     and API/PWA clients.
     """
-    @functools.wraps(view)
+    @wraps(view)
     def wrapped_view(**kwargs):
         if g.user is None:
             if request.is_json:
@@ -281,7 +281,7 @@ def admin_required(view):
     - HTML requests: Shows 403 error page
     - JSON requests: Returns 403 with error message
     """
-    @functools.wraps(view)
+    @wraps(view)
     def wrapped_view(**kwargs):
         if g.user.role != "admin":
             if request.is_json:
@@ -297,4 +297,82 @@ def admin_required(view):
 
         return view(**kwargs)
 
+    return wrapped_view
+
+def task_access_required(view):
+    """
+    Decorator to require task access permissions.
+    
+    Prevents clients from accessing task endpoints.
+    Workers, planners, and admins are allowed.
+    
+    Usage:
+        @bp.route('/list')
+        @login_required
+        @task_access_required
+        def list_tasks():
+            return jsonify(...)
+    """
+    @wraps(view)
+    def wrapped_view(**kwargs):
+        # Client role is not allowed to access tasks
+        if g.user.role == "client":
+            # Return appropriate error format based on request type
+            if request.is_json or request.headers.get("Accept") == "application/json":
+                return jsonify({
+                    "success": False,
+                    "error": "Access denied. Clients cannot access task endpoints."
+                }), 403
+            else:
+                # HTML error page
+                abort(403)
+        
+        return view(**kwargs)
+    
+    return wrapped_view
+
+# ============================================================================
+# CUSTOM DECORATOR: form_access_required
+# ============================================================================
+
+def form_access_required(view):
+    """
+    Decorator to require form management permissions.
+    
+    REASONING:
+    - Forms are internal operational tools, not for external clients
+    - Only Admin, Planner, and Worker roles can create/manage forms
+    - Clients only VIEW completed documents, not the templates
+    
+    MUST be used AFTER @login_required decorator.
+    
+    Usage:
+        @bp.route('/create')
+        @login_required
+        @form_access_required
+        def create_form():
+            return jsonify(...)
+    
+    Behavior:
+    - Checks if user role is NOT 'client'
+    - HTML requests: Shows 403 error page
+    - JSON requests: Returns 403 with error message
+    """
+    @wraps(view)
+    def wrapped_view(**kwargs):
+        # Client role is not allowed to manage forms
+        if g.user.role == "client":
+            # Return appropriate error format based on request type
+            if request.is_json or request.headers.get("Accept") == "application/json":
+                return jsonify({
+                    "success": False,
+                    "error": "Access denied. Clients cannot manage forms."
+                }), 403
+            else:
+                # HTML error page using Flask's abort
+                abort(403)
+        
+        # User has permission - proceed with the view
+        return view(**kwargs)
+    
     return wrapped_view
