@@ -75,15 +75,21 @@ def create_app(test_config=None):
     from .models.user_models import db
     db.init_app(app)
     
+    # Initialize Flask-Migrate extension for database migrations
+    # This allows us to track and version database schema changes
+    from flask_migrate import Migrate
+    migrate = Migrate(app, db)
+    
     # Import all models so SQLAlchemy knows about them
-    # This MUST happen after db.init_app() but before db.create_all()
+    # This MUST happen after db.init_app() but before any database operations
     # noqa tells linters to ignore "unused import" warnings
     from .models import user_models, docs_models  # noqa
     
-    # Create database tables if they don't exist
-    # In production, use Flask-Migrate instead of db.create_all()
-    with app.app_context():
-        db.create_all()
+    # NOTE: db.create_all() is now replaced by Flask-Migrate
+    # To create/update database schema, use: flask db upgrade
+    # For development convenience, you can uncomment the line below:
+    #with app.app_context():
+    #    db.create_all()
     
     # Register blueprints
     from . import auth
@@ -103,5 +109,60 @@ def create_app(test_config=None):
 
     # TODO: Register PWA routes (manifest.json, service-worker.js)
     # We'll add these in the next step
+    
+    # ============================================================================
+    # ROOT ROUTE: Redirect to appropriate page based on authentication
+    # ============================================================================
+    @app.route("/")
+    def index():
+        """
+        Root route handler.
+        
+        REASONING:
+        - When users visit the site root, we need to direct them somewhere useful
+        - If authenticated, send them to their role-appropriate dashboard
+        - If not authenticated, send them to login page
+        
+        BEHAVIOR:
+        - Unauthenticated users â†’ /auth/login
+        - Authenticated admin â†’ /admin/
+        - Authenticated planner â†’ /planifications/
+        - Authenticated worker â†’ /worker/
+        - Authenticated client â†’ /worker/ (or a custom client dashboard if you build one)
+        
+        This creates a smooth user experience where the homepage adapts to the user.
+        """
+        from flask import session, redirect, url_for
+        
+        # Check if user is logged in by looking for user_id in session
+        if "user_id" not in session:
+            # Not logged in â†’ send to login page
+            return redirect(url_for("auth.login"))
+        
+        # User is logged in â†’ get their info to determine dashboard
+        from pytarjas.models.user_models import User
+        user = User.query.get(session["user_id"])
+        
+        if user is None:
+            # Session has invalid user_id (maybe user was deleted)
+            # Clear session and send to login
+            session.clear()
+            return redirect(url_for("auth.login"))
+        
+        # Route based on user role
+        if user.role == "admin":
+            return redirect(url_for("admin.index"))
+        elif user.role == "planner":
+            return redirect(url_for("planifications.list_planifications"))
+        elif user.role == "worker":
+            return redirect(url_for("worker.index"))
+        elif user.role == "client":
+            # For now, send clients to worker dashboard
+            # TODO: Create a dedicated client dashboard showing their reports
+            return redirect(url_for("worker.index"))
+        else:
+            # Unknown role â†’ send to login
+            session.clear()
+            return redirect(url_for("auth.login"))
     
     return app

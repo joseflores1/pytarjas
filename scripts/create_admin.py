@@ -12,4 +12,4 @@ with app.app_context():
     admin.set_user_password(admin, "admin123")
     db.session.add(admin)
     db.session.commit()
-    print(f"Craeated admin: {admin.username}")
+    print(f"Created admin: {admin.username}")

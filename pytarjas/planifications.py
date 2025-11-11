@@ -1,18 +1,19 @@
 # pytarjas/planifications.py
 """
-Planifications blueprint for managing work planifications and their records.
+Planifications blueprint for managing work planifications and documents.
 
 This blueprint handles the complete workflow of planifications:
 1. Planners create planifications through HTML forms (manual data entry)
-2. System creates Records from the planification data
-3. System auto-generates Documents (one per Record) for workers to fill
-4. Workers access their assigned documents through the tasks interface
-5. Planners review completed work
+2. System auto-generates Documents directly from the planification data
+3. Workers access their assigned documents through the tasks interface
+4. Planners review completed work
+
+SIMPLIFIED: Record class has been removed - Documents now contain data directly.
 
 REASONING BEHIND THE CODE:
 - Planifications are work orders/schedules created by Planners
-- Each planification can have multiple Records (rows of work items)
-- Each Record gets one Document for a Worker to fill during field work
+- Each planification can have multiple Documents (work items)
+- Documents contain task data (record_data) and are filled by Workers during field work
 - This is the entry point for all field work - without planifications, workers have nothing to do
 
 ACCESS CONTROL:
@@ -34,7 +35,7 @@ from functools import wraps
 
 # Import database and models
 from pytarjas.models.user_models import db, User
-from pytarjas.models.docs_models import Planification, Record, Document, Form, Question #noqa
+from pytarjas.models.docs_models import Planification, Document, Form, Question #noqa
 
 # Import authentication decorators
 from pytarjas.auth import login_required
@@ -79,10 +80,11 @@ def check_planification_access(planification_id: str) -> Planification:
     """
     # Fetch planification with eager loading of relationships
     # joinedload prevents N+1 query problems by loading related data in one query
+    # UPDATED: records â†’ documents (Record class removed)
     planification = Planification.query.options(
         joinedload(Planification.planner),
         joinedload(Planification.form),
-        joinedload(Planification.records)
+        joinedload(Planification.documents)  # Load documents instead of records
     ).get_or_404(planification_id)
     
     # Role-based access control
@@ -190,7 +192,7 @@ def list_planifications():
                 "form_name": "Formulario Consolidado",
                 "form_type": "consolidado",
                 "status": "completed",
-                "total_records": 25,
+                "total_documents": 25,
                 "completed_documents": 23,
                 "planner": {
                     "id": "planner-uuid",
@@ -223,10 +225,11 @@ def list_planifications():
     
     # Build query with eager loading for better performance
     # joinedload prevents N+1 queries by fetching related data in one SQL query
+    # UPDATED: records â†’ documents (Record class removed)
     query = Planification.query.options(
         joinedload(Planification.planner),
         joinedload(Planification.form),
-        joinedload(Planification.records)
+        joinedload(Planification.documents)  # Load documents instead of records
     )
     
     # Apply filters based on query parameters
@@ -265,9 +268,10 @@ def list_planifications():
     planifications_data = []
     for plan in planifications:
         # Count completed documents for progress tracking
+        # UPDATED: Iterate over plan.documents directly (no longer through records)
         completed_docs = sum(
-            1 for record in plan.records 
-            if record.document and record.document.status == 'completed'
+            1 for doc in plan.documents 
+            if doc.status == 'completed'
         )
         
         plan_dict = {
@@ -276,7 +280,7 @@ def list_planifications():
             "form_name": plan.form.name,
             "form_type": plan.form.form_type,
             "status": plan.status,
-            "total_records": plan.total_records,
+            "total_documents": plan.total_documents,  # UPDATED: total_records â†’ total_documents
             "completed_documents": completed_docs,
             "planner": {
                 "id": plan.planner.id,
@@ -344,18 +348,20 @@ def get_planification(planification_id):
     Get detailed information about a specific planification.
     
     REASONING:
-    - Shows complete planification structure including all records
+    - Shows complete planification structure including all documents
     - Displays form template being used
     - Shows progress (how many documents completed)
-    - Workers use this to understand their assignment context
+    - Workers use this to understand their assignment context (if needed)
     - Planners use this to review and manage planifications
+    
+    UPDATED: Now directly shows documents (Record class removed for simplicity)
     
     DUAL RESPONSE ENDPOINT: Returns JSON or HTML based on request headers.
     
     Returns complete planification information including:
     - Planification metadata (client, status, dates)
     - Associated form structure
-    - All records with their document status
+    - All documents with their status and worker assignments
     - Progress metrics
     
     GET /planifications/<planification_id>
@@ -367,22 +373,21 @@ def get_planification(planification_id):
             "id": "plan-uuid",
             "client_name": "ACME Corp",
             "status": "completed",
-            "total_records": 10,
+            "total_documents": 10,
             "form": {
                 "id": "form-uuid",
                 "name": "Formulario Consolidado",
                 "form_type": "consolidado",
                 "questions": [...]
             },
-            "records": [
+            "documents": [
                 {
-                    "id": "record-uuid-1",
+                    "id": "doc-uuid-1",
                     "record_data": {"container_number": "ABCD123", ...},
-                    "document": {
-                        "id": "doc-uuid-1",
-                        "status": "completed",
-                        "worker": {...}
-                    }
+                    "status": "completed",
+                    "worker": {...},
+                    "started_at": "2025-10-22T08:00:00Z",
+                    "completed_at": "2025-10-22T10:30:00Z"
                 }
             ],
             "planner": {...},
@@ -405,8 +410,9 @@ def get_planification(planification_id):
     
     # Calculate progress metrics
     # Count documents by status for progress tracking
+    # UPDATED: Direct iteration over documents (Record class removed)
     progress = {
-        "total": planification.total_records,
+        "total": planification.total_documents,
         "pending": 0,
         "in_progress": 0,
         "completed": 0,
@@ -414,41 +420,33 @@ def get_planification(planification_id):
         "approved": 0
     }
     
-    for record in planification.records:
-        if record.document:
-            status = record.document.status
-            if status in progress:
-                progress[status] += 1
-            else:
-                progress["pending"] += 1  # Default to pending if unknown status
+    # UPDATED: Iterate directly over planification.documents
+    for document in planification.documents:
+        status = document.status
+        if status in progress:
+            progress[status] += 1
         else:
-            progress["pending"] += 1  # No document yet = pending
+            progress["pending"] += 1  # Default to pending if unknown status
     
-    # Serialize records with their documents
-    records_data = []
-    for record in planification.records:
-        record_dict = {
-            "id": record.id,
-            "record_data": record.record_data,
-            "created_at": record.created_at.isoformat() if record.created_at else None,
-            "document": None
+    # Serialize documents with their data
+    # UPDATED: Changed from records_data to documents_data for clarity
+    documents_data = []
+    for document in planification.documents:
+        doc_dict = {
+            "id": document.id,
+            "record_data": document.record_data,  # Task-specific data stored in document
+            "status": document.status,
+            "worker": {
+                "id": document.worker.id,
+                "username": document.worker.username
+            } if document.worker else None,
+            "started_at": document.started_at.isoformat() if document.started_at else None,
+            "completed_at": document.completed_at.isoformat() if document.completed_at else None,
+            "is_synced": document.is_synced,
+            "created_at": document.created_at.isoformat() if document.created_at else None
         }
         
-        # Include document info if it exists
-        if record.document:
-            record_dict["document"] = {
-                "id": record.document.id,
-                "status": record.document.status,
-                "worker": {
-                    "id": record.document.worker.id,
-                    "username": record.document.worker.username
-                } if record.document.worker else None,
-                "started_at": record.document.started_at.isoformat() if record.document.started_at else None,
-                "completed_at": record.document.completed_at.isoformat() if record.document.completed_at else None,
-                "is_synced": record.document.is_synced
-            }
-        
-        records_data.append(record_dict)
+        documents_data.append(doc_dict)
     
     # DUAL RESPONSE: Check what format the client wants
     if wants_json():
@@ -459,7 +457,7 @@ def get_planification(planification_id):
                 "id": planification.id,
                 "client_name": planification.client_name,
                 "status": planification.status,
-                "total_records": planification.total_records,
+                "total_documents": planification.total_documents,  # UPDATED: total_records → total_documents
                 "file_name": planification.file_name if planification.file_name else None,
                 "form": {
                     "id": planification.form.id,
@@ -478,7 +476,7 @@ def get_planification(planification_id):
                         for q in sorted(planification.form.questions, key=lambda x: x.order)
                     ]
                 },
-                "records": records_data,
+                "documents": documents_data,  # UPDATED: records → documents
                 "planner": {
                     "id": planification.planner.id,
                     "username": planification.planner.username,
@@ -494,7 +492,7 @@ def get_planification(planification_id):
     return render_template(
         "planifications/view_planification.html",
         planification=planification,
-        records=records_data,
+        documents=documents_data,  # UPDATED: Pass documents instead of records
         progress=progress,
         user=g.user
     )
@@ -514,20 +512,22 @@ def create_planification():
     REASONING:
     - Planners create planifications to define work for workers
     - Each planification specifies WHAT form to use and WHAT data to collect
-    - Records are created from the planification data
-    - Documents are auto-generated (one per record) for workers to fill
+    - Documents are created directly from the planification data (one per work item)
+    - Each document represents a task for a worker to complete in the field
+    
+    SIMPLIFIED: Documents are now created directly (Record class removed)
     
     ACCESS CONTROL:
     - Only planners and admins can create planifications
-    - Workers can view but NOT create
+    - Workers cannot create (they only work on assigned documents)
     
     GET: Show planification creation form
-    POST: Create the planification and generate records + documents
+    POST: Create the planification and generate documents
     
     Form/JSON Fields (required):
     - client_name: Name of the client this work is for
     - form_id: UUID of the form template to use
-    - records: List of record data dictionaries (the work items)
+    - records: List of record data dictionaries (the work items - name kept for API compatibility)
     
     Form/JSON Fields (optional):
     - status: Initial status (default: "uploaded")
@@ -554,11 +554,11 @@ def create_planification():
     JSON Success Response (201):
     {
         "success": true,
-        "message": "Planification created successfully with 2 records and 2 documents.",
+        "message": "Planification created successfully with 2 documents.",
         "planification": {
             "id": "plan-uuid",
             "client_name": "ACME Corp",
-            "total_records": 2,
+            "total_documents": 2,
             "status": "completed",
             "created_at": "2025-10-22T14:30:00Z"
         }
@@ -674,55 +674,44 @@ def create_planification():
                 form_id=form_id,
                 client_name=client_name,
                 status=status,
-                total_records=len(records_data),
+                total_documents=len(records_data),  # UPDATED: total_records → total_documents
                 file_path="",  # No file upload in this version
                 file_name="",  # Manual entry via form
                 created_at=datetime.now(timezone.utc)
             )
             db.session.add(planification)
             
-            # Create Records from the submitted data
-            created_records = []
+            # Create Documents directly from the submitted data
+            # SIMPLIFIED: No longer creating Records first - Documents contain data directly
+            # Each document represents one work item for a worker to complete
+            created_documents = []
             for record_data in records_data:
-                record = Record(
-                    id=str(uuid.uuid4()),
-                    planification_id=planification.id,
-                    record_data=record_data,  # JSON field stores flexible data
-                    created_at=datetime.now(timezone.utc)
-                )
-                db.session.add(record)
-                created_records.append(record)
-            
-            # Flush to get record IDs before creating documents
-            # flush() sends SQL to database but doesn't commit transaction
-            # This allows us to use the generated IDs immediately
-            db.session.flush()
-            
-            # Auto-generate Documents (one per Record)
-            # These will be assigned to workers later
-            for record in created_records:
                 document = Document(
                     id=str(uuid.uuid4()),
-                    record_id=record.id,
-                    worker_id=None,  # Not assigned yet
-                    status="pending",  # Waiting to be assigned
-                    responses={},  # Empty responses to start
-                    photos=[],  # No photos yet
-                    is_synced=True,  # Starts as synced
+                    planification_id=planification.id,  # Link to batch planification
+                    form_id=form_id,  # Direct reference to form template
+                    record_data=record_data,  # JSON field stores flexible task data
+                    worker_id=None,  # Not assigned yet - will be assigned manually or automatically
+                    status="pending",  # Waiting to be assigned and filled
+                    responses={},  # Empty responses to start - worker will fill these
+                    photos=[],  # No photos yet - worker will add during field work
+                    is_synced=True,  # Starts as synced (no offline changes yet)
                     created_at=datetime.now(timezone.utc)
                 )
                 db.session.add(document)
+                created_documents.append(document)
             
-            # Update planification status to completed (all records and documents created)
-            planification.status = "completed"
+            # Update planification counters and status
+            planification.total_documents = len(records_data)  # Track how many documents created
+            planification.status = "completed"  # All documents created successfully
             planification.updated_at = datetime.now(timezone.utc)
             
             # Commit all changes to database
+            # This commits the planification + all documents in one transaction
             db.session.commit()
             
             success_message = (
-                f"Planification created successfully with {len(records_data)} records "
-                f"and {len(records_data)} documents."
+                f"Planification created successfully with {len(records_data)} documents."
             )
             
             # Return appropriate response
@@ -733,7 +722,7 @@ def create_planification():
                     "planification": {
                         "id": planification.id,
                         "client_name": planification.client_name,
-                        "total_records": planification.total_records,
+                        "total_documents": planification.total_documents,  # UPDATED: total_records → total_documents
                         "status": planification.status,
                         "created_at": planification.created_at.isoformat()
                     }
@@ -828,8 +817,8 @@ def delete_planification(planification_id):
     # OPTIONAL: Check if there are completed documents
     # You might want to prevent deletion if work has been done
     # completed_count = sum(
-    #     1 for record in planification.records
-    #     if record.document and record.document.status == 'completed'
+    #     1 for doc in planification.documents
+    #     if doc.status == 'completed'
     # )
     # if completed_count > 0:
     #     error_msg = f"Cannot delete planification with {completed_count} completed documents."

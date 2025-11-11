@@ -340,9 +340,16 @@ def form_access_required(view):
     Decorator to require form management permissions.
     
     REASONING:
-    - Forms are internal operational tools, not for external clients
-    - Only Admin, Planner, and Worker roles can create/manage forms
+    - Forms are internal operational tools that define data collection structure
+    - Only Admin and Planner roles can create/manage forms (system configuration)
+    - Workers FILL forms during field work, but cannot modify form templates
     - Clients only VIEW completed documents, not the templates
+    
+    ACCESS RULES:
+    - Admin: ✅ Can manage forms (full system access)
+    - Planner: ✅ Can manage forms (creates forms for their planifications)
+    - Worker: ❌ Cannot manage forms (they only fill them out)
+    - Client: ❌ Cannot manage forms (external users, read-only)
     
     MUST be used AFTER @login_required decorator.
     
@@ -354,19 +361,21 @@ def form_access_required(view):
             return jsonify(...)
     
     Behavior:
-    - Checks if user role is NOT 'client'
+    - Checks if user role is 'admin' OR 'planner'
     - HTML requests: Shows 403 error page
     - JSON requests: Returns 403 with error message
     """
     @wraps(view)
     def wrapped_view(**kwargs):
-        # Client role is not allowed to manage forms
-        if g.user.role == "client":
+        # Only admin and planner roles are allowed to manage forms
+        # Workers can FILL forms but not CREATE/EDIT them
+        # Clients have no access to forms at all
+        if g.user.role not in ["admin", "planner"]:
             # Return appropriate error format based on request type
             if request.is_json or request.headers.get("Accept") == "application/json":
                 return jsonify({
                     "success": False,
-                    "error": "Access denied. Clients cannot manage forms."
+                    "error": "Access denied. Only admins and planners can manage forms."
                 }), 403
             else:
                 # HTML error page using Flask's abort
@@ -375,4 +384,73 @@ def form_access_required(view):
         # User has permission - proceed with the view
         return view(**kwargs)
     
+    return wrapped_view
+
+
+# ============================================================================
+# CUSTOM DECORATOR: assignment_access_required
+# ============================================================================
+
+def assignment_access_required(view):
+    """
+    Decorator to require task assignment permissions.
+    
+    REASONING:
+    - Only admins and planners should be able to assign tasks to workers
+    - Workers cannot assign tasks (they receive assignments)
+    - Clients have no involvement in task assignment at all
+    
+    ACCESS RULES:
+    - Admin: ✅ Can assign tasks (full system access)
+    - Planner: ✅ Can assign tasks (part of their coordination role)
+    - Worker: ❌ Cannot assign tasks (they are recipients of assignments)
+    - Client: ❌ Cannot assign tasks (external users, read-only)
+    
+    MUST be used AFTER @login_required decorator.
+    
+    Usage:
+        @bp.route('/tasks/<task_id>/assign')
+        @login_required
+        @assignment_access_required
+        def assign_task(task_id):
+            return jsonify(...)
+    
+    Behavior:
+    - Checks if user role is 'admin' OR 'planner'
+    - HTML requests: Shows 403 error page
+    - JSON requests: Returns 403 with error message
+    
+    WHY THIS DECORATOR:
+    - Centralizes assignment permission logic in one place
+    - Makes code more readable: @assignment_access_required is self-documenting
+    - Easy to modify permissions later if business rules change
+    - Consistent error messages across all assignment endpoints
+    """
+    # @wraps preserves the original function's metadata (name, docstring, etc.)
+    # This is important for Flask's routing system to work correctly
+    @wraps(view)
+    def wrapped_view(**kwargs):
+        # Check if user has assignment permissions
+        # Only admin and planner roles are allowed
+        if g.user.role not in ["admin", "planner"]:
+            # Return appropriate error format based on request type
+            
+            # Check if this is a JSON/API request
+            # We check both request.is_json and Accept header to catch all API calls
+            if request.is_json or request.headers.get("Accept") == "application/json":
+                # Return JSON error for API clients (PWA, AJAX, mobile apps)
+                return jsonify({
+                    "success": False,
+                    "error": "Access denied. Only admins and planners can assign tasks."
+                }), 403
+            else:
+                # HTML clients get a 403 Forbidden page
+                # abort() triggers Flask's error handler which shows a nice error page
+                abort(403)
+        
+        # User has permission (is admin or planner) - proceed with the view function
+        return view(**kwargs)
+    
+    # Return the wrapped function
+    # Flask will call this wrapper, which checks permissions before calling the actual view
     return wrapped_view

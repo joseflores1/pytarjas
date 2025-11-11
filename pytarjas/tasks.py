@@ -26,7 +26,7 @@ from flask import Blueprint, request, jsonify, render_template, g, abort
 from datetime import datetime, timezone
 from pytarjas.auth import login_required, task_access_required
 from pytarjas.models.user_models import User, db #noqa
-from pytarjas.models.docs_models import Document, Record, Planification, Form, Question #noqa
+from pytarjas.models.docs_models import Document, Planification, Form, Question #noqa
 from pytarjas.helper import wants_json
 # Create blueprint with URL prefix /tasks
 # This API is shared across worker, planner, and admin interfaces
@@ -86,8 +86,9 @@ def list_tasks():
     container_search = request.args.get('container_number')
     
     # Start building the query
-    # Join all necessary tables for complete task information
-    query = Document.query.join(Record).join(Planification).join(Form)
+    # Join necessary tables for complete task information
+    # UPDATED: Removed Record join - Document now directly references Planification and Form
+    query = Document.query.join(Planification).join(Form)
     
     # Role-based filtering
     if g.user.role == "worker":
@@ -105,10 +106,21 @@ def list_tasks():
     if status != 'all':
         query = query.filter(Document.status == status)
     
-    # Container number search (case-insensitive partial match)
-    # ilike = case-insensitive LIKE query
+    # TODO: Implement generic search in record_data JSON field
+    # Container/record search would need to search within the JSON field
+    # For PostgreSQL, this can be done with JSONB operators:
+    # query = query.filter(Document.record_data['field_name'].astext.ilike(f"%{search}%"))
+    # For now, this search is disabled to support any form structure
     if container_search:
-        query = query.filter(Record.container_number.ilike(f"%{container_search}%"))
+        # Placeholder: This would need JSON field search implementation
+        # Example for PostgreSQL JSONB:
+        # query = query.filter(
+        #     db.or_(
+        #         Document.record_data['container_number'].astext.ilike(f"%{container_search}%"),
+        #         Document.record_data['client_name'].astext.ilike(f"%{container_search}%")
+        #     )
+        # )
+        pass
     
     # Get total count BEFORE pagination (for showing "X of Y results")
     total = query.count()
@@ -119,20 +131,25 @@ def list_tasks():
     
     # Serialize documents to dictionary format
     # This creates a simple data structure that works for both JSON and templates
+    # REASONING: Use record_data dynamically to support any form structure
     tasks = []
     for doc in documents:
         task_data = {
             "id": doc.id,
-            "container_number": doc.record.container_number,
-            "client_name": doc.record.client_name,
-            "ship_name": doc.record.ship_name,
+            
+            # DYNAMIC RECORD DATA - supports any form type
+            # Pass the entire record_data dictionary for flexibility
+            # UPDATED: Access directly from document (no longer through record)
+            "record_data": doc.record_data or {},
+            
             "status": doc.status,
             "worker": {
                 "id": doc.worker.id,
                 "username": doc.worker.username
             } if doc.worker else None,
-            "form_type": doc.record.planification.form.form_type,
-            "form_name": doc.record.planification.form.name,
+            # UPDATED: Access form directly from document (no longer through record.planification)
+            "form_type": doc.form.form_type,
+            "form_name": doc.form.name,
             "created_at": doc.created_at.isoformat() if doc.created_at else None,
             "started_at": doc.started_at.isoformat() if doc.started_at else None,
             "completed_at": doc.completed_at.isoformat() if doc.completed_at else None,
@@ -224,11 +241,13 @@ def get_task(task_id):
     # Query the document with ALL related data using joinedload
     # joinedload = eager loading strategy (gets everything in one query)
     # This is more efficient than lazy loading which would cause N+1 queries
+    # UPDATED: Removed Record join - Document now directly references Planification and Form
     document = Document.query.options(
-        db.joinedload(Document.record).joinedload(Record.planification).joinedload(Planification.form).joinedload(Form.questions),
-        db.joinedload(Document.worker)
-    ).filter_by(id=task_id).first()
-    
+        db.joinedload(Document.form).joinedload(Form.questions),  # Direct form access
+        db.joinedload(Document.planification),  # Optional planification (might be NULL)
+        db.joinedload(Document.worker)  # Worker info
+    ).filter_by(id=task_id).first()  
+
     # 404 if task doesn't exist
     if not document:
         if wants_json():
@@ -251,8 +270,9 @@ def get_task(task_id):
     
     # Serialize form questions
     # Sort by order field to display questions in correct sequence
+    # UPDATED: Access form directly from document (no longer through record.planification)
     questions = []
-    for q in sorted(document.record.planification.form.questions, key=lambda x: x.order):
+    for q in sorted(document.form.questions, key=lambda x: x.order):
         questions.append({
             "id": q.id,
             "text": q.question_text,
@@ -265,27 +285,25 @@ def get_task(task_id):
         })
     
     # Build complete task data structure
+    # REASONING: Use record_data dynamically instead of hardcoded fields
+    # This allows the system to work with ANY form structure, not just container forms
+    # record_data is a flexible JSON field that adapts to different form types
     task_data = {
         "id": document.id,
         "status": document.status,
-        "container": {
-            "number": document.record.container_number,
-            "client_name": document.record.client_name,
-            "ship_name": document.record.ship_name,
-            "voyage_stage": document.record.voyage_stage,
-            "reservation": document.record.reservation,
-            "origin": document.record.origin,
-            "destination": document.record.destination,
-            "seal_number": document.record.seal_number,
-            "iso_code": document.record.iso_code,
-            "manifested_packages": document.record.manifested_packages,
-            "weight_kg": document.record.weight_kg,
-            "size": document.record.size
-        },
+        
+        # DYNAMIC RECORD DATA - works with any form structure
+        # Instead of hardcoded fields, we pass the entire record_data dictionary
+        # The template will display whatever fields exist in this specific record
+        # UPDATED: Access directly from document (no longer through record)
+        "record_data": document.record_data or {},
+        
+        # Form structure with questions
+        # UPDATED: Access form directly from document (no longer through record.planification)
         "form": {
-            "id": document.record.planification.form.id,
-            "name": document.record.planification.form.name,
-            "type": document.record.planification.form.form_type,
+            "id": document.form.id,
+            "name": document.form.name,
+            "type": document.form.form_type,
             "questions": questions
         },
         "responses": document.responses or {},
@@ -315,7 +333,7 @@ def get_task(task_id):
     
     # HTML Response - render form for filling/editing
     return render_template(
-        "tasks/detail.html",
+        "tasks/task_detail.html",
         task=task_data,
         user=g.user
     )

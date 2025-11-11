@@ -162,6 +162,8 @@ class Planification(db.Model):
     """
     Work planning document created by Planner.
     
+    SIMPLIFIED: Now directly contains Documents without the Record middle layer.
+    
     Attributes:
         id: Unique identifier (UUID)
         planner_id: Foreign key to User (Planner who created it)
@@ -170,12 +172,12 @@ class Planification(db.Model):
         file_name: Original filename - empty if created via UI
         status: Processing status (uploaded, processing, completed, error)
         client_name: Client who requested this work
-        total_records: Number of records/rows in this planification
+        total_documents: Number of documents in this planification (was total_records)
         created_at: When the planification was created
         updated_at: Last modification timestamp
         planner: Related User (Planner) object (many-to-one)
         form: Related Form object (many-to-one)
-        records: Related Record objects (one-to-many)
+        documents: Related Document objects (one-to-many) - CHANGED from records
     """
 
     __tablename__="planification"
@@ -224,7 +226,8 @@ class Planification(db.Model):
         index=True,
     )
     
-    total_records: Mapped[int]=mapped_column(
+    # RENAMED: total_records → total_documents (more accurate now)
+    total_documents: Mapped[int]=mapped_column(
         Integer,
         nullable=False,
         default=0,
@@ -248,112 +251,36 @@ class Planification(db.Model):
         "Form",
         back_populates="planifications",
     )
-    records: Mapped[list["Record"]]=relationship(
-        "Record",
+    # CHANGED: records → documents (direct relationship now)
+    documents: Mapped[list["Document"]]=relationship(
+        "Document",
         back_populates="planification",
         cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:
-        return f"<Planification: {self.client_name} - {self.total_records} records>"
+        return f"<Planification: {self.client_name} - {self.total_documents} documents>"
 
 
-class Record(db.Model):
-    """
-    Single work item (row) from a Planification.
-    
-    Uses JSON to store all form-specific data, allowing different forms
-    to have different fields without requiring database migrations.
-    
-    Attributes:
-        id: Unique identifier (UUID) - the primary key
-        planification_id: Foreign key to parent Planification
-        record_data: JSON containing all form-specific fields
-        created_at: When the record was created
-        updated_at: When the record was last modified
-        planification: Related Planification object (many-to-one)
-        document: Related Document object (one-to-one)
-    
-    Example record_data for different forms:
-        Container form: {"container_number": "ABCD123", "ship_name": "MSC Luna", ...}
-        Pallet form: {"pallet_number": "PLT-001", "warehouse": "A-15", ...}
-        Booking form: {"booking_number": "BK2025001", "client": "ACME", ...}
-    """
-    
-    __tablename__ = "record"
-    
-    id: Mapped[str] = mapped_column(
-        String(36),
-        primary_key=True,
-        default=lambda: str(uuid.uuid4()),
-    )
-    
-    planification_id: Mapped[str] = mapped_column(
-        String(36),
-        ForeignKey("planification.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    
-    record_data: Mapped[dict] = mapped_column(
-        JSON,
-        nullable=False,
-        default=dict,
-    )
-    
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-    )
-    
-    updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime,
-        nullable=True,
-    )
-    
-    planification: Mapped["Planification"] = relationship(
-        "Planification",
-        back_populates="records",
-    )
-    
-    document: Mapped["Document"] = relationship(
-        "Document",
-        back_populates="record",
-        uselist=False,
-        cascade="all, delete-orphan",
-    )
-    
-    def get_field(self, field_name: str, default=None):
-        """Get a field from record_data with optional default value."""
-        return self.record_data.get(field_name, default)
-    
-    def set_field(self, field_name: str, value):
-        """Set a field in record_data and mark as modified."""
-        self.record_data[field_name] = value
-        flag_modified(self, 'record_data')
-        self.updated_at = datetime.now(timezone.utc)
-    
-    def update_fields(self, fields_dict: dict):
-        """Update multiple fields in record_data at once."""
-        self.record_data.update(fields_dict)
-        flag_modified(self, 'record_data')
-        self.updated_at = datetime.now(timezone.utc)
-    
-    def __repr__(self) -> str:
-        return f"<Record: {self.id}>"
+# RECORD CLASS REMOVED - Its functionality has been merged into Document below
 
 
 class Document(db.Model):
     """
     Fillable tarja document for Workers.
     
-    Documents are automatically created from Records and Forms.
-    Workers fill them during faenas by answering questions and taking photos.
+    SIMPLIFIED: Now contains task data directly (record_data) and references Planification.
+    The Record middle layer has been removed for simplicity.
+    
+    Documents can be created in two ways:
+    1. Batch creation from Planification (planification_id is set)
+    2. Manual creation (planification_id can be NULL)
     
     Attributes:
         id: Unique identifier (UUID)
-        record_id: Foreign key to Record (unique for one-to-one)
+        planification_id: Foreign key to Planification (NULL for manual tasks)
+        form_id: Foreign key to Form (which template to use)
+        record_data: JSON containing all task-specific data (merged from Record)
         worker_id: Foreign key to User (Worker who fills it)
         status: Document status (pending, in_progress, completed, reviewed, approved)
         responses: JSON storing all question answers
@@ -366,8 +293,14 @@ class Document(db.Model):
         is_synced: Whether offline changes are synced
         created_at: When the document was created
         updated_at: Last modification timestamp
-        record: Related Record object (one-to-one)
+        planification: Related Planification object (many-to-one) - CHANGED from record
+        form: Related Form object (many-to-one) - NEW direct relationship
         worker: Related User (Worker) object (many-to-one)
+    
+    Example record_data for different forms:
+        Container form: {"container_number": "ABCD123", "ship_name": "MSC Luna", ...}
+        Pallet form: {"pallet_number": "PLT-001", "warehouse": "A-15", ...}
+        Booking form: {"booking_number": "BK2025001", "client": "ACME", ...}
     """
     __tablename__ = "document"
     
@@ -377,13 +310,31 @@ class Document(db.Model):
         default=lambda: str(uuid.uuid4()),
     )
     
-    record_id: Mapped[str] = mapped_column(
+    # CHANGED: record_id → planification_id (direct reference now)
+    # NULLABLE: Allows manual task creation without planification
+    planification_id: Mapped[str | None] = mapped_column(
         String(36),
-        ForeignKey("record.id", ondelete="CASCADE"),
-        nullable=False,
-        unique=True,
+        ForeignKey("planification.id", ondelete="CASCADE"),
+        nullable=True,  # NULL = manual task, not from planification
         index=True,
     )
+    
+    # NEW: Direct reference to Form (was accessed via record.planification.form)
+    form_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("form.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    
+    # NEW: Merged from Record - stores all task-specific data
+    # Uses JSON for flexibility - different forms can have different fields
+    record_data: Mapped[dict] = mapped_column(
+        JSON,
+        nullable=False,
+        default=dict,
+    )
+    
     worker_id: Mapped[str | None] = mapped_column(
         String(36),
         ForeignKey("users.id", ondelete="SET NULL"),
@@ -446,14 +397,86 @@ class Document(db.Model):
         nullable=True,
     )
     
-    record: Mapped["Record"] = relationship(
-        "Record",
-        back_populates="document",
+    # CHANGED: record → planification (direct relationship now)
+    planification: Mapped["Planification"] = relationship(
+        "Planification",
+        back_populates="documents",
     )
+    
+    # NEW: Direct relationship to Form
+    form: Mapped["Form"] = relationship(
+        "Form",
+        foreign_keys=[form_id],
+    )
+    
     worker: Mapped["User"] = relationship(
         "User",
         foreign_keys=[worker_id],
     )
+    
+    # ========================================================================
+    # HELPER METHODS - Merged from Record class
+    # ========================================================================
+    
+    def get_field(self, field_name: str, default=None):
+        """
+        Get a field from record_data with optional default value.
+        
+        Merged from Record class for convenience.
+        
+        Args:
+            field_name: Name of the field to retrieve
+            default: Default value if field doesn't exist
+            
+        Returns:
+            Field value or default
+            
+        Example:
+            container_number = document.get_field('container_number', 'N/A')
+        """
+        return self.record_data.get(field_name, default)
+    
+    def set_field(self, field_name: str, value):
+        """
+        Set a field in record_data and mark as modified.
+        
+        Merged from Record class. This ensures SQLAlchemy detects
+        the JSON field change and updates the database.
+        
+        Args:
+            field_name: Name of the field to set
+            value: Value to set
+            
+        Example:
+            document.set_field('container_number', 'ABC123')
+        """
+        self.record_data[field_name] = value
+        flag_modified(self, 'record_data')
+        self.updated_at = datetime.now(timezone.utc)
+    
+    def update_fields(self, fields_dict: dict):
+        """
+        Update multiple fields in record_data at once.
+        
+        Merged from Record class. More efficient than calling
+        set_field() multiple times.
+        
+        Args:
+            fields_dict: Dictionary of field_name: value pairs
+            
+        Example:
+            document.update_fields({
+                'container_number': 'ABC123',
+                'client_name': 'ACME Corp'
+            })
+        """
+        self.record_data.update(fields_dict)
+        flag_modified(self, 'record_data')
+        self.updated_at = datetime.now(timezone.utc)
+    
+    # ========================================================================
+    # EXISTING METHODS - Unchanged
+    # ========================================================================
     
     def start_filling(self, worker_id: str) -> None:
         """Mark document as started by a worker."""
