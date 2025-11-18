@@ -77,8 +77,8 @@ def create_app(test_config=None):
     
     # Initialize Flask-Migrate extension for database migrations
     # This allows us to track and version database schema changes
-    from flask_migrate import Migrate
-    migrate = Migrate(app, db)
+    #from flask_migrate import Migrate
+    #migrate = Migrate(app, db)
     
     # Import all models so SQLAlchemy knows about them
     # This MUST happen after db.init_app() but before any database operations
@@ -88,8 +88,8 @@ def create_app(test_config=None):
     # NOTE: db.create_all() is now replaced by Flask-Migrate
     # To create/update database schema, use: flask db upgrade
     # For development convenience, you can uncomment the line below:
-    #with app.app_context():
-    #    db.create_all()
+    with app.app_context():
+        db.create_all()
     
     # Register blueprints
     from . import auth

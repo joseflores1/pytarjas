@@ -1,53 +1,21 @@
 {# pytarjas/templates/forms/edit_form.html #}
 {#
-Edit Form Page - Interface for editing form templates and their questions
+Edit Form Page - Interface for editing form templates
 
-PURPOSE:
-This template allows admins/planners to edit existing form templates. Forms are
-the foundation of data collection in the field, so this interface must be both
-powerful and intuitive. It supports editing form metadata AND managing the
-dynamic list of questions.
-
-FEATURES:
-- Edit form metadata (name, description, type, active status)
-- Dynamic question management (add, edit, reorder, delete questions)
-- Drag-and-drop question reordering (optional enhancement)
-- Real-time validation
-- Touch-optimized for tablets
-- Save/cancel with confirmation on unsaved changes
-- Question type selector with appropriate options
-
-WORKFLOW CONTEXT:
-Forms define the structure of data collection:
-1. Form has metadata (name, type, description)
-2. Form contains multiple Questions
-3. Questions have types (text, number, photo, date, select, etc.)
-4. Questions can have validation rules stored in 'options' JSON field
-5. Questions have an 'order' field for sorting
-
-VARIABLES FROM forms.edit_form():
-- form: Form object with all metadata
-- form.questions: List of Question objects (sorted by order)
-
-REASONING BEHIND THE CODE:
-- Two-section layout: Form metadata + Questions list
-- Each question is a card that can be expanded/collapsed
-- Add question button prominently placed
-- Order field allows manual reordering (future: drag-and-drop)
-- Soft validation: warns but allows saving incomplete forms
-- Cancel button with unsaved changes warning
+Updates:
+- Fixed "style" attribute syntax errors by moving logic to CSS classes
+- Uses '.hidden' utility class for toggling visibility
+- Integrated visual Choice Builder for "Select" questions
 #}
 
 {% extends 'base.html' %}
 
-{# Page title #}
 {% block title %}Editar Formulario{% endblock %}
 
-{# Load forms.css for form controls #}
 {% block extra_css %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
   <style>
-    /* Question card styling for better visual hierarchy */
+    /* Question card styling */
     .question-card {
       border: 2px solid var(--color-border);
       border-radius: var(--radius-md);
@@ -84,7 +52,6 @@ REASONING BEHIND THE CODE:
       display: none;
     }
     
-    /* Drag handle styling (for future drag-and-drop) */
     .drag-handle {
       cursor: grab;
       padding: var(--space-sm);
@@ -92,11 +59,6 @@ REASONING BEHIND THE CODE:
       font-size: 1.2rem;
     }
     
-    .drag-handle:active {
-      cursor: grabbing;
-    }
-    
-    /* Delete button styling */
     .delete-question-btn {
       opacity: 0.7;
       transition: opacity var(--transition-fast);
@@ -105,10 +67,31 @@ REASONING BEHIND THE CODE:
     .delete-question-btn:hover {
       opacity: 1;
     }
+
+    /* Styles for Choices Management */
+    .choices-container {
+      background-color: var(--color-bg-tertiary);
+      padding: var(--space-md);
+      border-radius: var(--radius-md);
+      margin-top: var(--space-sm);
+      border: 1px solid var(--color-border);
+      grid-column: 1 / -1; /* Full width in grid */
+    }
+
+    /* Wrapper for the raw JSON textarea */
+    .raw-options-wrapper {
+      grid-column: 1 / -1; /* Full width in grid */
+    }
+
+    .choice-item {
+      display: flex;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-sm);
+      align-items: center;
+    }
   </style>
 {% endblock %}
 
-{# Page header #}
 {% block header %}
   <div class="container">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-md); margin-top: var(--space-lg); margin-bottom: var(--space-lg);">
@@ -125,152 +108,60 @@ REASONING BEHIND THE CODE:
   </div>
 {% endblock %}
 
-{# Main content #}
 {% block content %}
   <div class="container" style="max-width: 1000px;">
     
     <form method="POST" id="editFormForm">
       
-      {# ============================================
-           SECTION 1: FORM METADATA
-           Basic form information
-           ============================================ #}
+      {# SECTION 1: FORM METADATA #}
       <div class="card" style="margin-bottom: var(--space-xl);">
         <div class="card-header">
           <h2 class="card-title">📋 Información del Formulario</h2>
-          <p class="card-subtitle">Datos básicos del formulario</p>
         </div>
         
         <div class="card-body">
-          
-          {# Form Name #}
           <div class="form-group">
-            <label for="name" class="form-label">
-              Nombre del Formulario <span style="color: var(--color-danger);">*</span>
-            </label>
-            <input 
-              type="text" 
-              name="name" 
-              id="name" 
-              class="form-control"
-              value="{{ form.name }}" 
-              required
-              maxlength="100"
-              placeholder="Ej: Formulario de Consolidado v2">
-            <small class="form-help">
-              Nombre único que identifica este formulario (máximo 100 caracteres)
-            </small>
+            <label for="name" class="form-label">Nombre del Formulario <span style="color: var(--color-danger);">*</span></label>
+            <input type="text" name="name" id="name" class="form-control" value="{{ form.name }}" required maxlength="100">
           </div>
           
-          {# Form Description #}
           <div class="form-group">
-            <label for="description" class="form-label">
-              Descripción
-            </label>
-            <textarea 
-              name="description" 
-              id="description" 
-              class="form-control"
-              rows="4"
-              placeholder="Describe el propósito y uso de este formulario...">{{ form.description or '' }}</textarea>
-            <small class="form-help">
-              Descripción detallada del formulario y cuándo debe usarse
-            </small>
+            <label for="description" class="form-label">Descripción</label>
+            <textarea name="description" id="description" class="form-control" rows="4">{{ form.description or '' }}</textarea>
           </div>
           
-          {# Form Type #}
           <div class="form-group">
-            <label for="form_type" class="form-label">
-              Tipo de Formulario <span style="color: var(--color-danger);">*</span>
-            </label>
+            <label for="form_type" class="form-label">Tipo de Formulario <span style="color: var(--color-danger);">*</span></label>
             <select name="form_type" id="form_type" class="form-control" required>
-              <option value="">-- Seleccionar tipo --</option>
-              <option value="consolidado" {% if form.form_type == 'consolidado' %}selected{% endif %}>
-                📦 Consolidado
-              </option>
-              <option value="desconsolidado" {% if form.form_type == 'desconsolidado' %}selected{% endif %}>
-                📤 Desconsolidado
-              </option>
-              <option value="seal_verification" {% if form.form_type == 'seal_verification' %}selected{% endif %}>
-                🔒 Verificación de Sello
-              </option>
+              <option value="consolidado" {% if form.form_type == 'consolidado' %}selected{% endif %}>📦 Consolidado</option>
+              <option value="desconsolidado" {% if form.form_type == 'desconsolidado' %}selected{% endif %}>📤 Desconsolidado</option>
+              <option value="seal_verification" {% if form.form_type == 'seal_verification' %}selected{% endif %}>🔒 Verificación de Sello</option>
             </select>
-            <small class="form-help">
-              Categoría del formulario según el tipo de operación
-            </small>
           </div>
           
-          {# Active Status #}
           <div class="form-group">
-            <label class="form-label">Estado del Formulario</label>
+            <label class="form-label">Estado</label>
             <div style="display: flex; gap: var(--space-lg); align-items: center; padding: var(--space-md); background-color: var(--color-bg-secondary); border-radius: var(--radius-md);">
               <label style="display: flex; align-items: center; gap: var(--space-sm); cursor: pointer; margin: 0;">
-                <input 
-                  type="radio" 
-                  name="is_active" 
-                  value="true" 
-                  {% if form.is_active %}checked{% endif %}
-                  style="width: 20px; height: 20px; cursor: pointer;">
+                <input type="radio" name="is_active" value="true" {% if form.is_active %}checked{% endif %} style="width: 20px; height: 20px;">
                 <span style="font-weight: var(--font-weight-medium);">✅ Activo</span>
               </label>
               <label style="display: flex; align-items: center; gap: var(--space-sm); cursor: pointer; margin: 0;">
-                <input 
-                  type="radio" 
-                  name="is_active" 
-                  value="false" 
-                  {% if not form.is_active %}checked{% endif %}
-                  style="width: 20px; height: 20px; cursor: pointer;">
+                <input type="radio" name="is_active" value="false" {% if not form.is_active %}checked{% endif %} style="width: 20px; height: 20px;">
                 <span style="font-weight: var(--font-weight-medium);">⛔ Inactivo</span>
               </label>
             </div>
-            <small class="form-help">
-              Los formularios inactivos no están disponibles para nuevas planificaciones
-            </small>
           </div>
-          
-          {# Metadata Display (Read-only) #}
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-md); padding: var(--space-lg); background-color: var(--color-bg-secondary); border-radius: var(--radius-md); margin-top: var(--space-lg);">
-            <div>
-              <div style="color: var(--color-text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--space-xs);">
-                📅 Fecha de Creación
-              </div>
-              <div style="color: var(--color-text-primary); font-weight: var(--font-weight-medium);">
-                {{ form.created_at.strftime('%d/%m/%Y %H:%M') if form.created_at else 'N/A' }}
-              </div>
-            </div>
-            {% if form.updated_at %}
-            <div>
-              <div style="color: var(--color-text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--space-xs);">
-                🔄 Última Actualización
-              </div>
-              <div style="color: var(--color-text-primary); font-weight: var(--font-weight-medium);">
-                {{ form.updated_at.strftime('%d/%m/%Y %H:%M') }}
-              </div>
-            </div>
-            {% endif %}
-            <div>
-              <div style="color: var(--color-text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--space-xs);">
-                📝 Número de Preguntas
-              </div>
-              <div style="color: var(--color-text-primary); font-weight: var(--font-weight-medium);">
-                <span id="questionCount">{{ form.questions|length }}</span> preguntas
-              </div>
-            </div>
-          </div>
-          
         </div>
       </div>
       
-      {# ============================================
-           SECTION 2: QUESTIONS MANAGEMENT
-           Dynamic list of form questions
-           ============================================ #}
+      {# SECTION 2: QUESTIONS MANAGEMENT #}
       <div class="card" style="margin-bottom: var(--space-xl);">
         <div class="card-header">
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-md);">
             <div>
-              <h2 class="card-title">❓ Preguntas del Formulario</h2>
-              <p class="card-subtitle">Gestionar las preguntas que aparecerán en el formulario</p>
+              <h2 class="card-title">❓ Preguntas</h2>
+              <p class="card-subtitle">Gestionar las preguntas del formulario</p>
             </div>
             <button type="button" class="btn btn-success" onclick="addNewQuestion()">
               ➕ Agregar Pregunta
@@ -279,478 +170,303 @@ REASONING BEHIND THE CODE:
         </div>
         
         <div class="card-body">
-          
-          {# Questions Container #}
           <div id="questionsContainer">
             {% if form.questions %}
               {% for question in form.questions|sort(attribute='order') %}
                 <div class="question-card" data-question-id="{{ question.id }}">
                   
-                  {# Question Header - Click to expand/collapse #}
+                  {# Header #}
                   <div class="question-header" onclick="toggleQuestionCard(this)">
                     <div style="display: flex; align-items: center; gap: var(--space-md); flex: 1;">
-                      <span class="drag-handle" title="Arrastrar para reordenar">☰</span>
+                      <span class="drag-handle">☰</span>
                       <div style="flex: 1;">
-                        <div style="font-weight: var(--font-weight-semibold); color: var(--color-text-primary); margin-bottom: var(--space-xs);">
+                        <div style="font-weight: var(--font-weight-semibold); color: var(--color-text-primary);">
                           Pregunta #<span class="question-number">{{ question.order }}</span>
                         </div>
                         <div style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
-                          {{ question.question_text[:80] }}{% if question.question_text|length > 80 %}...{% endif %}
+                          {{ question.question_text[:60] }}...
                         </div>
                       </div>
-                      <span class="badge {% if question.is_required %}badge-danger{% else %}badge-secondary{% endif %}">
-                        {% if question.is_required %}Requerida{% else %}Opcional{% endif %}
-                      </span>
                       <span class="badge badge-info">{{ question.question_type }}</span>
                     </div>
-                    <button type="button" class="btn btn-sm btn-ghost delete-question-btn" onclick="deleteQuestion(event, '{{ question.id }}')" title="Eliminar pregunta">
-                      🗑️
-                    </button>
+                    <button type="button" class="btn btn-sm btn-ghost delete-question-btn" onclick="deleteQuestion(event, '{{ question.id }}')">🗑️</button>
                   </div>
                   
-                  {# Question Body - Expanded form #}
+                  {# Body #}
                   <div class="question-body">
-                    
-                    {# Hidden field to store question ID #}
                     <input type="hidden" name="question_ids[]" value="{{ question.id }}">
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md);">
                       
-                      {# Question Text #}
                       <div class="form-group" style="grid-column: 1 / -1;">
-                        <label class="form-label">
-                          Texto de la Pregunta <span style="color: var(--color-danger);">*</span>
-                        </label>
-                        <input 
-                          type="text" 
-                          name="question_text_{{ question.id }}" 
-                          class="form-control"
-                          value="{{ question.question_text }}" 
-                          required
-                          maxlength="500"
-                          placeholder="Ej: ¿Número de contenedor?">
+                        <label class="form-label">Texto <span style="color: var(--color-danger);">*</span></label>
+                        <input type="text" name="question_text_{{ question.id }}" class="form-control" value="{{ question.question_text }}" required>
                       </div>
                       
-                      {# Question Type #}
                       <div class="form-group">
-                        <label class="form-label">
-                          Tipo de Pregunta <span style="color: var(--color-danger);">*</span>
-                        </label>
-                        <select name="question_type_{{ question.id }}" class="form-control" required>
-                          <option value="text" {% if question.question_type == 'text' %}selected{% endif %}>
-                            📝 Texto Corto
-                          </option>
-                          <option value="textarea" {% if question.question_type == 'textarea' %}selected{% endif %}>
-                            📄 Texto Largo
-                          </option>
-                          <option value="number" {% if question.question_type == 'number' %}selected{% endif %}>
-                            🔢 Número
-                          </option>
-                          <option value="date" {% if question.question_type == 'date' %}selected{% endif %}>
-                            📅 Fecha
-                          </option>
-                          <option value="datetime" {% if question.question_type == 'datetime' %}selected{% endif %}>
-                            🕐 Fecha y Hora
-                          </option>
-                          <option value="photo" {% if question.question_type == 'photo' %}selected{% endif %}>
-                            📷 Fotografía
-                          </option>
-                          <option value="boolean" {% if question.question_type == 'boolean' %}selected{% endif %}>
-                            ✓ Sí/No
-                          </option>
-                          <option value="select" {% if question.question_type == 'select' %}selected{% endif %}>
-                            📋 Selección Múltiple
-                          </option>
+                        <label class="form-label">Tipo <span style="color: var(--color-danger);">*</span></label>
+                        <select name="question_type_{{ question.id }}" class="form-control" required onchange="toggleChoicesSection(this, '{{ question.id }}')">
+                          <option value="text" {% if question.question_type == 'text' %}selected{% endif %}>📝 Texto Corto</option>
+                          <option value="textarea" {% if question.question_type == 'textarea' %}selected{% endif %}>📄 Texto Largo</option>
+                          <option value="number" {% if question.question_type == 'number' %}selected{% endif %}>🔢 Número</option>
+                          <option value="date" {% if question.question_type == 'date' %}selected{% endif %}>📅 Fecha</option>
+                          <option value="datetime" {% if question.question_type == 'datetime' %}selected{% endif %}>🕐 Fecha y Hora</option>
+                          <option value="photo" {% if question.question_type == 'photo' %}selected{% endif %}>📷 Fotografía</option>
+                          <option value="boolean" {% if question.question_type == 'boolean' %}selected{% endif %}>✓ Sí/No (Radio)</option>
+                          <option value="select" {% if question.question_type == 'select' %}selected{% endif %}>📋 Selección Múltiple</option>
+                          <option value="file" {% if question.question_type == 'file' %}selected{% endif %}>📁 Archivo</option>
                         </select>
                       </div>
                       
-                      {# Order #}
                       <div class="form-group">
-                        <label class="form-label">
-                          Orden <span style="color: var(--color-danger);">*</span>
-                        </label>
-                        <input 
-                          type="number" 
-                          name="question_order_{{ question.id }}" 
-                          class="form-control"
-                          value="{{ question.order }}" 
-                          required
-                          min="0"
-                          step="1">
+                        <label class="form-label">Orden</label>
+                        <input type="number" name="question_order_{{ question.id }}" class="form-control" value="{{ question.order }}" required>
                       </div>
                       
-                      {# Is Required #}
                       <div class="form-group" style="grid-column: 1 / -1;">
                         <label style="display: flex; align-items: center; gap: var(--space-sm); cursor: pointer;">
-                          <input 
-                            type="checkbox" 
-                            name="question_required_{{ question.id }}" 
-                            value="true"
-                            {% if question.is_required %}checked{% endif %}
-                            style="width: 20px; height: 20px; cursor: pointer;">
-                          <span style="font-weight: var(--font-weight-medium);">
-                            Esta pregunta es obligatoria
-                          </span>
+                          <input type="checkbox" name="question_required_{{ question.id }}" value="true" {% if question.is_required %}checked{% endif %} style="width: 20px; height: 20px;">
+                          <span style="font-weight: var(--font-weight-medium);">Obligatoria</span>
                         </label>
                       </div>
                       
-                      {# Options (JSON field) - for future use #}
-                      <div class="form-group" style="grid-column: 1 / -1;">
-                        <label class="form-label">
-                          Opciones Adicionales (JSON)
-                        </label>
-                        <textarea 
-                          name="question_options_{{ question.id }}" 
-                          class="form-control"
-                          rows="2"
-                          placeholder='{"maxlength": 50, "placeholder": "Ingrese valor..."}'
-                          style="font-family: monospace; font-size: var(--font-size-sm);">{{ question.options|tojson if question.options else '' }}</textarea>
-                        <small class="form-help">
-                          Configuración adicional en formato JSON (opcional)
-                        </small>
+                      {# Visual Choices Builder - Toggled via class #}
+                      <div id="choices_container_{{ question.id }}" 
+                           class="choices-container {% if question.question_type != 'select' %}hidden{% endif %}">
+                        <label class="form-label">Opciones de Selección <span style="color: var(--color-danger);">*</span></label>
+                        <div id="choices_list_{{ question.id }}">
+                          {% if question.question_type == 'select' and question.options and question.options.choices %}
+                            {% for choice in question.options.choices %}
+                              <div class="choice-item">
+                                <span style="color: var(--color-text-tertiary);">•</span>
+                                <input type="text" class="form-control form-control-sm choice-input" value="{{ choice }}" required>
+                                <button type="button" class="btn btn-sm btn-ghost text-danger" onclick="this.parentElement.remove()">🗑️</button>
+                              </div>
+                            {% endfor %}
+                          {% endif %}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-secondary" style="margin-top: var(--space-sm);" onclick="addChoiceInput('{{ question.id }}')">
+                          + Agregar Opción
+                        </button>
+                      </div>
+
+                      {# Raw JSON Options - Toggled via class #}
+                      <div class="form-group raw-options-wrapper {% if question.question_type == 'select' %}hidden{% endif %}" 
+                           id="options_wrapper_{{ question.id }}">
+                        <label class="form-label">Opciones Avanzadas (JSON)</label>
+                        <textarea name="question_options_{{ question.id }}" class="form-control" rows="2" style="font-family: monospace;">{{ question.options|tojson if question.options else '' }}</textarea>
                       </div>
                       
                     </div>
                   </div>
-                  
                 </div>
               {% endfor %}
             {% else %}
-              {# Empty state for no questions #}
-              <div id="noQuestionsMessage" style="text-align: center; padding: var(--space-2xl); background-color: var(--color-bg-secondary); border-radius: var(--radius-md);">
-                <div style="font-size: 3rem; margin-bottom: var(--space-md); opacity: 0.3;">
-                  ❓
-                </div>
-                <p style="color: var(--color-text-secondary); margin-bottom: var(--space-lg);">
-                  Este formulario aún no tiene preguntas. Haz clic en "Agregar Pregunta" para comenzar.
-                </p>
-                <button type="button" class="btn btn-success" onclick="addNewQuestion()">
-                  ➕ Agregar Primera Pregunta
-                </button>
+              <div id="noQuestionsMessage" style="text-align: center; padding: var(--space-2xl);">
+                <p>No hay preguntas.</p>
               </div>
             {% endif %}
           </div>
-          
         </div>
       </div>
       
-      {# ============================================
-           FORM ACTIONS
-           Save and Cancel buttons
-           ============================================ #}
+      {# ACTIONS #}
       <div class="card">
         <div class="card-body">
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-md);">
-            
-            {# Cancel button #}
-            <a href="{{ url_for('forms.list_forms') }}" 
-               class="btn btn-secondary btn-lg" 
-               id="cancelButton">
-              ✖️ Cancelar
-            </a>
-            
-            {# Save button #}
-            <button type="submit" class="btn btn-primary btn-lg">
-              💾 Guardar Cambios
-            </button>
-            
-          </div>
-          
-          <div style="margin-top: var(--space-md); padding: var(--space-md); background-color: var(--color-bg-secondary); border-radius: var(--radius-md);">
-            <small style="color: var(--color-text-secondary);">
-              ⚠️ <strong>Nota:</strong> Los cambios no se guardarán hasta que hagas clic en "Guardar Cambios".
-              Las preguntas eliminadas se eliminarán permanentemente.
-            </small>
+          <div style="display: flex; justify-content: space-between;">
+            <a href="{{ url_for('forms.list_forms') }}" class="btn btn-secondary btn-lg" id="cancelButton">✖️ Cancelar</a>
+            <button type="submit" class="btn btn-primary btn-lg">💾 Guardar Cambios</button>
           </div>
         </div>
       </div>
       
     </form>
-    
   </div>
 {% endblock %}
 
-{# ============================================
-     JAVASCRIPT
-     Dynamic question management and validation
-     ============================================ #}
 {% block extra_js %}
 <script>
-  // Track form changes for unsaved changes warning
   let formChanged = false;
   let questionCounter = parseInt("{{ form.questions|length if form.questions else 0 }}");
-  /**
-   * Track when form is changed.
-   * REASONING: Warn users before leaving page with unsaved changes.
-   */
-  document.getElementById('editFormForm').addEventListener('input', function() {
-    formChanged = true;
-  });
   
-  /**
-   * Warn before leaving page with unsaved changes.
-   */
-  window.addEventListener('beforeunload', function(e) {
+  document.getElementById('editFormForm').addEventListener('input', () => formChanged = true);
+  
+  window.addEventListener('beforeunload', (e) => {
     if (formChanged) {
       e.preventDefault();
-      e.returnValue = 'Tienes cambios sin guardar. ¿Estás seguro que deseas salir?';
-      return e.returnValue;
+      e.returnValue = 'Cambios sin guardar.';
     }
   });
-  
-  /**
-   * Cancel button with confirmation if form changed.
-   */
-  document.getElementById('cancelButton').addEventListener('click', function(e) {
-    if (formChanged) {
-      if (!confirm('Tienes cambios sin guardar. ¿Estás seguro que deseas cancelar?')) {
-        e.preventDefault();
-      }
-    }
-  });
-  
-  /**
-   * Toggle question card expanded/collapsed state.
-   * REASONING: Long forms need collapsible questions for easier navigation.
-   */
-  function toggleQuestionCard(headerElement) {
-    const card = headerElement.closest('.question-card');
-    card.classList.toggle('collapsed');
+
+  function toggleQuestionCard(header) {
+    header.closest('.question-card').classList.toggle('collapsed');
   }
   
-  /**
-   * Add a new question to the form.
-   * REASONING: Dynamic UI allows adding unlimited questions without page reload.
-   */
+  // --- CHOICE MANAGEMENT ---
+  function toggleChoicesSection(select, qId) {
+    const choicesContainer = document.getElementById(`choices_container_${qId}`);
+    const optionsWrapper = document.getElementById(`options_wrapper_${qId}`);
+    
+    if (select.value === 'select') {
+      choicesContainer.classList.remove('hidden');
+      optionsWrapper.classList.add('hidden');
+      
+      // If empty, add first choice input
+      if (document.getElementById(`choices_list_${qId}`).children.length === 0) {
+        addChoiceInput(qId);
+      }
+    } else {
+      choicesContainer.classList.add('hidden');
+      optionsWrapper.classList.remove('hidden');
+    }
+  }
+
+  function addChoiceInput(qId, value = '') {
+    const list = document.getElementById(`choices_list_${qId}`);
+    const div = document.createElement('div');
+    div.className = 'choice-item';
+    div.innerHTML = `
+      <span>•</span>
+      <input type="text" class="form-control form-control-sm choice-input" value="${value}" placeholder="Opción" required>
+      <button type="button" class="btn btn-sm btn-ghost text-danger" onclick="this.parentElement.remove()">🗑️</button>
+    `;
+    list.appendChild(div);
+  }
+  
   function addNewQuestion() {
     questionCounter++;
     const container = document.getElementById('questionsContainer');
+    const noMsg = document.getElementById('noQuestionsMessage');
+    if (noMsg) noMsg.remove();
     
-    // Hide "no questions" message if it exists
-    const noQuestionsMsg = document.getElementById('noQuestionsMessage');
-    if (noQuestionsMsg) {
-      noQuestionsMsg.remove();
-    }
-    
-    // Generate unique temporary ID for new questions
     const tempId = 'new_' + Date.now();
     
-    // Create new question card HTML
-    const questionHtml = `
+    // NOTE: The HTML below uses inline styles for the NEW dynamic elements
+    // because they are created in JS. We use the classes for layout.
+    // For display toggling in JS, we modify style.display directly or toggle classes.
+    
+    const html = `
       <div class="question-card" data-question-id="${tempId}">
         <div class="question-header" onclick="toggleQuestionCard(this)">
           <div style="display: flex; align-items: center; gap: var(--space-md); flex: 1;">
-            <span class="drag-handle" title="Arrastrar para reordenar">☰</span>
+            <span class="drag-handle">☰</span>
             <div style="flex: 1;">
-              <div style="font-weight: var(--font-weight-semibold); color: var(--color-text-primary); margin-bottom: var(--space-xs);">
-                Pregunta #<span class="question-number">${questionCounter}</span>
-              </div>
-              <div style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
-                Nueva pregunta sin configurar
-              </div>
+              <div style="font-weight: bold;">Pregunta #${questionCounter}</div>
+              <div class="text-secondary">Nueva</div>
             </div>
-            <span class="badge badge-danger">Requerida</span>
-            <span class="badge badge-info">text</span>
+            <button type="button" class="btn btn-sm btn-ghost delete-question-btn" onclick="deleteQuestion(event, '${tempId}')">🗑️</button>
           </div>
-          <button type="button" class="btn btn-sm btn-ghost delete-question-btn" onclick="deleteQuestion(event, '${tempId}')" title="Eliminar pregunta">
-            🗑️
-          </button>
         </div>
         
         <div class="question-body">
           <input type="hidden" name="question_ids[]" value="${tempId}">
-          
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md);">
-            <div class="form-group" style="grid-column: 1 / -1;">
-              <label class="form-label">
-                Texto de la Pregunta <span style="color: var(--color-danger);">*</span>
-              </label>
-              <input 
-                type="text" 
-                name="question_text_${tempId}" 
-                class="form-control"
-                required
-                maxlength="500"
-                placeholder="Ej: ¿Número de contenedor?">
+            <div class="form-group" style="grid-column: 1/-1;">
+              <label class="form-label">Texto *</label>
+              <input type="text" name="question_text_${tempId}" class="form-control" required>
             </div>
-            
             <div class="form-group">
-              <label class="form-label">
-                Tipo de Pregunta <span style="color: var(--color-danger);">*</span>
-              </label>
-              <select name="question_type_${tempId}" class="form-control" required>
+              <label class="form-label">Tipo *</label>
+              <select name="question_type_${tempId}" class="form-control" required onchange="toggleChoicesSection(this, '${tempId}')">
                 <option value="text" selected>📝 Texto Corto</option>
                 <option value="textarea">📄 Texto Largo</option>
                 <option value="number">🔢 Número</option>
                 <option value="date">📅 Fecha</option>
                 <option value="datetime">🕐 Fecha y Hora</option>
                 <option value="photo">📷 Fotografía</option>
-                <option value="boolean">✓ Sí/No</option>
+                <option value="boolean">✓ Sí/No (Radio)</option>
                 <option value="select">📋 Selección Múltiple</option>
+                <option value="file">📁 Archivo</option>
               </select>
             </div>
-            
             <div class="form-group">
-              <label class="form-label">
-                Orden <span style="color: var(--color-danger);">*</span>
-              </label>
-              <input 
-                type="number" 
-                name="question_order_${tempId}" 
-                class="form-control"
-                value="${questionCounter}" 
-                required
-                min="0"
-                step="1">
+              <label class="form-label">Orden</label>
+              <input type="number" name="question_order_${tempId}" class="form-control" value="${questionCounter}" required>
             </div>
-            
-            <div class="form-group" style="grid-column: 1 / -1;">
-              <label style="display: flex; align-items: center; gap: var(--space-sm); cursor: pointer;">
-                <input 
-                  type="checkbox" 
-                  name="question_required_${tempId}" 
-                  value="true"
-                  checked
-                  style="width: 20px; height: 20px; cursor: pointer;">
-                <span style="font-weight: var(--font-weight-medium);">
-                  Esta pregunta es obligatoria
-                </span>
+            <div class="form-group" style="grid-column: 1/-1;">
+              <label style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" name="question_required_${tempId}" value="true" checked style="width: 20px; height: 20px;">
+                <span>Obligatoria</span>
               </label>
             </div>
-            
-            <div class="form-group" style="grid-column: 1 / -1;">
-              <label class="form-label">
-                Opciones Adicionales (JSON)
-              </label>
-              <textarea 
-                name="question_options_${tempId}" 
-                class="form-control"
-                rows="2"
-                placeholder='{"maxlength": 50, "placeholder": "Ingrese valor..."}'
-                style="font-family: monospace; font-size: var(--font-size-sm);"></textarea>
-              <small class="form-help">
-                Configuración adicional en formato JSON (opcional)
-              </small>
+
+            <div id="choices_container_${tempId}" class="choices-container hidden">
+              <label class="form-label">Opciones *</label>
+              <div id="choices_list_${tempId}"></div>
+              <button type="button" class="btn btn-sm btn-secondary mt-2" onclick="addChoiceInput('${tempId}')">+ Opción</button>
+            </div>
+
+            <div class="form-group raw-options-wrapper" id="options_wrapper_${tempId}">
+              <label class="form-label">Opciones (JSON)</label>
+              <textarea name="question_options_${tempId}" class="form-control" rows="2"></textarea>
             </div>
           </div>
         </div>
       </div>
     `;
     
-    // Add to container
-    container.insertAdjacentHTML('beforeend', questionHtml);
-    
-    // Update question count
-    updateQuestionCount();
-    
-    // Mark form as changed
+    container.insertAdjacentHTML('beforeend', html);
     formChanged = true;
     
-    // Scroll to new question
+    // Init toggle state
     const newCard = container.lastElementChild;
-    newCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    
-    // Show toast notification
-    if (window.showToast) {
-      window.showToast('Nueva pregunta agregada. Configúrala y guarda los cambios.', 'success');
-    }
+    toggleChoicesSection(newCard.querySelector('select'), tempId);
+    newCard.scrollIntoView({ behavior: 'smooth' });
   }
   
-  /**
-   * Delete a question from the form.
-   * REASONING: Allow removing questions, but confirm first to prevent accidents.
-   */
-  function deleteQuestion(event, questionId) {
-    event.stopPropagation(); // Prevent card toggle
-    
-    if (!confirm('¿Estás seguro que deseas eliminar esta pregunta?\n\nEsta acción no se puede deshacer una vez que guardes el formulario.')) {
-      return;
-    }
-    
-    const card = document.querySelector(`[data-question-id="${questionId}"]`);
-    if (card) {
-      card.remove();
+  function deleteQuestion(e, id) {
+    e.stopPropagation();
+    if (confirm('¿Eliminar pregunta?')) {
+      document.querySelector(`[data-question-id="${id}"]`).remove();
       formChanged = true;
-      updateQuestionCount();
-      
-      // Show empty state if no questions left
-      const container = document.getElementById('questionsContainer');
-      if (container.children.length === 0) {
-        container.innerHTML = `
-          <div id="noQuestionsMessage" style="text-align: center; padding: var(--space-2xl); background-color: var(--color-bg-secondary); border-radius: var(--radius-md);">
-            <div style="font-size: 3rem; margin-bottom: var(--space-md); opacity: 0.3;">
-              ❓
-            </div>
-            <p style="color: var(--color-text-secondary); margin-bottom: var(--space-lg);">
-              Este formulario no tiene preguntas. Haz clic en "Agregar Pregunta" para comenzar.
-            </p>
-            <button type="button" class="btn btn-success" onclick="addNewQuestion()">
-              ➕ Agregar Primera Pregunta
-            </button>
-          </div>
-        `;
-      }
-      
-      if (window.showToast) {
-        window.showToast('Pregunta eliminada. Guarda los cambios para confirmar.', 'info');
-      }
     }
   }
-  
-  /**
-   * Update the question count display.
-   */
-  function updateQuestionCount() {
-    const count = document.querySelectorAll('.question-card').length;
-    document.getElementById('questionCount').textContent = count;
-    
-    // Update question numbers
-    document.querySelectorAll('.question-card').forEach((card, index) => {
-      const numberSpan = card.querySelector('.question-number');
-      if (numberSpan) {
-        numberSpan.textContent = index + 1;
+
+  // Submit Handler: Serialize choices to JSON
+  document.getElementById('editFormForm').addEventListener('submit', function(e) {
+    const cards = document.querySelectorAll('.question-card');
+    let isValid = true;
+
+    cards.forEach(card => {
+      const qId = card.getAttribute('data-question-id');
+      const typeSelect = card.querySelector(`select[name="question_type_${qId}"]`);
+      const optionsArea = card.querySelector(`textarea[name="question_options_${qId}"]`);
+      
+      if (typeSelect.value === 'select') {
+        const choices = [];
+        card.querySelectorAll('.choice-input').forEach(input => {
+          if (input.value.trim()) choices.push(input.value.trim());
+        });
+        
+        if (choices.length === 0) {
+          alert(`La pregunta #${card.querySelector('.question-number').textContent} debe tener opciones.`);
+          isValid = false;
+          card.classList.remove('collapsed');
+          return;
+        }
+        
+        let opts = {};
+        try { if (optionsArea.value.trim()) opts = JSON.parse(optionsArea.value); } catch(e) {}
+        opts.choices = choices;
+        optionsArea.value = JSON.stringify(opts);
       }
     });
-  }
-  
-  /**
-   * Form submission handler.
-   * REASONING: Prevent double submission and provide feedback.
-   */
-  document.getElementById('editFormForm').addEventListener('submit', function(e) {
-    // Disable submit button to prevent double submission
-    const submitBtn = this.querySelector('button[type="submit"]');
-    submitBtn.disabled = true;
-    submitBtn.textContent = '💾 Guardando...';
-    
-    // Allow form submission to proceed
-    formChanged = false; // Prevent beforeunload warning
-  });
-  
-  /**
-   * Keyboard shortcuts for power users.
-   */
-  document.addEventListener('keydown', function(e) {
-    // Ctrl/Cmd + S = Save form
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-      e.preventDefault();
-      document.getElementById('editFormForm').submit();
-    }
-    
-    // Ctrl/Cmd + Q = Add question
-    if ((e.ctrlKey || e.metaKey) && e.key === 'q') {
-      e.preventDefault();
-      addNewQuestion();
+
+    if (!isValid) e.preventDefault();
+    else {
+      formChanged = false;
+      this.querySelector('button[type="submit"]').textContent = '💾 Guardando...';
     }
   });
-  
-  /**
-   * Initialize: Collapse all questions by default for easier overview.
-   * REASONING: Long forms are easier to navigate when questions start collapsed.
-   */
-  document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.question-card').forEach(function(card) {
+
+  // Initialize: Collapse all and ensure choices visible for existing selects
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.question-card').forEach(card => {
       card.classList.add('collapsed');
+      // Ensure select types have choice builder visible even if collapsed (for when they expand)
+      const qId = card.getAttribute('data-question-id');
+      const select = card.querySelector('select');
+      if (select) toggleChoicesSection(select, qId);
     });
   });
 </script>
