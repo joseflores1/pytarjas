@@ -433,7 +433,7 @@
 .navbar {
   background-color: var(--color-bg-primary);
   border-bottom: 1px solid var(--color-border);
-  padding: var(--space-md) 0;
+  padding: var(--space-lg) 0;
   position: sticky; /* Sticks to top when scrolling */
   top: 0;
   z-index: var(--z-sticky);
@@ -453,6 +453,8 @@
 
 /* Navbar brand/logo */
 .navbar-brand {
+  display: flex;
+  align-items: center;
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
@@ -461,6 +463,30 @@
 
 .navbar-brand:hover {
   color: var(--color-primary);
+}
+
+/* Navbar logo - override default img styles */
+.navbar-logo {
+  height: auto !important;
+  width: auto !important;
+  max-width: none !important;
+}
+
+/* Theme-based logo visibility */
+[data-theme="light"] .navbar-logo-light {
+  display: inline !important;
+}
+
+[data-theme="light"] .navbar-logo-dark {
+  display: none !important;
+}
+
+[data-theme="dark"] .navbar-logo-light {
+  display: none !important;
+}
+
+[data-theme="dark"] .navbar-logo-dark {
+  display: inline !important;
 }
 
 /* Navbar navigation links */

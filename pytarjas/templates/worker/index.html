@@ -21,7 +21,7 @@ Variables passed from worker.py:
 {% block title %}Worker Dashboard{% endblock %}
 
 {% block header %}
-  <h1>👋 Welcome, {{ user.username }}!</h1>
+  <h1>ðŸ‘‹ Welcome, {{ user.username }}!</h1>
   <p>Field Worker Dashboard</p>
 {% endblock %}
 
@@ -31,7 +31,7 @@ Variables passed from worker.py:
   {# Statistics Cards #}
   <section class="dashboard-stats">
     <div class="stat-card pending">
-      <div class="stat-icon">📋</div>
+      <div class="stat-icon">ðŸ“‹</div>
       <div class="stat-content">
         <h3>{{ pending_count }}</h3>
         <p>Pending Tasks</p>
@@ -39,7 +39,7 @@ Variables passed from worker.py:
     </div>
     
     <div class="stat-card in-progress">
-      <div class="stat-icon">⚙️</div>
+      <div class="stat-icon">âš™ï¸</div>
       <div class="stat-content">
         <h3>{{ in_progress_count }}</h3>
         <p>In Progress</p>
@@ -47,7 +47,7 @@ Variables passed from worker.py:
     </div>
     
     <div class="stat-card completed">
-      <div class="stat-icon">✅</div>
+      <div class="stat-icon">âœ…</div>
       <div class="stat-content">
         <h3>{{ completed_today }}</h3>
         <p>Completed Today</p>
@@ -55,7 +55,7 @@ Variables passed from worker.py:
     </div>
     
     <div class="stat-card total">
-      <div class="stat-icon">📊</div>
+      <div class="stat-icon">ðŸ“Š</div>
       <div class="stat-content">
         <h3>{{ total_assigned }}</h3>
         <p>Total Assigned</p>
@@ -67,23 +67,28 @@ Variables passed from worker.py:
   <section class="quick-actions">
     <h2>Quick Actions</h2>
     <div class="action-buttons">
+      <a href="{{ url_for('tasks.create_task') }}" class="action-btn primary">
+        <span class="btn-icon">➕</span>
+        <span class="btn-text">Create Task</span>
+      </a>
+      
       <a href="{{ url_for('tasks.list_tasks', status='pending') }}" class="action-btn primary">
-        <span class="btn-icon">📝</span>
+        <span class="btn-icon">ðŸ“</span>
         <span class="btn-text">View Pending Tasks</span>
       </a>
       
       <a href="{{ url_for('tasks.list_tasks', status='in_progress') }}" class="action-btn secondary">
-        <span class="btn-icon">🔄</span>
+        <span class="btn-icon">ðŸ”„</span>
         <span class="btn-text">Continue Working</span>
       </a>
       
       <a href="{{ url_for('tasks.list_tasks', status='completed') }}" class="action-btn success">
-        <span class="btn-icon">📋</span>
+        <span class="btn-icon">ðŸ“‹</span>
         <span class="btn-text">View Completed</span>
       </a>
       
       <a href="{{ url_for('worker.help_page') }}" class="action-btn info">
-        <span class="btn-icon">❓</span>
+        <span class="btn-icon">â“</span>
         <span class="btn-text">Help & Guide</span>
       </a>
     </div>
@@ -92,11 +97,11 @@ Variables passed from worker.py:
   {# Offline Status Indicator #}
   <section class="connection-status">
     <div id="online-status" class="status-indicator online">
-      <span class="status-icon">🟢</span>
+      <span class="status-icon">ðŸŸ¢</span>
       <span class="status-text">Connected</span>
     </div>
     <div id="offline-status" class="status-indicator offline" style="display: none;">
-      <span class="status-icon">🔴</span>
+      <span class="status-icon">ðŸ”´</span>
       <span class="status-text">Offline Mode - Changes will sync when reconnected</span>
     </div>
   </section>
@@ -112,7 +117,7 @@ Variables passed from worker.py:
   
   {# Tips for Field Workers #}
   <section class="worker-tips">
-    <h2>💡 Tips</h2>
+    <h2>ðŸ’¡ Tips</h2>
     <ul class="tips-list">
       <li>
         <strong>Working Offline:</strong> This app works without internet! Your progress is saved locally and syncs automatically when you reconnect.

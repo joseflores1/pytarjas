@@ -99,6 +99,7 @@
   --z-modal: 1050;
   --z-popover: 1060;
   --z-tooltip: 1070;
+  --z-notification: 1080;
   
   /* Transitions */
   --transition-fast: 150ms ease-in-out;
@@ -107,6 +108,37 @@
   
   /* Touch targets - Minimum 44x44px for accessibility */
   --touch-target-min: 44px;
+}
+
+/* ============================================
+   DARK MODE THEME
+   ============================================ */
+[data-theme="dark"] {
+  /* Dark theme colors */
+  --color-text-primary: #f9fafb;     /* Light text on dark background */
+  --color-text-secondary: #d1d5db;   /* Gray text */
+  --color-text-tertiary: #9ca3af;    /* Lighter gray */
+  
+  --color-bg-primary: #1f2937;       /* Dark background */
+  --color-bg-secondary: #111827;     /* Darker background */
+  --color-bg-tertiary: #374151;      /* Lighter dark */
+  
+  --color-border: #374151;           /* Dark border */
+  --color-border-dark: #4b5563;      /* Lighter border */
+  
+  /* Keep brand colors same in dark mode */
+  --color-primary: #ff6600;
+  --color-primary-dark: #ff8533;
+  --color-primary-light: #4a2600;
+  
+  /* Adjust shadows for dark mode */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 
+               0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 
+               0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 
+               0 10px 10px -5px rgba(0, 0, 0, 0.4);
 }
 
 
@@ -148,6 +180,8 @@ body {
   -moz-osx-font-smoothing: grayscale;
   /* Prevent text size adjustment on orientation change (iOS) */
   -webkit-text-size-adjust: 100%;
+  /* Smooth transition for theme changes */
+  transition: background-color var(--transition-base), color var(--transition-base);
 }
 
 /* Make images responsive by default */

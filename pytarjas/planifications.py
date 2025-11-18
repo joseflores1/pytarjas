@@ -691,6 +691,7 @@ def create_planification():
                     planification_id=planification.id,  # Link to batch planification
                     form_id=form_id,  # Direct reference to form template
                     record_data=record_data,  # JSON field stores flexible task data
+                    created_by_id=g.user.id,
                     worker_id=None,  # Not assigned yet - will be assigned manually or automatically
                     status="pending",  # Waiting to be assigned and filled
                     responses={},  # Empty responses to start - worker will fill these

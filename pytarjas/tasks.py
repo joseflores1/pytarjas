@@ -34,6 +34,206 @@ bp = Blueprint("tasks", __name__, url_prefix="/tasks")
 
 
 
+@bp.route("/create", methods=["GET", "POST"])
+@login_required
+@task_access_required
+def create_task():
+    """
+    Create a standalone task (not from planification).
+    
+    DUAL RESPONSE ENDPOINT: Returns JSON or HTML based on request headers.
+    
+    Role-based assignment rules:
+    - Worker: Can only assign to themselves
+    - Planner: Can assign to themselves or any Worker
+    - Admin: Can assign to anyone except other Admins
+    
+    GET Response:
+    Returns available forms and assignable users based on role
+    
+    POST Request Body (JSON):
+    {
+        "form_id": "form-uuid",
+        "worker_id": "user-uuid",  // Optional, defaults to creator
+        "record_data": {  // Optional initial data
+            "field1": "value1",
+            ...
+        }
+    }
+    
+    POST Response (201):
+    {
+        "success": true,
+        "task": {
+            "id": "doc-uuid",
+            "status": "pending",
+            ...
+        }
+    }
+    """
+    if request.method == "GET":
+        # Get active forms
+        active_forms = Form.query.filter_by(is_active=True).order_by(Form.name).all()
+        
+        # Get assignable users based on role
+        assignable_users = []
+        if g.user.role == "worker":
+            # Workers can only assign to themselves
+            assignable_users = [g.user]
+        elif g.user.role == "planner":
+            # Planners can assign to themselves + workers
+            assignable_users = User.query.filter(
+                User.role.in_(["worker", "planner"])
+            ).order_by(User.username).all()
+        elif g.user.role == "admin":
+            # Admins can assign to anyone except other admins
+            assignable_users = User.query.filter(
+                User.role.in_(["worker", "planner", "admin"])
+            ).order_by(User.username).all()
+        
+        if wants_json():
+            return jsonify({
+                "success": True,
+                "forms": [
+                    {
+                        "id": form.id,
+                        "name": form.name,
+                        "form_type": form.form_type,
+                        "description": form.description
+                    }
+                    for form in active_forms
+                ],
+                "assignable_users": [
+                    {
+                        "id": user.id,
+                        "username": user.username,
+                        "email": user.email,
+                        "role": user.role
+                    }
+                    for user in assignable_users
+                ]
+            }), 200
+        else:
+            return render_template(
+                "tasks/create_task.html",
+                forms=active_forms,
+                assignable_users=assignable_users,
+                user=g.user
+            )
+    
+    # POST: Create the task
+    if wants_json():
+        data = request.get_json()
+    else:
+        data = request.form.to_dict()
+    
+    form_id = data.get("form_id")
+    worker_id = data.get("worker_id")
+    record_data = data.get("record_data", {})
+    
+    # Validation
+    if not form_id:
+        error_msg = "Form is required"
+        if wants_json():
+            return jsonify({"success": False, "error": error_msg}), 400
+        else:
+            abort(400, description=error_msg)
+    
+    # Verify form exists and is active
+    form = Form.query.filter_by(id=form_id, is_active=True).first()
+    if not form:
+        error_msg = "Form not found or inactive"
+        if wants_json():
+            return jsonify({"success": False, "error": error_msg}), 404
+        else:
+            abort(404, description=error_msg)
+    
+    # Default worker_id to creator if not specified
+    if not worker_id:
+        worker_id = g.user.id
+    
+    # Verify assignment permissions
+    assignee = User.query.get(worker_id)
+    if not assignee:
+        error_msg = "Assigned user not found"
+        if wants_json():
+            return jsonify({"success": False, "error": error_msg}), 404
+        else:
+            abort(404, description=error_msg)
+    
+    # Check assignment rules
+    if g.user.role == "worker":
+        # Workers can only assign to themselves
+        if worker_id != g.user.id:
+            error_msg = "Workers can only assign tasks to themselves"
+            if wants_json():
+                return jsonify({"success": False, "error": error_msg}), 403
+            else:
+                abort(403, description=error_msg)
+    elif g.user.role == "planner":
+        # Planners can assign to workers and themselves
+        if assignee.role not in ["worker", "planner"]:
+            error_msg = "Planners can only assign to Workers or themselves"
+            if wants_json():
+                return jsonify({"success": False, "error": error_msg}), 403
+            else:
+                abort(403, description=error_msg)
+    elif g.user.role == "admin":
+        # Admins can assign to anyone except other admins
+        if assignee.role == "admin" and assignee.id != g.user.id:
+            error_msg = "Cannot assign tasks to other Admins"
+            if wants_json():
+                return jsonify({"success": False, "error": error_msg}), 403
+            else:
+                abort(403, description=error_msg)
+    
+    # Create the document
+    import uuid
+    document = Document(
+        id=str(uuid.uuid4()),
+        planification_id=None,  # Standalone task
+        form_id=form_id,
+        record_data=record_data,
+        worker_id=worker_id,
+        created_by_id=g.user.id,
+        status="pending",
+        responses={},
+        photos=[],
+        is_synced=True,
+        created_at=datetime.now(timezone.utc)
+    )
+    
+    try:
+        db.session.add(document)
+        db.session.commit()
+        
+        if wants_json():
+            return jsonify({
+                "success": True,
+                "message": "Task created successfully",
+                "task": {
+                    "id": document.id,
+                    "form_id": document.form_id,
+                    "worker_id": document.worker_id,
+                    "created_by_id": document.created_by_id,
+                    "status": document.status,
+                    "created_at": document.created_at.isoformat()
+                }
+            }), 201
+        else:
+            from flask import redirect, url_for, flash
+            flash("Task created successfully", "success")
+            return redirect(url_for("tasks.get_task", task_id=document.id))
+    
+    except Exception as e:
+        db.session.rollback()
+        error_msg = f"Database error: {str(e)}"
+        if wants_json():
+            return jsonify({"success": False, "error": error_msg}), 500
+        else:
+            abort(500, description=error_msg)
+
+
 @bp.route("/", methods=["GET"])
 @login_required
 @task_access_required
@@ -87,14 +287,18 @@ def list_tasks():
     
     # Start building the query
     # Join necessary tables for complete task information
-    # UPDATED: Removed Record join - Document now directly references Planification and Form
-    query = Document.query.join(Planification).join(Form)
+    # UPDATED: Left join Planification since standalone tasks have NULL planification_id
+    query = Document.query.outerjoin(Planification).join(Form)
     
     # Role-based filtering
     if g.user.role == "worker":
-        # Workers only see their own assigned tasks
-        # This is a security measure - prevents workers from seeing others' work
-        query = query.filter(Document.worker_id == g.user.id)
+        # Workers see tasks assigned to them OR created by them
+        query = query.filter(
+            db.or_(
+                Document.worker_id == g.user.id,
+                Document.created_by_id == g.user.id
+            )
+        )
     elif g.user.role in ["planner", "admin"]:
         # Planners and admins can see all tasks
         # But can optionally filter by worker using query param
@@ -147,9 +351,14 @@ def list_tasks():
                 "id": doc.worker.id,
                 "username": doc.worker.username
             } if doc.worker else None,
+            "created_by": {
+                "id": doc.created_by.id,
+                "username": doc.created_by.username
+            } if doc.created_by else None,
             # UPDATED: Access form directly from document (no longer through record.planification)
             "form_type": doc.form.form_type,
             "form_name": doc.form.name,
+            "planification_id": doc.planification_id,
             "created_at": doc.created_at.isoformat() if doc.created_at else None,
             "started_at": doc.started_at.isoformat() if doc.started_at else None,
             "completed_at": doc.completed_at.isoformat() if doc.completed_at else None,
@@ -174,7 +383,7 @@ def list_tasks():
     # HTML Response - for browser clicks
     # Render template with all the data needed for display
     return render_template(
-        "tasks/list.html",
+        "tasks/task_list.html",
         tasks=tasks,
         status=status,
         total=total,

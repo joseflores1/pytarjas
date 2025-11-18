@@ -92,12 +92,19 @@ All pages should extend this template.
        ============================================ -->
   <nav class="navbar">
     <div class="navbar-container container">
-      {# Logo and Brand - FIXED: Now goes to auth.login #}
+      {# Logo and Brand #}
       <a href="{{ url_for('auth.login') }}" class="navbar-brand">
-        <img src="{{ url_for('static', filename='icons/HGT-Logo-greyblue-orange-RGB.svg') }}" 
+        {# Light mode logo (greyblue/orange) #}
+        <img src="{{ url_for('static', filename='icons/HGT-Logo-greyblue-orange-RGB-192x192.png') }}" 
              alt="HGT Logo" 
-             style="height: 100px; margin-right: 12px;">
-        <span>HGT Data Collector</span>
+             class="navbar-logo navbar-logo-light"
+             style="height: 200px; width: 200px; margin-right: 12px;">
+        {# Dark mode logo (white/orange) #}
+        <img src="{{ url_for('static', filename='icons/HGT-Logo-white-orange-RGB-192x192.png') }}" 
+             alt="HGT Logo" 
+             class="navbar-logo navbar-logo-dark"
+             style="height: 200px; width: 200px; margin-right: 12px;">
+        <span style="font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold);">HGT Data Collector</span>
       </a>
       
       {# Mobile menu toggle #}
@@ -126,7 +133,7 @@ All pages should extend this template.
           {% if g.user.role == 'worker' %}
             <li><a href="{{ url_for('worker.index') }}" class="{% if request.endpoint == 'worker.index' %}active{% endif %}">🏠 Home</a></li>
             <li><a href="{{ url_for('tasks.list_tasks') }}" class="{% if request.endpoint == 'tasks' %}active{% endif %}">📋 Tasks</a></li>
-            <li><a href="{{ url_for('forms.list_forms') }}" class="{% if request.endpoint and request.endpoint.startswith('forms.') %}active{% endif %}">📝 Formularios</a></li>
+            <li><a href="{{ url_for('forms.list_forms') }}" class="{% if request.endpoint and request.endpoint.startswith('forms.') %}active{% endif %}">📄 Formularios</a></li>
           {% endif %}
           
           {# Client Navigation - NO FORMS ACCESS #}
@@ -141,6 +148,13 @@ All pages should extend this template.
               <span class="connection-status-dot"></span>
               <span id="connectionText">Online</span>
             </span>
+          </li>
+          
+          {# Theme toggle button #}
+          <li>
+            <button id="themeToggle" class="btn btn-ghost btn-sm" aria-label="Toggle theme" title="Cambiar tema">
+              <span id="themeIcon"></span>
+            </button>
           </li>
           
           {# User info #}
@@ -186,40 +200,11 @@ All pages should extend this template.
   <!-- ============================================
        FOOTER
        ============================================ -->
-  <footer class="layout-footer" style="background-color: var(--color-bg-secondary); padding: var(--space-xl) 0; margin-top: var(--space-2xl); border-top: 1px solid var(--color-border);">
-    <div class="container">
-      <div class="grid grid-cols-1 gap-lg" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
-        {# Company Info #}
-        <div>
-          <h4 style="margin-bottom: var(--space-md); color: var(--color-text-primary);">HGT Inland Services</h4>
-          <p class="text-secondary text-sm">Professional cargo handling and logistics solutions</p>
-        </div>
-        
-        {# Contact #}
-        <div>
-          <h4 style="margin-bottom: var(--space-md); color: var(--color-text-primary);">Contact</h4>
-          <p class="text-secondary text-sm">Email: <a href="mailto:info@hgt.cl" style="color: var(--color-primary);">info@hgt.cl</a></p>
-          <p class="text-secondary text-sm">Phone: +56 32 XXX XXXX</p>
-        </div>
-        
-        {# Quick Links #}
-        <div>
-          <h4 style="margin-bottom: var(--space-md); color: var(--color-text-primary);">Quick Links</h4>
-          <ul style="list-style: none; padding: 0;">
-            {% if g.user %}
-              <li><a href="{{ url_for('worker.help_page') }}" class="text-secondary text-sm" style="text-decoration: none;">Help & Support</a></li>
-              <li><a href="{{ url_for('worker.profile') }}" class="text-secondary text-sm" style="text-decoration: none;">My Profile</a></li>
-            {% else %}
-              <li><a href="{{ url_for('auth.login') }}" class="text-secondary text-sm" style="text-decoration: none;">Login</a></li>
-            {% endif %}
-          </ul>
-        </div>
-      </div>
-      
-      <div class="flex justify-between items-center flex-wrap gap-md" style="margin-top: var(--space-lg); padding-top: var(--space-lg); border-top: 1px solid var(--color-border);">
-        <p class="text-secondary text-sm">© 2025 HGT Inland Services. All rights reserved.</p>
-        <p class="text-secondary text-sm">Version 1.0.0</p>
-      </div>
+  <footer class="layout-footer">
+    <div class="container" style="text-align: center; padding: var(--space-xl) 0;">
+      <p style="color: var(--color-text-tertiary); font-size: var(--font-size-sm);">
+        &copy; 2024 HGT Data Collector. Todos los derechos reservados.
+      </p>
     </div>
   </footer>
   
@@ -325,7 +310,7 @@ All pages should extend this template.
       
       const icons = {
         success: '✓',
-        error: '✕',
+        error: '✖',
         warning: '⚠',
         info: 'ℹ'
       };
@@ -350,6 +335,68 @@ All pages should extend this template.
     
     // Make showToast globally available
     window.showToast = showToast;
+    
+    // ===== THEME SWITCHING =====
+    (function() {
+      const themeToggle = document.getElementById('themeToggle');
+      const themeIcon = document.getElementById('themeIcon');
+      const html = document.documentElement;
+      
+      // Get theme from localStorage or system preference
+      function getPreferredTheme() {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+          return savedTheme;
+        }
+        // Check system preference
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      
+      // Apply theme to document
+      function applyTheme(theme) {
+        html.setAttribute('data-theme', theme);
+        
+        // Update logos
+        const lightLogos = document.querySelectorAll('.navbar-logo-light');
+        const darkLogos = document.querySelectorAll('.navbar-logo-dark');
+        
+        if (theme === 'dark') {
+          lightLogos.forEach(logo => logo.style.display = 'none');
+          darkLogos.forEach(logo => logo.style.display = 'inline');
+          if (themeIcon) themeIcon.textContent = '🌙';
+        } else {
+          lightLogos.forEach(logo => logo.style.display = 'inline');
+          darkLogos.forEach(logo => logo.style.display = 'none');
+          if (themeIcon) themeIcon.textContent = '☀️';
+        }
+        
+        // Save to localStorage
+        localStorage.setItem('theme', theme);
+      }
+      
+      // Toggle theme
+      function toggleTheme() {
+        const currentTheme = html.getAttribute('data-theme') || 'light';
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+        applyTheme(newTheme);
+      }
+      
+      // Initialize theme on page load
+      applyTheme(getPreferredTheme());
+      
+      // Add click event to toggle button
+      if (themeToggle) {
+        themeToggle.addEventListener('click', toggleTheme);
+      }
+      
+      // Listen for system preference changes
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        // Only apply if user hasn't manually set a preference
+        if (!localStorage.getItem('theme')) {
+          applyTheme(e.matches ? 'dark' : 'light');
+        }
+      });
+    })();
   </script>
   
   {# Page-specific JavaScript #}

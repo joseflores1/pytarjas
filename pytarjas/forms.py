@@ -18,7 +18,7 @@ REASONING BEHIND THE CODE:
 - Soft deletion (is_active flag) preserves historical data while hiding inactive forms
 """
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for, jsonify
+from flask import Blueprint, flash, redirect, render_template, request, url_for, jsonify, g
 from sqlalchemy import insert
 from sqlalchemy.orm import joinedload
 from datetime import datetime, timezone
@@ -156,7 +156,7 @@ def get_form(form_id):
             "questions": [
                 {
                     "id": "q-uuid-1",
-                    "question_text": "¿Número de contenedor?",
+                    "question_text": "Â¿NÃºmero de contenedor?",
                     "question_type": "text",
                     "is_required": true,
                     "order": 1,
@@ -242,14 +242,14 @@ def create_form():
         "form_type": "consolidado",
         "questions": [
             {
-                "question_text": "¿Número de contenedor?",
+                "question_text": "Â¿NÃºmero de contenedor?",
                 "question_type": "text",
                 "is_required": true,
                 "order": 1,
                 "options": {"maxlength": 50, "placeholder": "Ej: ABCD1234567"}
             },
             {
-                "question_text": "¿Foto del sello?",
+                "question_text": "Â¿Foto del sello?",
                 "question_type": "photo",
                 "is_required": true,
                 "order": 2,
@@ -325,7 +325,7 @@ def create_form():
                 error = f"Form name '{name}' is already in use. Please choose a different name."
         
         # Validation: Question types must be valid
-        valid_question_types = ["text", "number", "photo", "date", "datetime", "boolean", "select", "textarea"]
+        valid_question_types = ["text", "number", "photo", "date", "datetime", "boolean", "select", "textarea", "file"]
         if not error and questions_data:
             for idx, q in enumerate(questions_data):
                 q_type = q.get("question_type")
@@ -341,7 +341,8 @@ def create_form():
                     name=name,
                     description=description,
                     form_type=form_type,
-                    is_active=True  # New forms are active by default
+                    is_active=True,  # New forms are active by default
+                    created_by_id=g.user.id  # Track who created this form
                 )
                 
                 # Add form to session

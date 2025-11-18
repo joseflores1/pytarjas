@@ -29,10 +29,12 @@ class Form(db.Model):
         description: Detailed description of the form's purpose
         form_type: Type category (consolidado, desconsolidado, seal_verification)
         is_active: Whether this form is currently available for use
+        created_by_id: Foreign key to User who created this form template
         created_at: When the form was created
         updated_at: Last modification timestamp
         questions: Related Question objects (one-to-many)
         planifications: Planifications using this form (one-to-many)
+        created_by: User who created this form template (many-to-one)
     """
     __tablename__="form"
 
@@ -64,6 +66,13 @@ class Form(db.Model):
         default=True,
     )
 
+    created_by_id: Mapped[str | None]=mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     created_at: Mapped[datetime]=mapped_column(
         DateTime,
         nullable=False,
@@ -83,6 +92,10 @@ class Form(db.Model):
         "Planification",
         back_populates="form"
     )
+    created_by: Mapped["User"]=relationship(
+        "User",
+        foreign_keys=[created_by_id],
+    )
 
 class Question(db.Model):
     """
@@ -92,13 +105,22 @@ class Question(db.Model):
         id: Unique identifier (UUID)
         form_id: Foreign key to parent Form
         question_text: The question to display to the worker
-        question_type: Type of input (text, number, photo, date, boolean, select)
+        question_type: Type of input (text, number, datetime, photo, select, file)
         is_required: Whether this question must be answered
         order: Display order within the form (lower numbers first)
-        options: JSON field for select/radio options, validation rules, etc.
+        options: JSON field for select options, validation rules, etc.
+                 For select type: {"choices": ["Option 1", "Option 2", ...]}
         created_at: When the question was created
         updated_at: Last modification timestamp
         form: Related Form object (many-to-one)
+    
+    Supported question_type values:
+        - text: Single or multi-line text input
+        - number: Numeric input (integer or decimal)
+        - datetime: Date and/or time picker
+        - photo: Camera/photo capture
+        - select: Single selection from predefined options
+        - file: File upload attachment
     """
 
     __tablename__="question"
@@ -226,7 +248,7 @@ class Planification(db.Model):
         index=True,
     )
     
-    # RENAMED: total_records → total_documents (more accurate now)
+    # RENAMED: total_records â†’ total_documents (more accurate now)
     total_documents: Mapped[int]=mapped_column(
         Integer,
         nullable=False,
@@ -251,7 +273,7 @@ class Planification(db.Model):
         "Form",
         back_populates="planifications",
     )
-    # CHANGED: records → documents (direct relationship now)
+    # CHANGED: records â†’ documents (direct relationship now)
     documents: Mapped[list["Document"]]=relationship(
         "Document",
         back_populates="planification",
@@ -282,6 +304,7 @@ class Document(db.Model):
         form_id: Foreign key to Form (which template to use)
         record_data: JSON containing all task-specific data (merged from Record)
         worker_id: Foreign key to User (Worker who fills it)
+        created_by_id: Foreign key to User (who created this task - for standalone tasks)
         status: Document status (pending, in_progress, completed, reviewed, approved)
         responses: JSON storing all question answers
         photos: JSON array of photo file paths/URLs
@@ -296,6 +319,7 @@ class Document(db.Model):
         planification: Related Planification object (many-to-one) - CHANGED from record
         form: Related Form object (many-to-one) - NEW direct relationship
         worker: Related User (Worker) object (many-to-one)
+        created_by: Related User object who created this task (many-to-one)
     
     Example record_data for different forms:
         Container form: {"container_number": "ABCD123", "ship_name": "MSC Luna", ...}
@@ -310,7 +334,7 @@ class Document(db.Model):
         default=lambda: str(uuid.uuid4()),
     )
     
-    # CHANGED: record_id → planification_id (direct reference now)
+    # CHANGED: record_id â†’ planification_id (direct reference now)
     # NULLABLE: Allows manual task creation without planification
     planification_id: Mapped[str | None] = mapped_column(
         String(36),
@@ -336,6 +360,14 @@ class Document(db.Model):
     )
     
     worker_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    
+    # NEW: Track who created the document (for standalone tasks)
+    created_by_id: Mapped[str | None] = mapped_column(
         String(36),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
@@ -397,7 +429,7 @@ class Document(db.Model):
         nullable=True,
     )
     
-    # CHANGED: record → planification (direct relationship now)
+    # CHANGED: record â†’ planification (direct relationship now)
     planification: Mapped["Planification"] = relationship(
         "Planification",
         back_populates="documents",
@@ -412,6 +444,12 @@ class Document(db.Model):
     worker: Mapped["User"] = relationship(
         "User",
         foreign_keys=[worker_id],
+    )
+    
+    # NEW: User who created this document (for standalone tasks)
+    created_by: Mapped["User"] = relationship(
+        "User",
+        foreign_keys=[created_by_id],
     )
     
     # ========================================================================

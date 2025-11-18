@@ -193,6 +193,32 @@
   to { transform: rotate(360deg); }
 }
 
+/* Theme toggle button */
+#themeToggle {
+  font-size: 1.5rem;
+  padding: 8px 12px;
+  min-height: 44px;
+  min-width: 44px;
+  border-radius: var(--radius-md);
+  background-color: transparent;
+  border: 1px solid var(--color-border);
+  transition: all var(--transition-fast);
+}
+
+#themeToggle:hover {
+  background-color: var(--color-bg-secondary);
+  border-color: var(--color-border-dark);
+}
+
+#themeToggle:active {
+  transform: scale(0.95);
+}
+
+#themeIcon {
+  display: inline-block;
+  line-height: 1;
+}
+
 
 /* ============================================
    CARDS

@@ -1,0 +1,380 @@
+{# pytarjas/templates/tasks/task_list.html #}
+{#
+Task List Template
+
+PURPOSE:
+Displays a filterable, sortable list of tasks for workers, planners, or admins.
+Supports offline caching and PWA functionality.
+
+FEATURES:
+- Role-based task filtering (workers see their tasks, admins see all)
+- Status filtering (pending, in_progress, completed, etc.)
+- Search by container/record data
+- Responsive card-based layout for mobile
+- Quick status indicators
+- Links to task details
+
+VARIABLES FROM tasks.list_tasks():
+- tasks: List of task dictionaries with document, worker, form info
+- status: Current status filter ('all', 'pending', 'in_progress', etc.)
+- total: Total number of matching tasks
+- offset: Current pagination offset
+- limit: Number of tasks per page
+- user: Current logged-in user (g.user)
+- container_search: Current search term (if any)
+- worker_id_filter: Current worker filter (if any)
+#}
+
+{% extends 'base.html' %}
+
+{% block title %}Task List{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+  <style>
+    .task-list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-lg);
+      gap: var(--space-md);
+      flex-wrap: wrap;
+    }
+
+    .filter-controls {
+      display: flex;
+      gap: var(--space-sm);
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .filter-btn {
+      padding: var(--space-sm) var(--space-md);
+      border: 1px solid var(--color-border);
+      background: white;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+      color: var(--color-text);
+    }
+
+    .filter-btn:hover {
+      background: var(--color-bg-secondary);
+    }
+
+    .filter-btn.active {
+      background: var(--color-primary);
+      color: white;
+      border-color: var(--color-primary);
+    }
+
+    .task-card {
+      background: white;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      margin-bottom: var(--space-md);
+      transition: all 0.2s;
+    }
+
+    .task-card:hover {
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .task-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: var(--space-sm);
+      gap: var(--space-md);
+    }
+
+    .task-title {
+      font-weight: var(--font-weight-semibold);
+      font-size: var(--font-size-lg);
+      color: var(--color-text);
+      margin: 0;
+    }
+
+    .task-meta {
+      display: flex;
+      gap: var(--space-md);
+      flex-wrap: wrap;
+      margin-top: var(--space-sm);
+      font-size: var(--font-size-sm);
+      color: var(--color-text-secondary);
+    }
+
+    .task-meta-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    .status-badge {
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+    }
+
+    .status-pending {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .status-in_progress {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .status-completed {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .status-reviewed {
+      background: #e0e7ff;
+      color: #3730a3;
+    }
+
+    .status-approved {
+      background: #dcfce7;
+      color: #14532d;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: var(--space-xl);
+      color: var(--color-text-secondary);
+    }
+
+    .empty-state-icon {
+      font-size: 4rem;
+      margin-bottom: var(--space-md);
+    }
+
+    @media (max-width: 768px) {
+      .task-list-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .filter-controls {
+        justify-content: center;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block header %}
+  <div class="container">
+    <div class="task-list-header">
+      <div>
+        <h1>📋 Tasks</h1>
+        <p style="color: var(--color-text-secondary); margin: var(--space-xs) 0 0 0;">
+          {% if status == 'all' %}
+            Showing all tasks
+          {% else %}
+            Showing {{ status|replace('_', ' ')|capitalize }} tasks
+          {% endif %}
+          ({{ total }} total)
+        </p>
+      </div>
+      <div style="display: flex; gap: var(--space-sm);">
+        <a href="{{ url_for('tasks.create_task') }}" class="btn btn-primary">
+          ➕ Create Task
+        </a>
+        <a href="{{ url_for('worker.index') }}" class="btn btn-secondary">
+          🏠 Dashboard
+        </a>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div class="container">
+    
+    {# Status Filters #}
+    <div class="filter-controls" style="margin-bottom: var(--space-lg);">
+      <span style="font-weight: var(--font-weight-medium); margin-right: var(--space-xs);">Filter:</span>
+      <a href="{{ url_for('tasks.list_tasks', status='all') }}" 
+         class="filter-btn {% if status == 'all' %}active{% endif %}">
+        All
+      </a>
+      <a href="{{ url_for('tasks.list_tasks', status='pending') }}" 
+         class="filter-btn {% if status == 'pending' %}active{% endif %}">
+        Pending
+      </a>
+      <a href="{{ url_for('tasks.list_tasks', status='in_progress') }}" 
+         class="filter-btn {% if status == 'in_progress' %}active{% endif %}">
+        In Progress
+      </a>
+      <a href="{{ url_for('tasks.list_tasks', status='completed') }}" 
+         class="filter-btn {% if status == 'completed' %}active{% endif %}">
+        Completed
+      </a>
+      <a href="{{ url_for('tasks.list_tasks', status='reviewed') }}" 
+         class="filter-btn {% if status == 'reviewed' %}active{% endif %}">
+        Reviewed
+      </a>
+      <a href="{{ url_for('tasks.list_tasks', status='approved') }}" 
+         class="filter-btn {% if status == 'approved' %}active{% endif %}">
+        Approved
+      </a>
+    </div>
+
+    {# Task List #}
+    {% if tasks %}
+      <div class="task-list">
+        {% for task in tasks %}
+          <div class="task-card">
+            <div class="task-card-header">
+              <div style="flex: 1;">
+                <h3 class="task-title">
+                  <a href="{{ url_for('tasks.get_task', task_id=task.id) }}" style="text-decoration: none; color: inherit;">
+                    {{ task.form_name }}
+                  </a>
+                </h3>
+                
+                {# Display dynamic record data #}
+                {% if task.record_data %}
+                  <div style="margin-top: var(--space-xs); color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+                    {% for key, value in task.record_data.items() %}
+                      {% if loop.index <= 3 %}
+                        <span style="margin-right: var(--space-md);">
+                          <strong>{{ key|replace('_', ' ')|title }}:</strong> {{ value }}
+                        </span>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+              
+              <span class="status-badge status-{{ task.status }}">
+                {{ task.status|replace('_', ' ')|capitalize }}
+              </span>
+            </div>
+
+            <div class="task-meta">
+              {% if task.worker %}
+                <span class="task-meta-item">
+                  👤 {{ task.worker.username }}
+                </span>
+              {% endif %}
+              
+              <span class="task-meta-item">
+                📝 {{ task.form_type or 'General' }}
+              </span>
+              
+              {% if task.created_at %}
+                <span class="task-meta-item">
+                  🕐 Created {{ task.created_at[:10] }}
+                </span>
+              {% endif %}
+              
+              {% if task.started_at %}
+                <span class="task-meta-item">
+                  ▶️ Started {{ task.started_at[:10] }}
+                </span>
+              {% endif %}
+              
+              {% if task.completed_at %}
+                <span class="task-meta-item">
+                  ✅ Completed {{ task.completed_at[:10] }}
+                </span>
+              {% endif %}
+            </div>
+
+            <div style="margin-top: var(--space-md);">
+              <a href="{{ url_for('tasks.get_task', task_id=task.id) }}" class="btn btn-primary btn-sm">
+                View Details →
+              </a>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      {# Pagination #}
+      {% if total > limit %}
+        <div style="display: flex; justify-content: center; gap: var(--space-sm); margin-top: var(--space-xl);">
+          {% if offset > 0 %}
+            <a href="{{ url_for('tasks.list_tasks', status=status, offset=offset-limit, limit=limit) }}" 
+               class="btn btn-secondary">
+              ← Previous
+            </a>
+          {% endif %}
+          
+          <span style="padding: var(--space-sm) var(--space-md); align-self: center;">
+            Page {{ (offset // limit) + 1 }} of {{ ((total - 1) // limit) + 1 }}
+          </span>
+          
+          {% if offset + limit < total %}
+            <a href="{{ url_for('tasks.list_tasks', status=status, offset=offset+limit, limit=limit) }}" 
+               class="btn btn-secondary">
+              Next →
+            </a>
+          {% endif %}
+        </div>
+      {% endif %}
+
+    {% else %}
+      {# Empty State #}
+      <div class="empty-state">
+        <div class="empty-state-icon">📭</div>
+        <h2>No tasks found</h2>
+        <p>
+          {% if status != 'all' %}
+            There are no {{ status|replace('_', ' ') }} tasks.
+          {% else %}
+            You don't have any tasks yet.
+          {% endif %}
+        </p>
+        <a href="{{ url_for('tasks.create_task') }}" class="btn btn-primary" style="margin-top: var(--space-md);">
+          Create Your First Task
+        </a>
+      </div>
+    {% endif %}
+
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script>
+    // Auto-refresh every 30 seconds to show new assignments
+    // Only when online and not in the middle of viewing a task
+    const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
+    
+    let autoRefreshTimer = null;
+    
+    function startAutoRefresh() {
+      if (navigator.onLine) {
+        autoRefreshTimer = setTimeout(() => {
+          window.location.reload();
+        }, AUTO_REFRESH_INTERVAL);
+      }
+    }
+    
+    function stopAutoRefresh() {
+      if (autoRefreshTimer) {
+        clearTimeout(autoRefreshTimer);
+        autoRefreshTimer = null;
+      }
+    }
+    
+    // Start auto-refresh on page load
+    startAutoRefresh();
+    
+    // Stop auto-refresh when user goes offline
+    window.addEventListener('offline', stopAutoRefresh);
+    
+    // Restart auto-refresh when user comes online
+    window.addEventListener('online', startAutoRefresh);
+    
+    // Stop auto-refresh before unload
+    window.addEventListener('beforeunload', stopAutoRefresh);
+  </script>
+{% endblock %}
