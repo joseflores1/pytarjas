@@ -1,11 +1,10 @@
 {# pytarjas/templates/forms/edit_form.html #}
 {#
-Edit Form Page - Interface for editing form templates
+Edit Form Page
 
 Updates:
-- Fixed "style" attribute syntax errors by moving logic to CSS classes
-- Uses '.hidden' utility class for toggling visibility
-- Integrated visual Choice Builder for "Select" questions
+- Implemented global 'showConfirm' modal for Cancel and Delete actions
+- Replaced native browser alerts
 #}
 
 {% extends 'base.html' %}
@@ -101,7 +100,7 @@ Updates:
           Modificando: <strong>{{ form.name }}</strong>
         </p>
       </div>
-      <a href="{{ url_for('forms.list_forms') }}" class="btn btn-secondary">
+      <a href="{{ url_for('forms.list_forms') }}" class="btn btn-secondary" id="headerBackBtn">
         ← Volver al Listado
       </a>
     </div>
@@ -291,12 +290,37 @@ Updates:
   
   document.getElementById('editFormForm').addEventListener('input', () => formChanged = true);
   
+  // Native browser check
   window.addEventListener('beforeunload', (e) => {
     if (formChanged) {
       e.preventDefault();
       e.returnValue = 'Cambios sin guardar.';
     }
   });
+
+  // Custom Modal for Cancel Actions
+  function handleCancel(e) {
+    e.preventDefault();
+    const targetUrl = this.href;
+    
+    if (formChanged) {
+      showConfirm(
+        'Tienes cambios sin guardar. ¿Seguro que deseas salir? Los cambios se perderán.',
+        () => {
+          formChanged = false; // Bypass beforeunload
+          window.location.href = targetUrl;
+        },
+        'Descartar Cambios',
+        'Sí, salir',
+        'danger'
+      );
+    } else {
+      window.location.href = targetUrl;
+    }
+  }
+  
+  document.getElementById('cancelButton').addEventListener('click', handleCancel);
+  document.getElementById('headerBackBtn').addEventListener('click', handleCancel);
 
   function toggleQuestionCard(header) {
     header.closest('.question-card').classList.toggle('collapsed');
@@ -341,10 +365,7 @@ Updates:
     
     const tempId = 'new_' + Date.now();
     
-    // NOTE: The HTML below uses inline styles for the NEW dynamic elements
-    // because they are created in JS. We use the classes for layout.
-    // For display toggling in JS, we modify style.display directly or toggle classes.
-    
+    // Using inline styles here for dynamic elements is fine as per base.css utility classes are available
     const html = `
       <div class="question-card" data-question-id="${tempId}">
         <div class="question-header" onclick="toggleQuestionCard(this)">
@@ -416,10 +437,17 @@ Updates:
   
   function deleteQuestion(e, id) {
     e.stopPropagation();
-    if (confirm('¿Eliminar pregunta?')) {
-      document.querySelector(`[data-question-id="${id}"]`).remove();
-      formChanged = true;
-    }
+    
+    showConfirm(
+      '¿Estás seguro que deseas eliminar esta pregunta? La acción se confirmará al guardar el formulario.',
+      () => {
+        document.querySelector(`[data-question-id="${id}"]`).remove();
+        formChanged = true;
+      },
+      'Eliminar Pregunta',
+      'Eliminar',
+      'danger'
+    );
   }
 
   // Submit Handler: Serialize choices to JSON

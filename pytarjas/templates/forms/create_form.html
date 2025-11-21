@@ -1,11 +1,10 @@
 {# pytarjas/templates/forms/create_form.html #}
 {#
-Create Form Page - Interface for creating new form templates
+Create Form Page
 
 Updates:
-- Added visual interface for "Select" question choices
-- Automatically serializes choices to JSON on submit
-- Improved question type handling
+- Implemented global 'showConfirm' modal for Cancel and Delete actions
+- Replaced native browser alerts
 #}
 
 {% extends 'base.html' %}
@@ -98,7 +97,7 @@ Updates:
           Definir una plantilla de formulario para recolección de datos en campo
         </p>
       </div>
-      <a href="{{ url_for('forms.list_forms') }}" class="btn btn-secondary">
+      <a href="{{ url_for('forms.list_forms') }}" class="btn btn-secondary" id="headerBackBtn">
         ← Volver al Listado
       </a>
     </div>
@@ -152,9 +151,6 @@ Updates:
               <h2 class="card-title">❓ Preguntas del Formulario</h2>
               <p class="card-subtitle">Define las preguntas que aparecerán en el formulario</p>
             </div>
-            <button type="button" class="btn btn-success" onclick="addNewQuestion()">
-              ➕ Agregar Pregunta
-            </button>
           </div>
         </div>
         
@@ -166,10 +162,18 @@ Updates:
                 Este formulario aún no tiene preguntas. Haz clic en "Agregar Pregunta" para comenzar.
               </p>
               <button type="button" class="btn btn-success" onclick="addNewQuestion()">
-                ➕ Agregar Primera Pregunta
+                ➕ Agregar Pregunta
               </button>
             </div>
           </div>
+
+          {# Permanent Bottom Add Button #}
+          <div id="bottomAddButtonWrapper" style="display: none; margin-top: var(--space-lg);">
+            <button type="button" class="btn btn-success" style="width: 100%; padding: var(--space-md); border: 2px dashed var(--color-secondary);" onclick="addNewQuestion()">
+              ➕ Agregar Nueva Pregunta
+            </button>
+          </div>
+
         </div>
       </div>
       
@@ -196,37 +200,59 @@ Updates:
     formChanged = true;
   });
   
+  // Browser-level protection (native)
   window.addEventListener('beforeunload', function(e) {
     if (formChanged) {
       e.preventDefault();
-      e.returnValue = 'Tienes cambios sin guardar. ¿Estás seguro que deseas salir?';
-      return e.returnValue;
+      e.returnValue = '';
     }
   });
+  
+  // Custom Modal for Cancel Actions
+  function handleCancel(e) {
+    e.preventDefault();
+    const targetUrl = this.href;
+    
+    if (formChanged) {
+      showConfirm(
+        'Tienes cambios sin guardar. ¿Seguro que deseas salir? Perderás el progreso.',
+        () => {
+          formChanged = false; // Bypass beforeunload
+          window.location.href = targetUrl;
+        },
+        'Descartar Cambios',
+        'Sí, salir',
+        'danger'
+      );
+    } else {
+      window.location.href = targetUrl;
+    }
+  }
+  
+  document.getElementById('cancelButton').addEventListener('click', handleCancel);
+  document.getElementById('headerBackBtn').addEventListener('click', handleCancel);
   
   function toggleQuestionCard(headerElement) {
     const card = headerElement.closest('.question-card');
     card.classList.toggle('collapsed');
   }
 
-  // --- NEW LOGIC FOR CHOICES ---
-  
+  // --- LOGIC FOR CHOICES ---
   function toggleChoicesSection(selectElement, questionId) {
     const choicesContainer = document.getElementById(`choices_container_${questionId}`);
     const optionsTextarea = document.getElementById(`options_wrapper_${questionId}`);
     
     if (selectElement.value === 'select') {
       choicesContainer.style.display = 'block';
-      optionsTextarea.style.display = 'none'; // Hide raw JSON when using visual builder
+      optionsTextarea.style.display = 'none';
       
-      // Add a first choice if empty
       const list = document.getElementById(`choices_list_${questionId}`);
       if (list.children.length === 0) {
         addChoiceInput(questionId);
       }
     } else {
       choicesContainer.style.display = 'none';
-      optionsTextarea.style.display = 'block'; // Show raw JSON for other types
+      optionsTextarea.style.display = 'block';
     }
   }
 
@@ -247,8 +273,11 @@ Updates:
   function addNewQuestion() {
     questionCounter++;
     const container = document.getElementById('questionsContainer');
+    
     const noQuestionsMsg = document.getElementById('noQuestionsMessage');
     if (noQuestionsMsg) noQuestionsMsg.remove();
+    
+    document.getElementById('bottomAddButtonWrapper').style.display = 'block';
     
     const tempId = 'new_' + Date.now();
     
@@ -302,18 +331,15 @@ Updates:
               </label>
             </div>
             
-            {# Visual Builder for Choices #}
             <div id="choices_container_${tempId}" class="choices-container" style="display: none; grid-column: 1 / -1;">
               <label class="form-label">Opciones de Selección <span style="color: var(--color-danger);">*</span></label>
-              <div id="choices_list_${tempId}">
-                </div>
+              <div id="choices_list_${tempId}"></div>
               <button type="button" class="btn btn-sm btn-secondary" style="margin-top: var(--space-sm);" onclick="addChoiceInput('${tempId}')">
                 + Agregar Opción
               </button>
               <small class="form-help">Agrega las opciones que podrá seleccionar el usuario.</small>
             </div>
 
-            {# Raw JSON Options (Hidden for Select, Visible for others) #}
             <div class="form-group" id="options_wrapper_${tempId}" style="grid-column: 1 / -1;">
               <label class="form-label">Opciones Avanzadas (JSON)</label>
               <textarea name="question_options_${tempId}" class="form-control" rows="2" placeholder='{"maxlength": 50}' style="font-family: monospace;"></textarea>
@@ -327,32 +353,46 @@ Updates:
     updateQuestionCount();
     formChanged = true;
     
-    // Trigger toggle to set initial state
     const newCard = container.lastElementChild;
     const select = newCard.querySelector('select');
     toggleChoicesSection(select, tempId);
     
-    newCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    newCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
   
   function deleteQuestion(event, questionId) {
     event.stopPropagation();
-    if (!confirm('¿Estás seguro que deseas eliminar esta pregunta?')) return;
     
-    const card = document.querySelector(`[data-question-id="${questionId}"]`);
-    if (card) {
-      card.remove();
-      formChanged = true;
-      updateQuestionCount();
-      
-      const container = document.getElementById('questionsContainer');
-      if (container.children.length === 0) {
-        container.innerHTML = `<div id="noQuestionsMessage" style="text-align: center; padding: var(--space-2xl);">...</div>`;
-        document.getElementById('noQuestionsMessage').innerHTML = `
-          <p>Haz clic en "Agregar Pregunta" para comenzar.</p>
-          <button type="button" class="btn btn-success" onclick="addNewQuestion()">➕ Agregar</button>`;
-      }
-    }
+    // Using custom confirmation modal
+    showConfirm(
+      '¿Estás seguro que deseas eliminar esta pregunta? La acción es irreversible si guardas el formulario.',
+      () => {
+        const card = document.querySelector(`[data-question-id="${questionId}"]`);
+        if (card) {
+          card.remove();
+          formChanged = true;
+          updateQuestionCount();
+          
+          const container = document.getElementById('questionsContainer');
+          if (container.children.length === 0) {
+            document.getElementById('bottomAddButtonWrapper').style.display = 'none';
+            container.innerHTML = `
+                <div id="noQuestionsMessage" style="text-align: center; padding: var(--space-2xl); background-color: var(--color-bg-secondary); border-radius: var(--radius-md);">
+                  <div style="font-size: 3rem; margin-bottom: var(--space-md); opacity: 0.3;">❓</div>
+                  <p style="color: var(--color-text-secondary); margin-bottom: var(--space-lg);">
+                    Este formulario aún no tiene preguntas. Haz clic en "Agregar Pregunta" para comenzar.
+                  </p>
+                  <button type="button" class="btn btn-success" onclick="addNewQuestion()">
+                    ➕ Agregar Pregunta
+                  </button>
+                </div>`;
+          }
+        }
+      },
+      'Eliminar Pregunta',
+      'Eliminar',
+      'danger'
+    );
   }
   
   function updateQuestionCount() {
@@ -363,9 +403,7 @@ Updates:
     });
   }
   
-  // Form Submission Handler
   document.getElementById('createFormForm').addEventListener('submit', function(e) {
-    // Serialize visual choices into JSON options
     const cards = document.querySelectorAll('.question-card');
     let isValid = true;
 
@@ -375,7 +413,6 @@ Updates:
       const optionsTextarea = card.querySelector(`textarea[name="question_options_${qId}"]`);
       
       if (typeSelect.value === 'select') {
-        // Gather choices from visual inputs
         const choices = [];
         card.querySelectorAll('.choice-input').forEach(input => {
           if (input.value.trim()) choices.push(input.value.trim());
@@ -384,13 +421,10 @@ Updates:
         if (choices.length === 0) {
           alert(`La pregunta #${card.querySelector('.question-number').textContent} de tipo Selección debe tener al menos una opción.`);
           isValid = false;
-          // Expand card if collapsed
           card.classList.remove('collapsed');
           return;
         }
         
-        // Update the hidden JSON textarea
-        // Merge with existing JSON if user typed something else? For now, overwrite choices.
         let existingOpts = {};
         try {
            if (optionsTextarea.value.trim()) existingOpts = JSON.parse(optionsTextarea.value);

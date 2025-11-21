@@ -1,37 +1,16 @@
 {# pytarjas/templates/admin/list_users.html #}
 {#
-List Users Page - Admin interface for viewing and managing all users
+List Users Page
 
-Purpose:
-- Display all users in a responsive table
-- Filter users by role (admin, worker, planner, client)
-- Quick actions: Edit and Delete users
-- Prevent self-deletion for safety
-
-Features:
-- Responsive table that adapts to mobile/tablet
-- Role-based filtering with active state indicators
-- Color-coded role badges
-- Touch-optimized action buttons
-- Confirmation dialog before deletion
-- Empty state when no users found
-
-Dependencies:
-- base.html (parent template)
-- components.css (badges, buttons, filters)
-- layout.css (responsive containers)
-
-Variables from admin.list_users():
-- users: List of User objects
-- role_filter: Current role filter (or None for all)
+Updates:
+- Implemented global 'showConfirm' modal for Delete User action
+- Replaced native browser alerts
 #}
 
 {% extends 'base.html' %}
 
-{# Page title #}
 {% block title %}Gestión de Usuarios{% endblock %}
 
-{# Page header #}
 {% block header %}
   <div class="container">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-md); margin-top: var(--space-lg); margin-bottom: var(--space-lg);">
@@ -52,18 +31,13 @@ Variables from admin.list_users():
   </div>
 {% endblock %}
 
-{# Main content #}
 {% block content %}
   <div class="container">
     
-    {# ============================================
-         ROLE FILTERS
-         Buttons to filter users by role
-         ============================================ #}
+    {# ROLE FILTERS #}
     <div style="margin-bottom: var(--space-xl);">
       <div style="display: flex; flex-wrap: wrap; gap: var(--space-sm);">
         
-        {# All Users Filter #}
         <a href="{{ url_for('admin.list_users') }}" 
            class="btn {% if not role_filter %}btn-primary{% else %}btn-secondary{% endif %}"
            style="min-width: 120px;">
@@ -71,7 +45,6 @@ Variables from admin.list_users():
           Todos
         </a>
         
-        {# Admin Filter #}
         <a href="{{ url_for('admin.list_users', role='admin') }}" 
            class="btn {% if role_filter == 'admin' %}btn-primary{% else %}btn-secondary{% endif %}"
            style="min-width: 120px;">
@@ -79,7 +52,6 @@ Variables from admin.list_users():
           Administradores
         </a>
         
-        {# Worker Filter #}
         <a href="{{ url_for('admin.list_users', role='worker') }}" 
            class="btn {% if role_filter == 'worker' %}btn-primary{% else %}btn-secondary{% endif %}"
            style="min-width: 120px;">
@@ -87,7 +59,6 @@ Variables from admin.list_users():
           Trabajadores
         </a>
         
-        {# Planner Filter #}
         <a href="{{ url_for('admin.list_users', role='planner') }}" 
            class="btn {% if role_filter == 'planner' %}btn-primary{% else %}btn-secondary{% endif %}"
            style="min-width: 120px;">
@@ -95,7 +66,6 @@ Variables from admin.list_users():
           Planificadores
         </a>
         
-        {# Client Filter #}
         <a href="{{ url_for('admin.list_users', role='client') }}" 
            class="btn {% if role_filter == 'client' %}btn-primary{% else %}btn-secondary{% endif %}"
            style="min-width: 120px;">
@@ -106,13 +76,9 @@ Variables from admin.list_users():
       </div>
     </div>
     
-    {# ============================================
-         USERS TABLE
-         Responsive table with user data
-         ============================================ #}
+    {# USERS TABLE #}
     {% if users %}
       
-      {# Desktop/Tablet Table View #}
       <div class="card" style="overflow-x: auto;">
         <table style="width: 100%; border-collapse: collapse;">
           <thead>
@@ -146,7 +112,6 @@ Variables from admin.list_users():
                 onmouseover="this.style.backgroundColor='var(--color-bg-secondary)'"
                 onmouseout="this.style.backgroundColor='transparent'">
               
-              {# Username Column #}
               <td style="padding: var(--space-md); color: var(--color-text-primary); font-weight: var(--font-weight-medium);">
                 {{ user.username }}
                 {% if user.id == g.user.id %}
@@ -154,12 +119,10 @@ Variables from admin.list_users():
                 {% endif %}
               </td>
               
-              {# Email Column #}
               <td style="padding: var(--space-md); color: var(--color-text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis;">
                 {{ user.email }}
               </td>
               
-              {# Role Column with Color-Coded Badge #}
               <td style="padding: var(--space-md);">
                 {% if user.role == 'admin' %}
                   <span class="badge badge-danger" style="display: inline-flex; align-items: center; gap: var(--space-xs);">
@@ -180,12 +143,10 @@ Variables from admin.list_users():
                 {% endif %}
               </td>
               
-              {# Created Date Column #}
               <td style="padding: var(--space-md); color: var(--color-text-secondary); font-size: var(--font-size-sm); white-space: nowrap;">
                 {{ user.created_at.strftime('%d/%m/%Y') if user.created_at else 'N/A' }}
               </td>
               
-              {# Last Login Column #}
               <td style="padding: var(--space-md); color: var(--color-text-secondary); font-size: var(--font-size-sm); white-space: nowrap;">
                 {% if user.login_at %}
                   {{ user.login_at.strftime('%d/%m/%Y %H:%M') }}
@@ -194,7 +155,6 @@ Variables from admin.list_users():
                 {% endif %}
               </td>
               
-              {# Last Updated Column #}
               <td style="padding: var(--space-md); color: var(--color-text-secondary); font-size: var(--font-size-sm); white-space: nowrap;">
                 {% if user.updated_at %}
                   {{ user.updated_at.strftime('%d/%m/%Y %H:%M') }}
@@ -203,23 +163,21 @@ Variables from admin.list_users():
                 {% endif %}
               </td>
               
-              {# Actions Column #}
               <td style="padding: var(--space-md); text-align: center;">
                 <div style="display: flex; gap: var(--space-sm); justify-content: center; flex-wrap: wrap;">
                   
-                  {# Edit Button #}
                   <a href="{{ url_for('admin.edit_user', user_id=user.id) }}" 
                      class="btn btn-sm btn-secondary"
                      title="Editar usuario">
                     ✏️ Editar
                   </a>
                   
-                  {# Delete Button - Only if not self #}
                   {% if user.id != g.user.id %}
                     <form method="POST" 
                           action="{{ url_for('admin.delete_user', user_id=user.id) }}" 
                           style="display: inline;"
-                          onsubmit="return confirmDelete('{{ user.username }}');">
+                          class="delete-user-form"
+                          data-username="{{ user.username }}">
                       <button type="submit" 
                               class="btn btn-sm btn-danger"
                               title="Eliminar usuario">
@@ -227,7 +185,6 @@ Variables from admin.list_users():
                       </button>
                     </form>
                   {% else %}
-                    {# Can't delete yourself #}
                     <button type="button" 
                             class="btn btn-sm btn-ghost"
                             disabled
@@ -246,7 +203,6 @@ Variables from admin.list_users():
         </table>
       </div>
       
-      {# User Count Summary #}
       <div style="margin-top: var(--space-lg); padding: var(--space-md); background-color: var(--color-bg-secondary); border-radius: var(--radius-md); text-align: center;">
         <span style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
           Mostrando <strong style="color: var(--color-text-primary);">{{ users|length }}</strong> usuario(s)
@@ -255,10 +211,6 @@ Variables from admin.list_users():
       
     {% else %}
       
-      {# ============================================
-           EMPTY STATE
-           Shown when no users match the filter
-           ============================================ #}
       <div class="card">
         <div class="card-body" style="text-align: center; padding: var(--space-2xl);">
           <div style="font-size: 4rem; margin-bottom: var(--space-lg); opacity: 0.3;">
@@ -291,37 +243,35 @@ Variables from admin.list_users():
     
   </div>
 
-  {# ============================================
-       JAVASCRIPT - Delete Confirmation
-       ============================================ #}
+  {% block extra_js %}
   <script>
-    /**
-     * Confirm user deletion with a dialog
-     * @param {string} username - The username to delete
-     * @returns {boolean} True if confirmed, false otherwise
-     */
-    function confirmDelete(username) {
-      return confirm(
-        '¿Está seguro que desea eliminar al usuario "' + username + '"?\n\n' +
-        'Esta acción no se puede deshacer.\n\n' +
-        'Se eliminarán todos los datos asociados a este usuario.'
-      );
-    }
+    // Handle Delete Confirmation with custom modal
+    document.querySelectorAll('.delete-user-form').forEach(form => {
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const username = this.dataset.username;
+        
+        showConfirm(
+          `¿Está seguro que desea eliminar al usuario "${username}"?\n\nEsta acción no se puede deshacer y eliminará todos los datos asociados.`,
+          () => {
+            this.submit();
+          },
+          'Eliminar Usuario',
+          'Sí, eliminar',
+          'danger'
+        );
+      });
+    });
 
-    /**
-     * Add keyboard shortcuts for quick actions
-     */
+    // Keyboard shortcuts
     document.addEventListener('keydown', function(e) {
-      // Ctrl/Cmd + N = New User
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
         e.preventDefault();
         window.location.href = "{{ url_for('admin.create_user') }}";
       }
     });
 
-    /**
-     * Highlight current user row on page load
-     */
+    // Highlight current user row
     document.addEventListener('DOMContentLoaded', function() {
       const currentUserBadges = document.querySelectorAll('.badge-info');
       currentUserBadges.forEach(function(badge) {
@@ -333,24 +283,14 @@ Variables from admin.list_users():
       });
     });
   </script>
+  {% endblock %}
 
-  {# ============================================
-       CSS - Mobile Responsive Adjustments
-       ============================================ #}
   <style>
     /* Mobile: Stack table cells vertically */
     @media (max-width: 767px) {
-      table {
-        display: block;
-      }
-      
-      thead {
-        display: none; /* Hide headers on mobile */
-      }
-      
-      tbody {
-        display: block;
-      }
+      table { display: block; }
+      thead { display: none; }
+      tbody { display: block; }
       
       tr {
         display: block;
@@ -368,9 +308,7 @@ Variables from admin.list_users():
         border-bottom: 1px solid var(--color-border);
       }
       
-      td:last-child {
-        border-bottom: none;
-      }
+      td:last-child { border-bottom: none; }
       
       /* Add labels before each cell on mobile */
       td:nth-child(1)::before { content: "Usuario: "; font-weight: bold; }
@@ -382,21 +320,13 @@ Variables from admin.list_users():
       td:nth-child(7)::before { content: "Acciones: "; font-weight: bold; display: block; margin-bottom: var(--space-xs); }
       
       /* Action buttons full width on mobile */
-      td:nth-child(7) > div {
-        flex-direction: column;
-      }
-      
-      td:nth-child(7) .btn {
-        width: 100%;
-      }
+      td:nth-child(7) > div { flex-direction: column; }
+      td:nth-child(7) .btn { width: 100%; }
     }
     
     /* Tablet: Reduce padding */
     @media (min-width: 768px) and (max-width: 1199px) {
-      th, td {
-        padding: var(--space-sm) !important;
-        font-size: var(--font-size-sm);
-      }
+      th, td { padding: var(--space-sm) !important; font-size: var(--font-size-sm); }
     }
   </style>
 {% endblock %}

@@ -1,40 +1,24 @@
+
 {# pytarjas/templates/admin/edit_user.html #}
 {#
 Edit User Page - Admin interface for updating user information
 
-Purpose:
-- Edit existing user details (username, email, role, password)
-- Field-by-field editing with inline edit buttons
-- Prevents self-role-editing for security
-- Shows user metadata (created date, last login)
-
-Features:
-- Uses forms.css for form styling
-- Field groups with edit/cancel buttons for selective editing
-- Touch-optimized for Android tablets
-- Client-side validation with visual feedback
-- Password confirmation matching
-
-Dependencies:
-- base.html (parent template)
-- forms.css (loaded via extra_css block)
-- components.css (buttons, cards, badges)
-
-Variables from admin.edit_user():
-- user: User object to edit (username, email, role, id, created_at, login_at)
+Updates:
+- Locked Role editing for ALL admins (self or others)
+- Updated warning message regarding admin role immutability
+- Implemented global 'showConfirm' modal for Cancel/Back actions
+- Added form change tracking (formChanged)
+- KEPT native browser protection (beforeunload) for refresh/close tab
 #}
 
 {% extends 'base.html' %}
 
-{# Page title #}
 {% block title %}Editar Usuario{% endblock %}
 
-{# Load forms.css for form controls #}
 {% block extra_css %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
 {% endblock %}
 
-{# Page header #}
 {% block header %}
   <div class="container">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-lg);">
@@ -44,18 +28,16 @@ Variables from admin.edit_user():
           Modificar información de <strong>{{ user.username }}</strong>
         </p>
       </div>
-      <a href="{{ url_for('admin.list_users') }}" class="btn btn-secondary">
+      <a href="{{ url_for('admin.list_users') }}" class="btn btn-secondary" id="headerBackBtn">
         ← Volver al Listado
       </a>
     </div>
   </div>
 {% endblock %}
 
-{# Main content #}
 {% block content %}
   <div class="container" style="max-width: 800px;">
     
-    {# Edit Form Card #}
     <div class="card" style="margin-bottom: var(--space-xl);">
       <div class="card-header">
         <h2 class="card-title">Información del Usuario</h2>
@@ -65,9 +47,7 @@ Variables from admin.edit_user():
       <div class="card-body">
         <form method="POST" id="editUserForm">
           
-          {# ============================================
-               USERNAME FIELD
-               ============================================ #}
+          {# USERNAME #}
           <div class="form-group" id="username-group">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
               <label for="username" class="form-label" style="margin-bottom: 0;">
@@ -92,9 +72,7 @@ Variables from admin.edit_user():
             </small>
           </div>
           
-          {# ============================================
-               EMAIL FIELD
-               ============================================ #}
+          {# EMAIL #}
           <div class="form-group" id="email-group">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
               <label for="email" class="form-label" style="margin-bottom: 0;">
@@ -119,49 +97,45 @@ Variables from admin.edit_user():
             </small>
           </div>
           
-          {# ============================================
-               ROLE FIELD
-               Special handling: Cannot edit own role
-               ============================================ #}
+          {# ROLE #}
           <div class="form-group" id="role-group">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
               <label for="role" class="form-label" style="margin-bottom: 0;">
                 Rol <span style="color: var(--color-danger);">*</span>
               </label>
               
-              {% if user.id == g.user.id %}
-                {# Editing own user - cannot change role #}
+              {# Check if user is admin (Self OR Other) #}
+              {% if user.role == 'admin' %}
                 <span style="font-size: var(--font-size-sm); color: var(--color-danger); font-weight: var(--font-weight-medium);">
-                  🔒 No puede editar su propio rol
+                  🔒 Rol de Administrador inmutable
                 </span>
               {% else %}
-                {# Editing another user - can change role #}
+                {# Editing non-admin user #}
                 <button type="button" class="btn btn-sm btn-ghost" onclick="toggleEdit('role')" id="role-edit-btn">
                   ✏️ Editar
                 </button>
               {% endif %}
             </div>
             
-            {% if user.id == g.user.id %}
-              {# Own profile: Disabled select + hidden input with actual value #}
+            {% if user.role == 'admin' %}
+              {# Admin User (Self or Other): Disabled select + hidden input + Warning #}
               <select id="role" class="form-select" disabled>
-                <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Administrador</option>
-                <option value="worker" {% if user.role == 'worker' %}selected{% endif %}>Trabajador</option>
-                <option value="planner" {% if user.role == 'planner' %}selected{% endif %}>Planificador</option>
-                <option value="client" {% if user.role == 'client' %}selected{% endif %}>Cliente</option>
+                <option value="admin" selected>Administrador</option>
+                <option value="worker">Trabajador</option>
+                <option value="planner">Planificador</option>
+                <option value="client">Cliente</option>
               </select>
               <input type="hidden" name="role" value="{{ user.role }}">
               
               <div class="alert alert-warning" style="margin-top: var(--space-sm); padding: var(--space-sm) var(--space-md); border-left-width: 4px;">
                 <div class="alert-content">
                   <div class="alert-message" style="font-size: var(--font-size-sm);">
-                    ⚠️ Por razones de seguridad, no puede cambiar su propio rol. 
-                    Solicite a otro administrador que lo haga.
+                    ⚠️ Por razones de seguridad, el rol de Administrador no puede ser modificado.
                   </div>
                 </div>
               </div>
             {% else %}
-              {# Other user: Normal editable select #}
+              {# Non-Admin User: Normal editable select #}
               <select name="role" id="role" class="form-select" disabled required>
                 <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Administrador</option>
                 <option value="worker" {% if user.role == 'worker' %}selected{% endif %}>Trabajador</option>
@@ -178,10 +152,7 @@ Variables from admin.edit_user():
             {% endif %}
           </div>
           
-          {# ============================================
-               PASSWORD FIELD
-               Optional - only fill to change password
-               ============================================ #}
+          {# PASSWORD #}
           <div class="form-group" id="password-group">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
               <label for="password" class="form-label" style="margin-bottom: 0;">
@@ -205,10 +176,7 @@ Variables from admin.edit_user():
             </small>
           </div>
           
-          {# ============================================
-               PASSWORD CONFIRMATION FIELD
-               Hidden by default, shown when editing password
-               ============================================ #}
+          {# PASSWORD CONFIRM #}
           <div class="form-group" id="password-confirm-group" style="display: none;">
             <label for="password_confirm" class="form-label">
               Confirmar Nueva Contraseña <span style="color: var(--color-danger);">*</span>
@@ -225,15 +193,12 @@ Variables from admin.edit_user():
             <small class="form-help" id="password-match-message"></small>
           </div>
           
-          {# ============================================
-               FORM ACTIONS
-               Save and Cancel buttons
-               ============================================ #}
+          {# ACTIONS #}
           <div style="display: flex; gap: var(--space-md); margin-top: var(--space-2xl); padding-top: var(--space-lg); border-top: 1px solid var(--color-border);">
             <button type="submit" class="btn btn-primary btn-lg" id="saveBtn">
               💾 Guardar Cambios
             </button>
-            <a href="{{ url_for('admin.list_users') }}" class="btn btn-secondary btn-lg">
+            <a href="{{ url_for('admin.list_users') }}" class="btn btn-secondary btn-lg" id="cancelBtn">
               Cancelar
             </a>
           </div>
@@ -242,10 +207,7 @@ Variables from admin.edit_user():
       </div>
     </div>
     
-    {# ============================================
-         USER METADATA CARD
-         Shows read-only information about the user
-         ============================================ #}
+    {# USER METADATA CARD #}
     <div class="card">
       <div class="card-header">
         <h3 class="card-title">Información del Sistema</h3>
@@ -290,11 +252,11 @@ Variables from admin.edit_user():
     
   </div>
 
-  {# ============================================
-       JAVASCRIPT - Form Interactivity
-       ============================================ #}
   <script>
-    // Store original values to restore on cancel
+    // Change Tracking Flag
+    let formChanged = false;
+
+    // Existing Values
     const originalValues = {
       username: "{{ user.username }}",
       email: "{{ user.email }}",
@@ -302,13 +264,46 @@ Variables from admin.edit_user():
       password: ""
     };
 
-    // Track which fields are currently being edited
+    // Track inputs
+    document.getElementById('editUserForm').addEventListener('input', function() {
+      formChanged = true;
+    });
+
+    // --- HANDLE CANCEL WITH MODAL ---
+    function handleCancel(e) {
+      e.preventDefault();
+      const targetUrl = this.href;
+      
+      if (formChanged) {
+        showConfirm(
+          'Ha realizado cambios en la información del usuario. ¿Desea salir sin guardar? Los cambios se perderán.',
+          () => {
+            formChanged = false; // Disable beforeunload check
+            window.location.href = targetUrl;
+          },
+          'Descartar Cambios',
+          'Sí, salir',
+          'danger'
+        );
+      } else {
+        window.location.href = targetUrl;
+      }
+    }
+
+    document.getElementById('cancelBtn').addEventListener('click', handleCancel);
+    document.getElementById('headerBackBtn').addEventListener('click', handleCancel);
+
+    // --- NATIVE BROWSER PROTECTION (Kept as requested) ---
+    window.addEventListener('beforeunload', function(e) {
+      if (formChanged) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+
+    // --- FIELD EDIT LOGIC ---
     const editingFields = new Set();
 
-    /**
-     * Toggle edit mode for a specific field
-     * @param {string} fieldName - The field to toggle (username, email, role)
-     */
     function toggleEdit(fieldName) {
       const field = document.getElementById(fieldName);
       const button = document.getElementById(fieldName + '-edit-btn');
@@ -325,6 +320,7 @@ Variables from admin.edit_user():
         button.classList.remove('btn-ghost');
         button.classList.add('btn-danger');
         editingFields.add(fieldName);
+        formChanged = true; // Mark as changed when editing starts
       } else {
         // Cancel editing - restore original value
         field.value = originalValues[fieldName];
@@ -340,10 +336,6 @@ Variables from admin.edit_user():
       }
     }
 
-    /**
-     * Toggle password editing mode
-     * Shows/hides password confirmation field
-     */
     function togglePasswordEdit() {
       const passwordField = document.getElementById('password');
       const confirmField = document.getElementById('password_confirm');
@@ -351,7 +343,6 @@ Variables from admin.edit_user():
       const button = document.getElementById('password-edit-btn');
       
       if (passwordField.readOnly) {
-        // Enable password editing
         passwordField.readOnly = false;
         confirmField.readOnly = false;
         confirmGroup.style.display = 'block';
@@ -360,8 +351,8 @@ Variables from admin.edit_user():
         button.classList.remove('btn-ghost');
         button.classList.add('btn-danger');
         editingFields.add('password');
+        formChanged = true;
       } else {
-        // Cancel password editing
         passwordField.value = '';
         confirmField.value = '';
         passwordField.readOnly = true;
@@ -372,17 +363,12 @@ Variables from admin.edit_user():
         button.classList.add('btn-ghost');
         editingFields.delete('password');
         
-        // Clear validation messages
         const matchMessage = document.getElementById('password-match-message');
         matchMessage.textContent = '';
         matchMessage.style.color = '';
       }
     }
 
-    /**
-     * Real-time password matching validation
-     * Shows visual feedback as user types
-     */
     function checkPasswordMatch() {
       const password = document.getElementById('password').value;
       const confirm = document.getElementById('password_confirm').value;
@@ -402,26 +388,22 @@ Variables from admin.edit_user():
       }
     }
 
-    // Attach password matching listener
     document.getElementById('password').addEventListener('input', checkPasswordMatch);
     document.getElementById('password_confirm').addEventListener('input', checkPasswordMatch);
 
-    /**
-     * Form submission handler
-     * Validates before submitting
-     */
     document.getElementById('editUserForm').addEventListener('submit', function(e) {
       const password = document.getElementById('password').value;
       const confirm = document.getElementById('password_confirm').value;
       
-      // If password is being changed, ensure they match
       if (password !== '' && password !== confirm) {
         e.preventDefault();
         alert('Las contraseñas no coinciden. Por favor, verifique.');
         return false;
       }
       
-      // Show loading state on submit button
+      // Submit successful - clear flag
+      formChanged = false;
+
       const saveBtn = document.getElementById('saveBtn');
       saveBtn.disabled = true;
       saveBtn.innerHTML = '⏳ Guardando...';

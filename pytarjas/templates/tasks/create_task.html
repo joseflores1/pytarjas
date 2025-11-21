@@ -1,59 +1,36 @@
 {# pytarjas/templates/tasks/create_task.html #}
 {#
-Create Task Page - Interface for creating new tasks from form templates
+Create Task Page
 
-PURPOSE:
-This template allows admins/planners to create new standalone tasks by selecting
-a form template and assigning it to a worker. Workers can also create tasks for themselves.
-
-FEATURES:
-- Select from active form templates
-- Assign to appropriate users based on role:
-  * Workers: Can only assign to themselves
-  * Planners: Can assign to themselves or any worker
-  * Admins: Can assign to anyone
-- Shows form preview before creation
-- Client-side validation
-- Mobile-optimized for tablets
-
-WORKFLOW CONTEXT:
-1. User selects a Form template (defines what questions to answer)
-2. User assigns the task to a worker (who will fill the form)
-3. System creates a Document with pending status
-4. Worker receives the task and fills it out in the field
-
-VARIABLES FROM tasks.create_task():
-- forms: List of active Form objects (id, name, form_type, description)
-- assignable_users: List of User objects user can assign to (filtered by role)
-- user: Current logged-in user (g.user)
-
-ROLE-BASED ASSIGNMENT RULES:
-- Worker role: Can only assign tasks to themselves (worker_id auto-set)
-- Planner role: Can assign to themselves or any Worker
-- Admin role: Can assign to anyone except other Admins
+Updates:
+- Implemented global 'showConfirm' modal for Cancel action
+- Added form change tracking to prevent accidental data loss
 #}
 
 {% extends 'base.html' %}
 
-{# Page title #}
 {% block title %}Crear Nueva Tarea{% endblock %}
 
-{# Load forms.css for form controls #}
 {% block extra_css %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
   <style>
-    /* Form preview card */
     .form-preview {
       background-color: var(--color-bg-secondary);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
       padding: var(--space-md);
       margin-top: var(--space-md);
-      display: none; /* Hidden by default, shown when form selected */
+      display: none;
     }
 
     .form-preview.visible {
       display: block;
+      animation: fadeIn 0.3s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     .form-preview-title {
@@ -69,29 +46,17 @@ ROLE-BASED ASSIGNMENT RULES:
       flex-wrap: wrap;
       margin-top: var(--space-sm);
     }
-
-    .form-preview-meta .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-xs);
-    }
-
-    /* User card styling */
-    .user-option {
+    
+    .form-actions {
       display: flex;
-      align-items: center;
-      gap: var(--space-sm);
-      padding: var(--space-sm);
-    }
-
-    .user-option-role {
-      font-size: var(--font-size-sm);
-      color: var(--color-text-tertiary);
+      gap: var(--space-md);
+      margin-top: var(--space-xl);
+      padding-top: var(--space-lg);
+      border-top: 1px solid var(--color-border);
     }
   </style>
 {% endblock %}
 
-{# Page header #}
 {% block header %}
   <div class="container">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-md); margin-top: var(--space-lg); margin-bottom: var(--space-lg);">
@@ -101,18 +66,16 @@ ROLE-BASED ASSIGNMENT RULES:
           Seleccione un formulario y asigne a un trabajador
         </p>
       </div>
-      <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary">
+      <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary" id="headerBackBtn">
         ← Volver al Listado
       </a>
     </div>
   </div>
 {% endblock %}
 
-{# Main content #}
 {% block content %}
   <div class="container" style="max-width: 800px;">
     
-    {# Flash messages #}
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
@@ -123,7 +86,6 @@ ROLE-BASED ASSIGNMENT RULES:
       {% endif %}
     {% endwith %}
 
-    {# Error: No forms available #}
     {% if not forms %}
       <div class="card">
         <div class="card-body" style="text-align: center; padding: var(--space-xl);">
@@ -141,12 +103,9 @@ ROLE-BASED ASSIGNMENT RULES:
       </div>
     {% else %}
 
-    {# Task Creation Form #}
     <form method="POST" id="createTaskForm">
       
-      {# ============================================
-           SECTION 1: SELECT FORM TEMPLATE
-           ============================================ #}
+      {# SECTION 1: SELECT FORM #}
       <div class="card" style="margin-bottom: var(--space-lg);">
         <div class="card-header">
           <h2 class="card-title">📋 Seleccionar Formulario</h2>
@@ -182,7 +141,6 @@ ROLE-BASED ASSIGNMENT RULES:
             </small>
           </div>
 
-          {# Form Preview (shown when form is selected) #}
           <div id="formPreview" class="form-preview">
             <div class="form-preview-title" id="previewName"></div>
             <p id="previewDescription" style="color: var(--color-text-secondary); margin-bottom: var(--space-sm);"></p>
@@ -193,9 +151,7 @@ ROLE-BASED ASSIGNMENT RULES:
         </div>
       </div>
 
-      {# ============================================
-           SECTION 2: ASSIGN TO WORKER
-           ============================================ #}
+      {# SECTION 2: ASSIGN WORKER #}
       <div class="card" style="margin-bottom: var(--space-lg);">
         <div class="card-header">
           <h2 class="card-title">👤 Asignar Trabajador</h2>
@@ -209,32 +165,16 @@ ROLE-BASED ASSIGNMENT RULES:
             </label>
             
             {% if user.role == 'worker' %}
-              {# Workers can only assign to themselves #}
-              <input 
-                type="hidden" 
-                name="worker_id" 
-                value="{{ user.id }}"
-              >
+              <input type="hidden" name="worker_id" value="{{ user.id }}">
               <div class="alert alert-info" style="margin-bottom: 0;">
                 <strong>Auto-asignado:</strong> {{ user.username }} (usted)
               </div>
             {% else %}
-              {# Planners and Admins can choose #}
-              <select 
-                id="worker_id" 
-                name="worker_id" 
-                class="form-control"
-                required
-              >
+              <select id="worker_id" name="worker_id" class="form-control" required>
                 <option value="">-- Seleccione un trabajador --</option>
                 {% for assignee in assignable_users %}
-                  <option 
-                    value="{{ assignee.id }}"
-                    {% if assignee.id == user.id %}selected{% endif %}
-                  >
-                    {{ assignee.username }}
-                    {% if assignee.id == user.id %}(usted){% endif %}
-                    - {{ assignee.role|capitalize }}
+                  <option value="{{ assignee.id }}" {% if assignee.id == user.id %}selected{% endif %}>
+                    {{ assignee.username }} {% if assignee.id == user.id %}(usted){% endif %} - {{ assignee.role|capitalize }}
                   </option>
                 {% endfor %}
               </select>
@@ -250,16 +190,14 @@ ROLE-BASED ASSIGNMENT RULES:
         </div>
       </div>
 
-      {# ============================================
-           FORM ACTIONS
-           ============================================ #}
+      {# ACTIONS #}
       <div class="form-actions">
+        <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary" id="cancelBtn">
+          Cancelar
+        </a>
         <button type="submit" class="btn btn-primary">
           ✓ Crear Tarea
         </button>
-        <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary">
-          Cancelar
-        </a>
       </div>
 
     </form>
@@ -268,41 +206,37 @@ ROLE-BASED ASSIGNMENT RULES:
   </div>
 {% endblock %}
 
-{# Page-specific JavaScript #}
 {% block extra_js %}
   <script>
-    /**
-     * Show preview of selected form
-     * Displays form name, description, and type badge
-     */
+    let formChanged = false;
+
+    // Track changes
+    document.getElementById('createTaskForm')?.addEventListener('change', function() {
+      formChanged = true;
+    });
+
+    // Preview Logic
     function showFormPreview() {
       const select = document.getElementById('form_id');
       const preview = document.getElementById('formPreview');
       const selectedOption = select.options[select.selectedIndex];
       
       if (selectedOption.value) {
-        // Get form data from option attributes
         const name = selectedOption.dataset.name;
         const description = selectedOption.dataset.description;
         const type = selectedOption.dataset.type;
         
-        // Update preview content
         document.getElementById('previewName').textContent = name;
         document.getElementById('previewDescription').textContent = description || 'Sin descripción';
         document.getElementById('previewType').textContent = type || 'Sin tipo';
         
-        // Show preview
         preview.classList.add('visible');
       } else {
-        // Hide preview if no form selected
         preview.classList.remove('visible');
       }
     }
 
-    /**
-     * Form submission handler
-     * Validates required fields before submission
-     */
+    // Validation & Submission
     document.getElementById('createTaskForm')?.addEventListener('submit', function(e) {
       const formId = document.getElementById('form_id').value;
       
@@ -313,10 +247,44 @@ ROLE-BASED ASSIGNMENT RULES:
         return false;
       }
       
-      // Show loading state
       const submitBtn = this.querySelector('button[type="submit"]');
       submitBtn.disabled = true;
       submitBtn.innerHTML = '⏳ Creando...';
+      
+      // Allow submission without warning
+      formChanged = false;
+    });
+
+    // --- HANDLE CANCEL WITH MODAL ---
+    function handleCancel(e) {
+      e.preventDefault();
+      const targetUrl = this.href;
+      
+      if (formChanged) {
+        showConfirm(
+          'Has seleccionado opciones pero no has creado la tarea. ¿Deseas salir y descartar la selección?',
+          () => {
+            formChanged = false; // Bypass check
+            window.location.href = targetUrl;
+          },
+          'Descartar Tarea',
+          'Sí, salir',
+          'danger'
+        );
+      } else {
+        window.location.href = targetUrl;
+      }
+    }
+
+    document.getElementById('cancelBtn')?.addEventListener('click', handleCancel);
+    document.getElementById('headerBackBtn')?.addEventListener('click', handleCancel);
+
+    // Browser native fallback
+    window.addEventListener('beforeunload', function(e) {
+      if (formChanged) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
     });
   </script>
 {% endblock %}

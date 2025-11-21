@@ -33,19 +33,26 @@
     }
 
     /* --- COLOR SCHEME INVERSION --- */
+
+    /* LIGHT MODE DEFAULTS (Page is Light, Navbar is DARK) */
     :root {
       --body-bg: #f1f5f9; 
+      
+      /* Dark Navbar Variables */
       --nav-bg: #1e293b;       
       --nav-text: #cbd5e1;     
       --nav-text-hover: #ffffff;
       --nav-active-bg: rgba(255, 255, 255, 0.1);
-      --nav-active-text: #fb923c; 
+      --nav-active-text: #fb923c; /* Orange */
       --nav-border: #0f172a;
       --nav-btn-hover: rgba(255, 255, 255, 0.1);
     }
 
+    /* DARK MODE OVERRIDES (Page is Dark, Navbar is LIGHT) */
     [data-theme="dark"] {
       --body-bg: #0f172a; 
+      
+      /* Light Navbar Variables */
       --nav-bg: #ffffff;       
       --nav-text: #475569;     
       --nav-text-hover: #0f172a; 
@@ -78,7 +85,7 @@
     .navbar-brand {
       display: flex;
       align-items: center;
-      gap: 80px; /* Significantly increased gap to push text to "middle" */
+      gap: 80px; 
       text-decoration: none;
       margin-right: 24px; 
       height: 100%;
@@ -86,16 +93,13 @@
     }
 
     .navbar-brand .navbar-logo {
-      height: 70px !important; 
+      height: 76px !important; 
       width: auto !important;
-      max-height: 70px !important;
-      
-      /* Increased scale further */
+      max-height: 76px !important;
       transform: scale(2.8); 
       transform-origin: center;
-      
       display: none; 
-      margin-left: 25px; /* Increased margin to accommodate scale */
+      margin-left: 25px;
     }
 
     .brand-text {
@@ -108,7 +112,6 @@
 
     :root:not([data-theme="dark"]) .logo-for-dark-bg { display: block !important; }
     [data-theme="dark"] .logo-for-light-bg { display: block !important; }
-
 
     /* --- NAV LINKS --- */
     .navbar-nav {
@@ -284,7 +287,7 @@
               <span class="user-name">{{ g.user.username }}</span>
               <span class="user-role">{{ g.user.role }}</span>
             </div>
-            <a href="{{ url_for('auth.logout') }}" class="icon-btn logout-btn" title="Salir">
+            <a href="{{ url_for('auth.logout') }}" class="icon-btn logout-btn" id="logoutBtn" title="Salir">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
             </a>
           </div>
@@ -316,6 +319,22 @@
     
     {% block content %}{% endblock %}
   </main>
+  
+  <div id="confirmationModal" class="modal-backdrop" style="display: none; z-index: 1050;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalTitle">Confirmar</h3>
+        <button class="modal-close" onclick="closeModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <p id="modalMessage">¿Estás seguro?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-primary" id="modalConfirmBtn">Confirmar</button>
+      </div>
+    </div>
+  </div>
   
   <div id="toastContainer" class="toast-container"></div>
 
@@ -357,6 +376,55 @@
       box.appendChild(div);
       setTimeout(() => div.remove(), 3000);
     };
+
+    // --- GLOBAL CONFIRMATION MODAL LOGIC ---
+    let confirmCallback = null;
+
+    window.showConfirm = function(message, onConfirm, title="Confirmación", confirmText="Confirmar", confirmType="primary") {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalMessage').textContent = message;
+      
+      const confirmBtn = document.getElementById('modalConfirmBtn');
+      confirmBtn.textContent = confirmText;
+      
+      confirmBtn.className = 'btn';
+      if (confirmType === 'danger') confirmBtn.classList.add('btn-danger');
+      else if (confirmType === 'success') confirmBtn.classList.add('btn-success');
+      else confirmBtn.classList.add('btn-primary');
+      
+      confirmCallback = onConfirm;
+      
+      document.getElementById('confirmationModal').style.display = 'flex';
+    };
+
+    window.closeModal = function() {
+      document.getElementById('confirmationModal').style.display = 'none';
+      confirmCallback = null;
+    };
+
+    document.getElementById('modalConfirmBtn').addEventListener('click', function() {
+      if (confirmCallback) confirmCallback();
+      closeModal();
+    });
+
+    // --- LOGOUT CONFIRMATION ---
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const url = this.href;
+        
+        showConfirm(
+          '¿Está seguro que desea cerrar sesión?',
+          () => {
+            window.location.href = url;
+          },
+          'Cerrar Sesión',
+          'Salir',
+          'primary' // Not strictly destructive data loss, so primary/neutral is fine
+        );
+      });
+    }
   </script>
   {% block extra_js %}{% endblock %}
 </body>

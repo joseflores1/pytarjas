@@ -1,39 +1,20 @@
 {# pytarjas/templates/admin/create_user.html #}
 {#
-Create User Page - Admin interface for adding new users
+Create User Page
 
-Purpose:
-- Create new users with username, email, password, and role
-- Form validation with client-side and server-side checks
-- Password confirmation matching
-- Role selection with descriptions
-
-Features:
-- Uses forms.css for modern form styling
-- Real-time password validation
-- Touch-optimized for Android tablets
-- Clear role descriptions to help admins choose correctly
-- Visual feedback for validation states
-
-Dependencies:
-- base.html (parent template)
-- forms.css (loaded via extra_css block)
-- components.css (buttons, cards, alerts)
-
-Form submits to: POST /admin/users/create
+Updates:
+- Implemented global 'showConfirm' modal for Cancel action
+- Added form change tracking to prevent accidental data loss
 #}
 
 {% extends 'base.html' %}
 
-{# Page title #}
 {% block title %}Crear Usuario{% endblock %}
 
-{# Load forms.css for form controls #}
 {% block extra_css %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
 {% endblock %}
 
-{# Page header #}
 {% block header %}
   <div class="container">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-lg);">
@@ -43,14 +24,13 @@ Form submits to: POST /admin/users/create
           Complete los datos del nuevo usuario del sistema
         </p>
       </div>
-      <a href="{{ url_for('admin.list_users') }}" class="btn btn-secondary">
+      <a href="{{ url_for('admin.list_users') }}" class="btn btn-secondary" id="headerBackBtn">
         ← Volver al Listado
       </a>
     </div>
   </div>
 {% endblock %}
 
-{# Main content #}
 {% block content %}
   <div class="container" style="max-width: 800px;">
     
@@ -64,14 +44,11 @@ Form submits to: POST /admin/users/create
       <div class="card-body">
         <form method="POST" id="createUserForm" autocomplete="off">
           
-          {# ============================================
-               USERNAME FIELD
-               ============================================ #}
+          {# USERNAME #}
           <div class="form-group">
             <label for="username" class="form-label form-label-required">
               Nombre de Usuario
             </label>
-            
             <input 
               type="text" 
               name="username" 
@@ -91,14 +68,11 @@ Form submits to: POST /admin/users/create
             <div class="invalid-feedback" id="username-feedback"></div>
           </div>
           
-          {# ============================================
-               EMAIL FIELD
-               ============================================ #}
+          {# EMAIL #}
           <div class="form-group">
             <label for="email" class="form-label form-label-required">
               Correo Electrónico
             </label>
-            
             <input 
               type="email" 
               name="email" 
@@ -114,14 +88,11 @@ Form submits to: POST /admin/users/create
             <div class="invalid-feedback" id="email-feedback"></div>
           </div>
           
-          {# ============================================
-               ROLE FIELD
-               ============================================ #}
+          {# ROLE #}
           <div class="form-group">
             <label for="role" class="form-label form-label-required">
               Rol
             </label>
-            
             <select name="role" id="role" class="form-select" required>
               <option value="" selected disabled>-- Seleccione un Rol --</option>
               <option value="admin">👑 Administrador</option>
@@ -129,21 +100,17 @@ Form submits to: POST /admin/users/create
               <option value="planner">📋 Planificador</option>
               <option value="client">🏢 Cliente</option>
             </select>
-            
             <small class="form-help">
               Seleccione el rol apropiado según las responsabilidades del usuario
             </small>
             <div class="invalid-feedback" id="role-feedback"></div>
           </div>
           
-          {# ============================================
-               PASSWORD FIELD
-               ============================================ #}
+          {# PASSWORD #}
           <div class="form-group">
             <label for="password" class="form-label form-label-required">
               Contraseña
             </label>
-            
             <div style="position: relative;">
               <input 
                 type="password" 
@@ -154,8 +121,6 @@ Form submits to: POST /admin/users/create
                 autocomplete="new-password"
                 required
                 minlength="8">
-              
-              {# Toggle password visibility button #}
               <button 
                 type="button" 
                 onclick="togglePasswordVisibility('password')"
@@ -164,13 +129,12 @@ Form submits to: POST /admin/users/create
                 <span id="password-toggle-icon">👁️</span>
               </button>
             </div>
-            
             <small class="form-help">
               Mínimo 8 caracteres. Use una combinación de letras, números y símbolos.
             </small>
             <div class="invalid-feedback" id="password-feedback"></div>
             
-            {# Password strength indicator #}
+            {# Strength Indicator #}
             <div id="password-strength" style="margin-top: var(--space-sm); display: none;">
               <div style="display: flex; gap: var(--space-xs); margin-bottom: var(--space-xs);">
                 <div class="strength-bar" id="strength-bar-1"></div>
@@ -182,14 +146,11 @@ Form submits to: POST /admin/users/create
             </div>
           </div>
           
-          {# ============================================
-               PASSWORD CONFIRMATION FIELD
-               ============================================ #}
+          {# PASSWORD CONFIRM #}
           <div class="form-group">
             <label for="password_confirm" class="form-label form-label-required">
               Confirmar Contraseña
             </label>
-            
             <div style="position: relative;">
               <input 
                 type="password" 
@@ -200,8 +161,6 @@ Form submits to: POST /admin/users/create
                 autocomplete="new-password"
                 required
                 minlength="8">
-              
-              {# Toggle password visibility button #}
               <button 
                 type="button" 
                 onclick="togglePasswordVisibility('password_confirm')"
@@ -210,19 +169,16 @@ Form submits to: POST /admin/users/create
                 <span id="password_confirm-toggle-icon">👁️</span>
               </button>
             </div>
-            
             <small class="form-help" id="password-match-message"></small>
             <div class="invalid-feedback" id="password-confirm-feedback"></div>
           </div>
           
-          {# ============================================
-               FORM ACTIONS
-               ============================================ #}
+          {# ACTIONS #}
           <div style="display: flex; gap: var(--space-md); margin-top: var(--space-2xl); padding-top: var(--space-lg); border-top: 1px solid var(--color-border);">
             <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
               ✅ Crear Usuario
             </button>
-            <a href="{{ url_for('admin.list_users') }}" class="btn btn-secondary btn-lg">
+            <a href="{{ url_for('admin.list_users') }}" class="btn btn-secondary btn-lg" id="cancelBtn">
               Cancelar
             </a>
           </div>
@@ -231,82 +187,47 @@ Form submits to: POST /admin/users/create
       </div>
     </div>
     
-    {# ============================================
-         ROLE DESCRIPTIONS CARD
-         Helps admins understand each role
-         ============================================ #}
+    {# Role Descriptions #}
     <div class="card">
       <div class="card-header">
         <h3 class="card-title">Descripción de Roles</h3>
       </div>
       <div class="card-body">
         <div style="display: grid; gap: var(--space-lg);">
-          
-          {# Admin Role #}
           <div style="padding: var(--space-md); background-color: var(--color-bg-secondary); border-radius: var(--radius-md); border-left: 4px solid #dc2626;">
             <div style="display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm);">
               <span style="font-size: 1.5rem;">👑</span>
-              <h4 style="margin: 0; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: #dc2626;">
-                Administrador
-              </h4>
+              <h4 style="margin: 0; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: #dc2626;">Administrador</h4>
             </div>
-            <p style="margin: 0; color: var(--color-text-secondary); line-height: var(--line-height-relaxed);">
-              Acceso completo al sistema. Puede gestionar usuarios, configurar el sistema, 
-              ver todos los datos y realizar cualquier operación administrativa.
-            </p>
+            <p style="margin: 0; color: var(--color-text-secondary);">Acceso completo al sistema. Gestión de usuarios y configuración.</p>
           </div>
-          
-          {# Worker Role #}
           <div style="padding: var(--space-md); background-color: var(--color-bg-secondary); border-radius: var(--radius-md); border-left: 4px solid var(--color-secondary);">
             <div style="display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm);">
               <span style="font-size: 1.5rem;">🔧</span>
-              <h4 style="margin: 0; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: var(--color-secondary);">
-                Trabajador
-              </h4>
+              <h4 style="margin: 0; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: var(--color-secondary);">Trabajador</h4>
             </div>
-            <p style="margin: 0; color: var(--color-text-secondary); line-height: var(--line-height-relaxed);">
-              Trabajadores de campo que recolectan datos. Pueden completar formularios, 
-              tomar fotos, actualizar documentos asignados y trabajar sin conexión (modo offline).
-            </p>
+            <p style="margin: 0; color: var(--color-text-secondary);">Recolecta datos en campo, completa formularios y toma fotos.</p>
           </div>
-          
-          {# Planner Role #}
           <div style="padding: var(--space-md); background-color: var(--color-bg-secondary); border-radius: var(--radius-md); border-left: 4px solid #8b5cf6;">
             <div style="display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm);">
               <span style="font-size: 1.5rem;">📋</span>
-              <h4 style="margin: 0; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: #8b5cf6;">
-                Planificador
-              </h4>
+              <h4 style="margin: 0; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: #8b5cf6;">Planificador</h4>
             </div>
-            <p style="margin: 0; color: var(--color-text-secondary); line-height: var(--line-height-relaxed);">
-              Planifica y supervisa el trabajo de campo. Puede crear formularios, 
-              asignar tareas a trabajadores, ver el progreso y generar reportes.
-            </p>
+            <p style="margin: 0; color: var(--color-text-secondary);">Planifica faenas, crea formularios y asigna tareas.</p>
           </div>
-          
-          {# Client Role #}
           <div style="padding: var(--space-md); background-color: var(--color-bg-secondary); border-radius: var(--radius-md); border-left: 4px solid #f59e0b;">
             <div style="display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm);">
               <span style="font-size: 1.5rem;">🏢</span>
-              <h4 style="margin: 0; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: #f59e0b;">
-                Cliente
-              </h4>
+              <h4 style="margin: 0; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: #f59e0b;">Cliente</h4>
             </div>
-            <p style="margin: 0; color: var(--color-text-secondary); line-height: var(--line-height-relaxed);">
-              Clientes externos con acceso limitado. Pueden ver documentos y datos 
-              específicos relacionados con sus proyectos, pero no pueden modificarlos.
-            </p>
+            <p style="margin: 0; color: var(--color-text-secondary);">Acceso de solo lectura a documentos relacionados con sus proyectos.</p>
           </div>
-          
         </div>
       </div>
     </div>
     
   </div>
 
-  {# ============================================
-       CSS - Password Strength Indicator
-       ============================================ #}
   <style>
     .strength-bar {
       height: 4px;
@@ -315,36 +236,56 @@ Form submits to: POST /admin/users/create
       border-radius: var(--radius-sm);
       transition: background-color var(--transition-fast);
     }
-    
-    .strength-bar.active-weak {
-      background-color: var(--color-danger);
-    }
-    
-    .strength-bar.active-fair {
-      background-color: #f59e0b;
-    }
-    
-    .strength-bar.active-good {
-      background-color: #3b82f6;
-    }
-    
-    .strength-bar.active-strong {
-      background-color: var(--color-secondary);
-    }
+    .strength-bar.active-weak { background-color: var(--color-danger); }
+    .strength-bar.active-fair { background-color: #f59e0b; }
+    .strength-bar.active-good { background-color: #3b82f6; }
+    .strength-bar.active-strong { background-color: var(--color-secondary); }
   </style>
 
-  {# ============================================
-       JAVASCRIPT - Form Validation & Interactivity
-       ============================================ #}
   <script>
-    /**
-     * Toggle password visibility
-     * @param {string} fieldId - The password field ID
-     */
+    let formChanged = false;
+
+    // Track changes
+    document.getElementById('createUserForm').addEventListener('input', function() {
+      formChanged = true;
+    });
+
+    // --- HANDLE CANCEL WITH MODAL ---
+    function handleCancel(e) {
+      e.preventDefault();
+      const targetUrl = this.href;
+      
+      if (formChanged) {
+        showConfirm(
+          'Ha ingresado datos para el nuevo usuario. ¿Desea salir y perder estos datos?',
+          () => {
+            formChanged = false; // Bypass check
+            window.location.href = targetUrl;
+          },
+          'Descartar Usuario',
+          'Sí, salir',
+          'danger'
+        );
+      } else {
+        window.location.href = targetUrl;
+      }
+    }
+
+    document.getElementById('cancelBtn').addEventListener('click', handleCancel);
+    document.getElementById('headerBackBtn').addEventListener('click', handleCancel);
+
+    // Browser native fallback
+    window.addEventListener('beforeunload', function(e) {
+      if (formChanged) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+
+    // --- EXISTING FORM LOGIC ---
     function togglePasswordVisibility(fieldId) {
       const field = document.getElementById(fieldId);
       const icon = document.getElementById(fieldId + '-toggle-icon');
-      
       if (field.type === 'password') {
         field.type = 'text';
         icon.textContent = '🙈';
@@ -354,26 +295,16 @@ Form submits to: POST /admin/users/create
       }
     }
 
-    /**
-     * Calculate password strength
-     * @param {string} password - The password to evaluate
-     * @returns {number} Strength score (0-4)
-     */
     function calculatePasswordStrength(password) {
       let strength = 0;
-      
       if (password.length >= 8) strength++;
       if (password.length >= 12) strength++;
       if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
       if (/\d/.test(password)) strength++;
       if (/[^a-zA-Z\d]/.test(password)) strength++;
-      
       return Math.min(strength, 4);
     }
 
-    /**
-     * Update password strength indicator
-     */
     function updatePasswordStrength() {
       const password = document.getElementById('password').value;
       const strengthDiv = document.getElementById('password-strength');
@@ -387,30 +318,22 @@ Form submits to: POST /admin/users/create
       strengthDiv.style.display = 'block';
       const strength = calculatePasswordStrength(password);
       
-      // Reset all bars
       for (let i = 1; i <= 4; i++) {
-        const bar = document.getElementById('strength-bar-' + i);
-        bar.className = 'strength-bar';
+        document.getElementById('strength-bar-' + i).className = 'strength-bar';
       }
       
-      // Activate bars based on strength
       const levels = ['weak', 'fair', 'good', 'strong'];
       const texts = ['Débil', 'Aceptable', 'Buena', 'Fuerte'];
       const colors = ['var(--color-danger)', '#f59e0b', '#3b82f6', 'var(--color-secondary)'];
       
       for (let i = 1; i <= strength; i++) {
-        const bar = document.getElementById('strength-bar-' + i);
-        bar.classList.add('active-' + levels[strength - 1]);
+        document.getElementById('strength-bar-' + i).classList.add('active-' + levels[strength - 1]);
       }
       
       strengthText.textContent = 'Fortaleza: ' + texts[strength - 1];
       strengthText.style.color = colors[strength - 1];
     }
 
-    /**
-     * Check if passwords match
-     * Provides real-time visual feedback
-     */
     function checkPasswordMatch() {
       const password = document.getElementById('password').value;
       const confirm = document.getElementById('password_confirm').value;
@@ -431,9 +354,6 @@ Form submits to: POST /admin/users/create
       }
     }
 
-    /**
-     * Validate username format
-     */
     function validateUsername() {
       const username = document.getElementById('username');
       const feedback = document.getElementById('username-feedback');
@@ -454,9 +374,6 @@ Form submits to: POST /admin/users/create
       }
     }
 
-    /**
-     * Validate email format
-     */
     function validateEmail() {
       const email = document.getElementById('email');
       const feedback = document.getElementById('email-feedback');
@@ -473,20 +390,14 @@ Form submits to: POST /admin/users/create
       }
     }
 
-    // Attach event listeners
     document.getElementById('password').addEventListener('input', function() {
       updatePasswordStrength();
       checkPasswordMatch();
     });
-    
     document.getElementById('password_confirm').addEventListener('input', checkPasswordMatch);
     document.getElementById('username').addEventListener('input', validateUsername);
     document.getElementById('email').addEventListener('input', validateEmail);
 
-    /**
-     * Form submission handler
-     * Final validation before submitting
-     */
     document.getElementById('createUserForm').addEventListener('submit', function(e) {
       const username = document.getElementById('username').value;
       const email = document.getElementById('email').value;
@@ -494,30 +405,25 @@ Form submits to: POST /admin/users/create
       const confirm = document.getElementById('password_confirm').value;
       const role = document.getElementById('role').value;
       
-      // Validate all fields
       let isValid = true;
       
       if (username.trim() === '' || !validateUsername()) {
         document.getElementById('username').classList.add('is-invalid');
         isValid = false;
       }
-      
       if (email.trim() === '' || !validateEmail()) {
         document.getElementById('email').classList.add('is-invalid');
         isValid = false;
       }
-      
       if (role === '') {
         document.getElementById('role').classList.add('is-invalid');
         isValid = false;
       }
-      
       if (password.length < 8) {
         document.getElementById('password').classList.add('is-invalid');
         document.getElementById('password-feedback').textContent = 'La contraseña debe tener al menos 8 caracteres';
         isValid = false;
       }
-      
       if (password !== confirm) {
         document.getElementById('password_confirm').classList.add('is-invalid');
         document.getElementById('password-confirm-feedback').textContent = 'Las contraseñas no coinciden';
@@ -530,7 +436,9 @@ Form submits to: POST /admin/users/create
         return false;
       }
       
-      // Show loading state
+      // Submit successful - disable flag
+      formChanged = false;
+      
       const submitBtn = document.getElementById('submitBtn');
       submitBtn.disabled = true;
       submitBtn.innerHTML = '⏳ Creando Usuario...';

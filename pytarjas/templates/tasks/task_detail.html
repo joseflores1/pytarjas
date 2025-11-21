@@ -209,7 +209,7 @@
 
   {# Action Bar #}
   <div class="action-bar">
-    <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary">Volver</a>
+    <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary" id="backBtn">Volver</a>
     
     {% if task.status not in ['completed', 'reviewed'] %}
       <button type="button" class="btn btn-secondary" id="saveBtn">💾 Guardar</button>
@@ -235,7 +235,6 @@
 
   // --- PROGRESS & CHANGE TRACKING ---
   function updateProgress() {
-    // Logic to count answers (same as before)
     const inputs = document.querySelectorAll('.response-input');
     const answered = new Set();
     inputs.forEach(i => {
@@ -296,7 +295,7 @@
       }
     } catch(e) {
       text.textContent = '⚠️ Error (Guardando offline)';
-      // Offline logic here (omitted for brevity, assume handled)
+      // Offline logic
     }
   }
 
@@ -306,34 +305,67 @@
     saveTimeout = setTimeout(() => { if(hasUnsavedChanges) saveTask(); }, 5000);
   }
 
-  // --- BUTTON HANDLERS (Fixing the UX issue) ---
+  // --- BUTTON HANDLERS ---
   
   document.getElementById('saveBtn')?.addEventListener('click', () => saveTask());
 
+  // Start Task - Custom Confirmation
   document.getElementById('startBtn')?.addEventListener('click', () => {
-    if(confirm('¿Iniciar tarea?')) {
-       // IMPORTANT: We are about to reload/redirect, so we clear the flag manually
-       // to prevent the "Leave site?" popup from blocking the legitimate action.
-       hasUnsavedChanges = false; 
-       saveTask('in_progress');
-    }
+    showConfirm(
+      '¿Estás seguro que deseas iniciar esta tarea? El tiempo comenzará a correr.',
+      () => {
+        hasUnsavedChanges = false; // Allow reload
+        saveTask('in_progress');
+      },
+      'Iniciar Tarea',
+      'Sí, iniciar',
+      'primary'
+    );
   });
 
+  // Complete Task - Custom Confirmation
   document.getElementById('completeBtn')?.addEventListener('click', () => {
     const form = document.getElementById('taskForm');
     if(!form.checkValidity()) { form.reportValidity(); return; }
     
-    if(confirm('¿Completar tarea?')) {
-       hasUnsavedChanges = false; // Prevent popup
-       saveTask('completed');
+    showConfirm(
+      '¿Confirmas que has completado la tarea? Una vez completada, pasará a revisión y no podrás editarla.',
+      () => {
+        hasUnsavedChanges = false; // Allow reload
+        saveTask('completed');
+      },
+      'Completar Tarea',
+      'Sí, completar',
+      'success'
+    );
+  });
+  
+  // Back Button - Custom Confirmation for Unsaved Changes
+  document.getElementById('backBtn').addEventListener('click', function(e) {
+    e.preventDefault();
+    const targetUrl = this.href;
+    
+    if (hasUnsavedChanges) {
+      showConfirm(
+        'Hay cambios sin guardar en esta tarea. ¿Seguro que deseas salir? Los cambios no guardados se perderán.',
+        () => {
+          hasUnsavedChanges = false; // Disable native check
+          window.location.href = targetUrl;
+        },
+        'Cambios sin guardar',
+        'Salir sin guardar',
+        'danger'
+      );
+    } else {
+      window.location.href = targetUrl;
     }
   });
 
-  // --- LEAVE WARNING ---
+  // --- BROWSER LEAVE WARNING (Native fallback) ---
   window.addEventListener('beforeunload', (e) => {
     if (hasUnsavedChanges && taskStatus !== 'completed') {
       e.preventDefault();
-      e.returnValue = ''; // Standard way to trigger browser prompt
+      e.returnValue = ''; 
     }
   });
 
