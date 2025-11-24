@@ -146,9 +146,13 @@
 
   {# Form #}
   <form id="taskForm" data-task-id="{{ task.id }}" data-total-questions="{{ task.form.questions|length }}">
+    {# Determine read-only state for inputs, allowing override for Admin/Planner #}
+    {% set is_read_only = (task.status in ['completed', 'reviewed', 'approved']) and not task.can_override_edit %}
+    
     {% for question in task.form.questions %}
       {% set current_answer = task.responses.get(question.id, '') %}
-      {% set is_readonly = task.status in ['completed', 'reviewed', 'approved'] %}
+      {# is_readonly now controlled by the variable defined above #}
+      {% set is_input_disabled = is_read_only %}
       
       <div class="question-card">
         <div class="question-text">
@@ -156,21 +160,42 @@
           {{ question.text }} {% if question.is_required %}<span style="color:var(--color-danger)">*</span>{% endif %}
         </div>
 
-        {# Input Types #}
+        {# TEXT (Short) #}
         {% if question.type == 'text' %}
           <input type="text" name="response_{{ question.id }}" id="response_{{ question.id }}"
                  class="form-control response-input" value="{{ current_answer }}"
-                 {% if question.is_required %}required{% endif %} {% if is_readonly %}readonly{% endif %}>
-                 
+                 {% if question.is_required %}required{% endif %} {% if is_input_disabled %}readonly{% endif %}>
+        
+        {# TEXTAREA (Long) #}
+        {% elif question.type == 'textarea' %}
+          <textarea name="response_{{ question.id }}" id="response_{{ question.id }}"
+                    class="form-control response-input" rows="4"
+                    {% if question.is_required %}required{% endif %} 
+                    {% if is_input_disabled %}readonly{% endif %}>{{ current_answer }}</textarea>
+
+        {# NUMBER #}
         {% elif question.type == 'number' %}
           <input type="number" name="response_{{ question.id }}" id="response_{{ question.id }}"
                  class="form-control response-input" value="{{ current_answer }}"
-                 {% if question.is_required %}required{% endif %} {% if is_readonly %}readonly{% endif %}>
+                 {% if question.is_required %}required{% endif %} {% if is_input_disabled %}readonly{% endif %}>
 
+        {# DATE #}
+        {% elif question.type == 'date' %}
+          <input type="date" name="response_{{ question.id }}" id="response_{{ question.id }}"
+                 class="form-control response-input" value="{{ current_answer }}"
+                 {% if question.is_required %}required{% endif %} {% if is_input_disabled %}readonly{% endif %}>
+
+        {# DATETIME #}
+        {% elif question.type == 'datetime' %}
+          <input type="datetime-local" name="response_{{ question.id }}" id="response_{{ question.id }}"
+                 class="form-control response-input" value="{{ current_answer }}"
+                 {% if question.is_required %}required{% endif %} {% if is_input_disabled %}readonly{% endif %}>
+
+        {# SELECT #}
         {% elif question.type == 'select' %}
           <select name="response_{{ question.id }}" id="response_{{ question.id }}"
                   class="form-control response-input"
-                  {% if question.is_required %}required{% endif %} {% if is_readonly %}disabled{% endif %}>
+                  {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
             <option value="">-- Seleccionar --</option>
             {% if question.options and question.options.choices %}
               {% for choice in question.options.choices %}
@@ -179,26 +204,32 @@
             {% endif %}
           </select>
 
-        {# Boolean (Radio) Fix #}
+        {# BOOLEAN (Radio) #}
         {% elif question.type == 'boolean' %}
           <div class="radio-group">
             <label class="radio-option">
               <input type="radio" name="response_{{ question.id }}" value="true" class="response-input"
                      {% if current_answer == 'true' or current_answer == True %}checked{% endif %}
-                     {% if is_readonly %}disabled{% endif %}>
+                     {% if is_input_disabled %}disabled{% endif %}>
               <span>Sí</span>
             </label>
             <label class="radio-option">
               <input type="radio" name="response_{{ question.id }}" value="false" class="response-input"
                      {% if current_answer == 'false' or current_answer == False %}checked{% endif %}
-                     {% if is_readonly %}disabled{% endif %}>
+                     {% if is_input_disabled %}disabled{% endif %}>
               <span>No</span>
             </label>
           </div>
           
+        {# PHOTO #}
         {% elif question.type == 'photo' %}
           <input type="file" name="response_{{ question.id }}" class="form-control response-input" accept="image/*"
-                 {% if is_readonly %}disabled{% endif %}>
+                 {% if is_input_disabled %}disabled{% endif %}>
+        
+        {# GENERIC FILE #}
+        {% elif question.type == 'file' %}
+          <input type="file" name="response_{{ question.id }}" class="form-control response-input"
+                 {% if is_input_disabled %}disabled{% endif %}>
                  
         {% else %}
            <input type="text" class="form-control" value="Tipo no soportado: {{ question.type }}" readonly>
@@ -207,20 +238,33 @@
     {% endfor %}
   </form>
 
-  {# Action Bar #}
+  {# Action Bar - Show save/complete options only if UI is NOT fully read-only OR if status allows transitions #}
+  {% set can_transition = task.status not in ['completed', 'reviewed', 'approved'] %}
+  {% set show_action_bar = can_transition or task.can_override_edit %}
+  
+  {% if show_action_bar %}
   <div class="action-bar">
     <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary" id="backBtn">Volver</a>
     
-    {% if task.status not in ['completed', 'reviewed'] %}
+    {# If Admin/Planner can override, show Save button #}
+    {% if task.can_override_edit or task.status not in ['completed', 'reviewed', 'approved'] %}
       <button type="button" class="btn btn-secondary" id="saveBtn">💾 Guardar</button>
+    {% endif %}
+    
+    {# Show Start/Complete buttons only if status allows transitions, or if Admin/Planner can force transition #}
+    {% if can_transition or task.can_override_edit %}
       
       {% if task.status == 'pending' %}
         <button type="button" class="btn btn-primary" id="startBtn">▶️ Iniciar</button>
       {% elif task.status == 'in_progress' %}
         <button type="button" class="btn btn-success" id="completeBtn">✓ Completar</button>
       {% endif %}
+      
+      {# OPTIONAL: Add Review/Approve buttons for Admin/Planner here if needed #}
+      
     {% endif %}
   </div>
+  {% endif %}
   
   <div class="save-indicator" id="saveIndicator"><span id="saveIndicatorText">Guardando...</span></div>
 </div>
@@ -228,16 +272,63 @@
 
 {% block extra_js %}
 <script>
+  // --- UTILITIES FOR DATE/TIME DEFAULTS ---
+  function getFormattedDate(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+  }
+
+  function getFormattedDateTime(date) {
+      const datePart = getFormattedDate(date);
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${datePart}T${hours}:${minutes}`;
+  }
+
+  // --- INITIALIZATION ---
   const taskStatus = '{{ task.status }}';
+  
+  // FIX: Use JSON.parse and surrounding quotes to robustly pass the JSON string 
+  // "true"/"false" from Jinja into a JavaScript boolean, satisfying the linter.
+  const canOverrideEdit = JSON.parse("{{ task.can_override_edit | tojson }}"); 
+  const isTaskReadonly = taskStatus in ['completed', 'reviewed', 'approved'] && !canOverrideEdit;
+  
   let hasUnsavedChanges = false;
   let taskId = document.getElementById('taskForm').dataset.taskId;
   let totalQuestions = parseInt(document.getElementById('taskForm').dataset.totalQuestions);
+
+  // Set default current date/time for empty fields on load
+  if (!isTaskReadonly) {
+      const now = new Date();
+      const formattedDate = getFormattedDate(now);
+      const formattedDateTime = getFormattedDateTime(now);
+
+      // Set default for DATE inputs
+      document.querySelectorAll('input.response-input[type="date"]').forEach(input => {
+          // Check if value is truly empty before setting default
+          if (!input.value) {
+              input.value = formattedDate;
+          }
+      });
+      // Set default for DATETIME-LOCAL inputs
+      document.querySelectorAll('input.response-input[type="datetime-local"]').forEach(input => {
+          if (!input.value) {
+              input.value = formattedDateTime;
+          }
+      });
+  }
+
 
   // --- PROGRESS & CHANGE TRACKING ---
   function updateProgress() {
     const inputs = document.querySelectorAll('.response-input');
     const answered = new Set();
     inputs.forEach(i => {
+       // Only count inputs that are NOT disabled (i.e. editable)
+       if(i.disabled || i.readOnly) return; 
+
        if((i.type==='radio'||i.type==='checkbox') && i.checked) answered.add(i.name);
        else if(i.value.trim()) answered.add(i.name);
     });
@@ -247,12 +338,15 @@
   }
 
   document.querySelectorAll('.response-input').forEach(input => {
+    // Skip attaching listeners to readOnly or disabled fields
+    if(input.disabled || input.readOnly) return;
+
     input.addEventListener('change', () => {
       hasUnsavedChanges = true;
       updateProgress();
       scheduleAutoSave();
     });
-    if(input.type==='text' || input.type==='number') {
+    if(input.type==='text' || input.type==='number' || input.type==='textarea' || input.type==='date' || input.type==='datetime-local') {
        input.addEventListener('input', () => { hasUnsavedChanges = true; });
     }
   });
@@ -264,17 +358,34 @@
     const responses = {};
     document.querySelectorAll('.response-input').forEach(input => {
       const qId = input.name.replace('response_', '');
-      if(input.type==='radio') { if(input.checked) responses[qId] = input.value; }
-      else if(input.type==='file') { if(input.files.length) responses[qId] = 'file_uploaded'; }
+      
+      // Handle disabled/readonly fields: we still send their content if they have a value
+      if(input.type==='radio') { 
+          if(input.checked) responses[qId] = input.value; 
+      }
+      else if(input.type==='file') { 
+          // For file inputs, we assume the server handles the actual file upload separately 
+          // Here we just indicate that a file was handled if we're in the frontend save logic.
+          if(input.files.length || input.value) responses[qId] = 'file_uploaded'; 
+          else if (input.readOnly || input.disabled) responses[qId] = input.value; // Preserve existing value
+      }
       else responses[qId] = input.value;
     });
     return responses;
   }
 
   async function saveTask(statusChange = null) {
+    // Only attempt save if there are changes OR if a status change is forced (Admin/Planner)
+    if (!hasUnsavedChanges && !statusChange) {
+        console.log("No changes to save.");
+        return;
+    }
+
     const indicator = document.getElementById('saveIndicator');
     const text = document.getElementById('saveIndicatorText');
-    indicator.classList.add('show'); text.textContent = 'Guardando...';
+    indicator.classList.add('show'); 
+    indicator.classList.remove('saved'); // Reset saved state before starting
+    text.textContent = 'Guardando...';
     
     try {
       const payload = { responses: collectResponses() };
@@ -286,16 +397,25 @@
       });
       
       if(res.ok) {
-        indicator.classList.add('saved'); text.textContent = '✓ Guardado';
+        // SUCCESS: Show green text and start timeout
+        indicator.classList.add('saved'); 
+        text.textContent = '✓ Guardado';
         hasUnsavedChanges = false; // Clear flag on success
-        setTimeout(() => indicator.classList.remove('show'), 2000);
+        
+        // Hide the indicator after 2 seconds
+        setTimeout(() => indicator.classList.remove('show', 'saved'), 2000); 
+        
         if(statusChange) window.location.reload();
       } else {
-        throw new Error('Error saving');
+        // FAILURE: Show red text and remain visible
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Error saving');
       }
     } catch(e) {
-      text.textContent = '⚠️ Error (Guardando offline)';
-      // Offline logic
+      // CATCH: Show warning text
+      text.textContent = `⚠️ Error: ${e.message} (Guardando offline)`;
+      indicator.classList.add('show');
+      indicator.classList.remove('saved');
     }
   }
 
@@ -326,10 +446,14 @@
   // Complete Task - Custom Confirmation
   document.getElementById('completeBtn')?.addEventListener('click', () => {
     const form = document.getElementById('taskForm');
-    if(!form.checkValidity()) { form.reportValidity(); return; }
+    // Check form validity only if the user is a regular worker or if the task is not yet completed
+    if(!canOverrideEdit && !form.checkValidity()) { 
+        form.reportValidity(); 
+        return; 
+    }
     
     showConfirm(
-      '¿Confirmas que has completado la tarea? Una vez completada, pasará a revisión y no podrás editarla.',
+      '¿Confirmas que has completado la tarea? Una vez completada, pasará a revisión y no podrás editarla (a menos que seas Planificador/Administrador).',
       () => {
         hasUnsavedChanges = false; // Allow reload
         saveTask('completed');
@@ -363,7 +487,7 @@
 
   // --- BROWSER LEAVE WARNING (Native fallback) ---
   window.addEventListener('beforeunload', (e) => {
-    if (hasUnsavedChanges && taskStatus !== 'completed') {
+    if (hasUnsavedChanges && !canOverrideEdit) { // Only warn regular users
       e.preventDefault();
       e.returnValue = ''; 
     }

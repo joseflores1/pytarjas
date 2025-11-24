@@ -11,6 +11,9 @@ The form submits to POST /auth/login which:
 1. Validates credentials
 2. Creates a session
 3. Redirects based on user role (admin, worker, planner, client)
+
+UPDATES:
+- Changed login field from 'username' to 'email'.
 #}
 
 {% extends 'base.html' %}
@@ -38,22 +41,22 @@ The form submits to POST /auth/login which:
         {# Card Body with Login Form #}
         <div class="card-body">
             <form method="POST" action="{{ url_for('auth.login') }}" id="loginForm">
-                {# Username Field #}
+                {# EMAIL Field (Replaced Username) #}
                 <div class="form-group">
-                    <label for="username" class="form-label form-label-required">
-                        Usuario
+                    <label for="email" class="form-label form-label-required">
+                        Correo Electrónico
                     </label>
                     <input 
-                        type="text" 
-                        name="username" 
-                        id="username" 
+                        type="email" 
+                        name="email" 
+                        id="email" 
                         class="form-control"
-                        placeholder="Ingrese su usuario"
-                        autocomplete="username"
+                        placeholder="Ingrese su correo electrónico"
+                        autocomplete="email"
                         autofocus
                         required>
                     <small class="form-help">
-                        Su nombre de usuario asignado por el sistema
+                        Su correo electrónico registrado
                     </small>
                 </div>
                 
@@ -200,12 +203,13 @@ The form submits to POST /auth/login which:
     });
     
     // ===== FORM VALIDATION ENHANCEMENT =====
-    const usernameInput = document.getElementById('username');
+    // Replaced 'username' with 'email'
+    const emailInput = document.getElementById('email'); 
     const passwordInput = document.getElementById('password');
     
     // Add real-time validation feedback
-    usernameInput.addEventListener('blur', function() {
-        if (this.value.trim() === '') {
+    emailInput.addEventListener('blur', function() {
+        if (this.value.trim() === '' || !this.checkValidity()) { // checkValidity handles basic email format
             this.classList.add('is-invalid');
         } else {
             this.classList.remove('is-invalid');
@@ -223,8 +227,8 @@ The form submits to POST /auth/login which:
     });
     
     // ===== KEYBOARD SHORTCUTS =====
-    // Press Enter in username field to focus password
-    usernameInput.addEventListener('keypress', function(e) {
+    // Press Enter in email field to focus password
+    emailInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             e.preventDefault();
             passwordInput.focus();
@@ -244,8 +248,7 @@ The form submits to POST /auth/login which:
         console.log('PWA install prompt available');
     });
     
-    // ===== CHECK IF ALREADY LOGGED IN =====
-    // This prevents users from seeing login page if they're already logged in
+    // ===== CHECK IF ALREADY LOGGED IN (Remains the same) =====
     fetch('/auth/session')
         .then(response => response.json())
         .then(data => {
@@ -257,7 +260,8 @@ The form submits to POST /auth/login which:
                 } else if (role === 'worker') {
                     window.location.href = '/worker/';
                 } else if (role === 'planner') {
-                    window.location.href = '/planner/';
+                    // NOTE: The backend redirects planners to /planifications/list_planifications
+                    window.location.href = '/planifications/'; 
                 } else if (role === 'client') {
                     window.location.href = '/client/';
                 }

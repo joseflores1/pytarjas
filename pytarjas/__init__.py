@@ -1,6 +1,6 @@
 # pytarjas/__init__.py
 import os
-from flask import Flask
+from flask import Flask, redirect, url_for, session, g
 
 
 def create_app(test_config=None):
@@ -8,63 +8,25 @@ def create_app(test_config=None):
     Create and configure the Flask application.
     
     This is the application factory pattern recommended by Flask.
-    It allows creating multiple instances of the app with different
-    configurations (useful for testing, development, production).
-    
-    Args:
-        test_config: Optional dictionary of configuration values for testing.
-                     When provided, overrides all other configuration.
-        
-    Returns:
-        Flask: Configured Flask application instance
-        
-    Example:
-        # Development (default - no environment variables needed)
-        app = create_app()
-        
-        # Production (set APP_ENV in .env or environment)
-        # APP_ENV=production
-        app = create_app()
-        
-        # Testing (used by pytest)
-        app = create_app({"TESTING": True})
     """
     # Create Flask app instance
-    # instance_relative_config=True tells Flask to look for config files
-    # in the instance folder (for deployment-specific settings)
     app = Flask(__name__, instance_relative_config=True)
     
+    # ... [Configuration loading and instance path setup remain unchanged] ...
     if test_config is None:
         # Load configuration from config.py based on APP_ENV
-        # Default to 'development' if APP_ENV is not set
-        # You can set APP_ENV in your .env file: APP_ENV=production
-        app_env = os.getenv('APP_ENV', 'development')
-        
-        # Load the appropriate config class
-        # 'development' -> DevelopmentConfig
-        # 'production' -> ProductionConfig  
-        # 'testing' -> TestingConfig
+        app_env = os.getenv('FLASK_ENV', 'development')
         config_class = f'config.{app_env.capitalize()}Config'
         app.config.from_object(config_class)
-        
-        # Optional: Load instance-specific config file if it exists
-        # This allows overriding config.py settings on a per-deployment basis
-        # silent=True means don't error if the file doesn't exist
         app.config.from_pyfile('config.py', silent=True)
-        
     else:
-        # Load the test config if passed in (for pytest)
-        # This completely overrides config.py settings
         app.config.from_mapping(test_config)
     
-    # Ensure the instance folder exists
-    # This folder stores deployment-specific files (logs, uploads, etc.)
     try:
         os.makedirs(app.instance_path)
     except OSError:
         pass
     
-    # Ensure upload folder exists (for field work file attachments)
     try:
         upload_path = os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'])
         os.makedirs(upload_path)
@@ -75,19 +37,9 @@ def create_app(test_config=None):
     from .models.user_models import db
     db.init_app(app)
     
-    # Initialize Flask-Migrate extension for database migrations
-    # This allows us to track and version database schema changes
-    #from flask_migrate import Migrate
-    #migrate = Migrate(app, db)
-    
     # Import all models so SQLAlchemy knows about them
-    # This MUST happen after db.init_app() but before any database operations
-    # noqa tells linters to ignore "unused import" warnings
     from .models import user_models, docs_models  # noqa
     
-    # NOTE: db.create_all() is now replaced by Flask-Migrate
-    # To create/update database schema, use: flask db upgrade
-    # For development convenience, you can uncomment the line below:
     with app.app_context():
         db.create_all()
     
@@ -106,10 +58,22 @@ def create_app(test_config=None):
 
     from . import forms
     app.register_blueprint(forms.bp)
-
-    # TODO: Register PWA routes (manifest.json, service-worker.js)
-    # We'll add these in the next step
     
+    from . import planner # Asegurar que la redirección a 'planner' funcione
+    app.register_blueprint(planner.bp)
+
+    # ============================================================================
+    # FIX DE SEGURIDAD: DESHABILITAR CACHÉ DEL NAVEGADOR (BFCACHE)
+    # Esto previene que el botón 'Atrás' muestre la página del usuario anterior.
+    # ============================================================================
+    @app.after_request
+    def set_secure_headers(response):
+        """Añade cabeceras para prevenir caching de la página por el navegador."""
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+
     # ============================================================================
     # ROOT ROUTE: Redirect to appropriate page based on authentication
     # ============================================================================
@@ -117,29 +81,14 @@ def create_app(test_config=None):
     def index():
         """
         Root route handler.
-        
-        REASONING:
-        - When users visit the site root, we need to direct them somewhere useful
-        - If authenticated, send them to their role-appropriate dashboard
-        - If not authenticated, send them to login page
-        
-        BEHAVIOR:
-        - Unauthenticated users â†’ /auth/login
-        - Authenticated admin â†’ /admin/
-        - Authenticated planner â†’ /planifications/
-        - Authenticated worker â†’ /worker/
-        - Authenticated client â†’ /worker/ (or a custom client dashboard if you build one)
-        
-        This creates a smooth user experience where the homepage adapts to the user.
         """
-        from flask import session, redirect, url_for
         
         # Check if user is logged in by looking for user_id in session
         if "user_id" not in session:
-            # Not logged in â†’ send to login page
+            # Not logged in → send to login page
             return redirect(url_for("auth.login"))
         
-        # User is logged in â†’ get their info to determine dashboard
+        # User is logged in → get their info to determine dashboard
         from pytarjas.models.user_models import User
         user = User.query.get(session["user_id"])
         
@@ -157,11 +106,10 @@ def create_app(test_config=None):
         elif user.role == "worker":
             return redirect(url_for("worker.index"))
         elif user.role == "client":
-            # For now, send clients to worker dashboard
-            # TODO: Create a dedicated client dashboard showing their reports
+            # Redirigir a worker.index ya que /client/ no existe aún
             return redirect(url_for("worker.index"))
         else:
-            # Unknown role â†’ send to login
+            # Unknown role → send to login
             session.clear()
             return redirect(url_for("auth.login"))
     

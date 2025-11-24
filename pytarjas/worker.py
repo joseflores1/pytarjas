@@ -50,6 +50,13 @@ def index():
         HTML: Rendered worker dashboard template
         JSON: Dashboard statistics
     """
+    # FIX: Initialize all variables to 0 to prevent UnboundLocalError 
+    # for non-worker roles (Admin, Planner, Client).
+    pending_count = 0
+    in_progress_count = 0
+    completed_today = 0
+    total_assigned = 0
+
     # Query statistics based on user role
     if g.user.role == "worker":
         # Workers see only their assigned documents

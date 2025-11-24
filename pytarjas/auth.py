@@ -23,63 +23,45 @@ bp = Blueprint("auth", __name__, url_prefix="/auth")
 def login():
     """
     Log in an existing user.
-    
-    GET: Display login form (HTML)
-    POST: Process login and create session
-    
-    Accepts two content types:
-    1. application/x-www-form-urlencoded (HTML forms)
-    2. application/json (API/PWA requests)
-    
-    JSON Request Example:
-    {
-        "username": "admin",
-        "password": "secret123"
-    }
-    
-    JSON Success Response (200):
-    {
-        "success": true,
-        "message": "Welcome back, admin!",
-        "user": {
-            "id": "uuid-here",
-            "username": "admin",
-            "role": "admin",
-            "email": "admin@example.com"
-        }
-    }
-    
-    JSON Error Response (401):
-    {
-        "success": false,
-        "error": "Incorrect password."
-    }
     """
+    # FIX: Redirige inmediatamente si el usuario ya está autenticado (Control UX/Seguridad)
+    if g.user is not None:
+        if g.user.role == "admin":
+            return redirect(url_for("admin.index"))
+        if g.user.role == "planner":
+            # Redirección al listado principal de planificación
+            return redirect(url_for("planifications.list_planifications"))
+        if g.user.role == "worker":
+            return redirect(url_for("worker.index"))
+        if g.user.role == "client":
+            # Redirección a una página de cliente (actualmente worker.index, ya que el endpoint /client/ no existe aún)
+            return redirect(url_for("worker.index")) # Asumiendo worker.index o una ruta de cliente.
+    
     if request.method == "POST":
         # Detect request type and extract credentials
         if request.is_json:
             # JSON request from API/PWA
             data = request.get_json()
-            username = data.get("username")
+            email = data.get("email") 
             password = data.get("password")
         else:
             # Form data from HTML
-            username = request.form.get("username")
+            email = request.form.get("email") 
             password = request.form.get("password")
         
         error = None
         
         # Validation
-        if not username:
-            error = "Username is required."
+        if not email:
+            error = "Email is required."
         elif not password:
             error = "Password is required."
         else:
-            # Query user by username
-            user = User.query.filter_by(username=username).first()
+            # Query user by email (PRIMARY CHANGE)
+            user = User.query.filter_by(email=email).first()
 
             if user is None:
-                error = "Incorrect username."
+                error = "Incorrect email."
             elif not user.check_password(password):
                 error = "Incorrect password."
         
@@ -100,7 +82,7 @@ def login():
                     # JSON response for API clients (PWA)
                     return jsonify({
                         "success": True,
-                        "message": f"Welcome back, {user.username}!",
+                        "message": f"Welcome back, {user.username}!", 
                         "user": {
                             "id": user.id,
                             "username": user.username,
@@ -116,9 +98,9 @@ def login():
                     if user.role=="worker":
                         return redirect(url_for("worker.index"))
                     if user.role=="planner":
-                        return redirect(url_for("planner.index"))
+                        return redirect(url_for("planifications.list_planifications")) # Redirect Planner to list
                     if user.role=="client":
-                        return redirect(url_for("client.index"))
+                        return redirect(url_for("worker.index"))
  
             except Exception as e:
                 db.session.rollback()
@@ -135,7 +117,7 @@ def login():
             # Flash message for HTML clients
             flash(error, "error")
 
-    # GET request: show login form
+    # GET request: show login form (only reached if g.user is None)
     return render_template("auth/login.html")
 
 

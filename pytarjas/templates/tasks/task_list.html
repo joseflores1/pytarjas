@@ -2,10 +2,13 @@
 {#
 Task List Template
 
-Updates:
-- Fixed filter button visibility in Dark Mode
-- Removed redundant "Dashboard" button (already in Navbar)
-- Polished UI for consistency with new design system
+UPDATES:
+- Implemented Dynamic Filtering using JavaScript Debouncing (auto-submits form).
+- Fixed excessive table width by adjusting column widths and removing min-width.
+- FIX: Removed Sync columns and filters to simplify table and save horizontal space.
+- FIX: MOVED 'Acciones' (Ver/Editar button) to the far left (second column) to improve UX and eliminate horizontal scroll for core actions.
+- FIX: Removed redundant "Filtrar" button and implemented scroll position restoration on page reload.
+- FIX: Removed setTimeout(..., 10) on scroll restoration for imperceptible scrolling.
 #}
 
 {% extends 'base.html' %}
@@ -13,137 +16,154 @@ Updates:
 {% block title %}Lista de Tareas{% endblock %}
 
 {% block extra_css %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
   <style>
-    /* Page Layout */
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: var(--space-lg);
-      flex-wrap: wrap;
-      gap: var(--space-md);
-    }
-
-    .page-title h1 {
-      margin-bottom: var(--space-xs);
-      font-size: 1.8rem;
-    }
-
-    .page-subtitle {
-      color: var(--color-text-secondary);
-      margin: 0;
-      font-size: 0.95rem;
-    }
-
-    /* Filter Bar */
-    .filter-bar {
-      display: flex;
-      gap: var(--space-sm);
-      flex-wrap: wrap;
-      align-items: center;
+    /* Table Styling for better display */
+    .table-responsive {
+      /* Permite el scroll horizontal SÓLO si la tabla es más ancha que el contenedor */
+      overflow-x: auto;
       margin-bottom: var(--space-xl);
-      padding: var(--space-sm);
+    }
+    
+    .tasks-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      /* min-width: 1400px; - REMOVED: La tabla se auto-ajusta al 100% ahora */
+    }
+
+    .tasks-table th, .tasks-table td {
+      padding: var(--space-md) var(--space-sm);
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid var(--color-border);
+      font-size: var(--font-size-sm);
+      white-space: nowrap; /* Mantener nowrap como default para timestmps, sobreescribir para texto */
+    }
+
+    /* Column Widths and Wrapping FIX */
+    .col-fixed-date {
+        width: 70px; /* Reducido para fechas (YYYY-MM-DD) */
+    }
+    .col-fixed-status {
+        width: 60px; /* Reducido para badges de estado */
+    }
+    .col-fixed-sync {
+        width: 50px;
+        text-align: center;
+    }
+    .col-fixed-action {
+        width: 100px; /* Fija el ancho del botón */
+        text-align: center;
+    }
+    .col-key-data {
+        width: 180px; /* Ancho suficiente para 2 líneas */
+        white-space: normal; /* PERMITE EL AJUSTE DE TEXTO */
+    }
+    .col-wrapping-text {
+        width: 120px;
+        white-space: normal; /* PERMITE EL AJUSTE DE TEXTO */
+    }
+
+    .tasks-table thead tr {
       background-color: var(--color-bg-secondary);
-      border-radius: var(--radius-lg);
-      border: 1px solid var(--color-border);
+    }
+    
+    .tasks-table tbody tr:hover {
+      background-color: var(--color-bg-tertiary);
+    }
+    
+    .tasks-table tbody tr.collapsible-row:hover {
+      background-color: transparent !important;
     }
 
-    .filter-label {
-      font-weight: 600;
-      margin-right: var(--space-xs);
-      color: var(--color-text-primary);
-      padding-left: var(--space-sm);
+    /* Collapsible Row Styling (FORZADO A VERTICAL) */
+    .detail-row {
+      background-color: var(--color-bg-secondary);
+      border-top: 1px dashed var(--color-border);
+      padding: 0 !important;
     }
-
-    .filter-btn {
-      padding: 6px 16px;
-      border: 1px solid transparent;
-      background-color: transparent; /* Transparent by default */
-      border-radius: var(--radius-md);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-decoration: none;
-      color: var(--color-text-secondary);
-      font-size: 0.9rem;
-      font-weight: 500;
-    }
-
-    .filter-btn:hover {
-      background-color: var(--color-bg-tertiary); /* Theme aware hover */
-      color: var(--color-text-primary);
-    }
-
-    .filter-btn.active {
-      background-color: var(--color-primary);
-      color: white;
-      box-shadow: var(--shadow-sm);
-    }
-
-    /* Task Grid */
-    .task-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: var(--space-lg);
-    }
-
-    /* Task Card */
-    .task-card {
-      background-color: var(--color-bg-primary);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-lg);
+    
+    .detail-content {
       padding: var(--space-lg);
-      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-    }
-
-    .task-card:hover {
-      transform: translateY(-4px);
-      box-shadow: var(--shadow-lg);
-      border-color: var(--color-primary);
-    }
-
-    .task-card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
+      display: grid;
+      grid-template-columns: 1fr; /* Una sola columna para evitar scroll horizontal */
+      gap: var(--space-md);
+      border: 1px solid var(--color-border);
+      border-top: none;
+      border-radius: 0 0 var(--radius-lg) var(--radius-lg);
       margin-bottom: var(--space-md);
     }
 
-    .task-title {
-      font-weight: 700;
-      font-size: 1.1rem;
+    .qa-group {
+      background-color: var(--color-bg-primary);
+      padding: var(--space-md);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .qa-question {
+      font-weight: var(--font-weight-semibold);
       color: var(--color-text-primary);
-      margin: 0;
-      line-height: 1.3;
-    }
-    
-    .task-link {
-      text-decoration: none;
-      color: inherit;
-    }
-    
-    .task-link:hover {
-      color: var(--color-primary);
+      margin-bottom: var(--space-xs);
+      font-size: var(--font-size-sm);
     }
 
-    /* Metadata */
-    .task-meta {
-      margin-top: auto; /* Push to bottom */
-      padding-top: var(--space-md);
-      border-top: 1px solid var(--color-border);
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-      font-size: 0.85rem;
+    .qa-answer {
       color: var(--color-text-secondary);
+      word-break: break-word;
+      font-size: var(--font-size-base);
+      line-height: 1.4;
     }
 
-    .meta-row {
-      display: flex;
-      align-items: center;
-      gap: var(--space-sm);
+    .toggle-icon {
+      cursor: pointer;
+      font-size: 1.2rem;
+      transition: transform 0.2s;
+      margin-right: var(--space-sm);
+    }
+
+    .toggle-icon.open {
+      transform: rotate(90deg);
+    }
+    
+    /* Filter Bar */
+    .filter-group-container {
+        display: flex;
+        gap: var(--space-md);
+        flex-wrap: wrap;
+        padding: var(--space-md);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        background-color: var(--color-bg-secondary);
+        margin-bottom: var(--space-xl);
+    }
+    
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        min-width: 150px;
+    }
+    
+    .filter-group label {
+        font-size: var(--font-size-sm);
+        margin-bottom: var(--space-xs);
+        font-weight: var(--font-weight-medium);
+        color: var(--color-text-primary);
+    }
+    
+    .filter-group input, .filter-group select {
+        font-size: var(--font-size-base);
+        padding: var(--space-xs);
+    }
+    
+    .date-filter-pair {
+        display: flex;
+        gap: var(--space-sm);
+    }
+    
+    .date-filter-pair input {
+        width: 50%;
     }
 
     /* Status Badges */
@@ -156,86 +176,27 @@ Updates:
       letter-spacing: 0.5px;
       white-space: nowrap;
     }
-
     .status-pending { background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
     .status-in_progress { background: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe; }
     .status-completed { background: #f0fdf4; color: #15803d; border: 1px solid #dcfce7; }
     .status-reviewed { background: #f5f3ff; color: #6d28d9; border: 1px solid #ede9fe; }
     .status-approved { background: #ecfdf5; color: #047857; border: 1px solid #d1fae5; }
-
-    /* Record Data List */
-    .record-data {
-      margin-bottom: var(--space-md);
-      font-size: 0.9rem;
-    }
     
-    .record-item {
-      display: flex;
-      margin-bottom: 4px;
-      color: var(--color-text-secondary);
-    }
-    
-    .record-label {
-      font-weight: 600;
-      margin-right: 8px;
-      color: var(--color-text-primary);
-      min-width: 80px;
-    }
-
-    /* Empty State */
-    .empty-state {
-      background-color: var(--color-bg-secondary);
-      border: 2px dashed var(--color-border);
-      border-radius: var(--radius-xl);
-      padding: var(--space-3xl) var(--space-xl);
-      text-align: center;
-      margin-top: var(--space-lg);
-    }
-
-    .empty-icon {
-      font-size: 4rem;
-      margin-bottom: var(--space-md);
-      opacity: 0.5;
-    }
-
-    .empty-title {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: var(--color-text-primary);
-      margin-bottom: var(--space-sm);
-    }
-
-    .empty-desc {
-      color: var(--color-text-secondary);
-      margin-bottom: var(--space-xl);
-      max-width: 400px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    /* Dark Mode Adjustments */
-    [data-theme="dark"] .filter-bar {
-      background-color: rgba(255, 255, 255, 0.03);
-    }
+    .is-synced-badge { background-color: var(--color-secondary); color: white; }
+    .not-synced-badge { background-color: var(--color-danger); color: white; }
   </style>
 {% endblock %}
 
 {% block header %}
   <div class="container">
-    <div class="page-header">
-      <div class="page-title">
-        <h1>📋 Tareas</h1>
-        <p class="page-subtitle">
-          {% if status == 'all' %}
-            Mostrando <strong>todas</strong> las tareas
-          {% else %}
-            Mostrando tareas: <strong>{{ status|replace('_', ' ')|capitalize }}</strong>
-          {% endif %}
-          <span style="opacity: 0.6;">({{ total }} total)</span>
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-md); margin-top: var(--space-lg); margin-bottom: var(--space-lg);">
+      <div>
+        <h1 style="margin-bottom: var(--space-xs);">📋 Listado de Tareas</h1>
+        <p style="color: var(--color-text-secondary); margin-bottom: 0;">
+          Mostrando **{{ total }}** tareas. Utilice los filtros para refinar la búsqueda.
         </p>
       </div>
-      
-      <a href="{{ url_for('tasks.create_task') }}" class="btn btn-primary btn-lg" style="box-shadow: var(--shadow-md);">
+      <a href="{{ url_for('tasks.create_task') }}" class="btn btn-primary btn-lg">
         <span style="margin-right: 8px; font-size: 1.2em;">+</span> Nueva Tarea
       </a>
     </div>
@@ -245,99 +206,245 @@ Updates:
 {% block content %}
   <div class="container">
     
-    {# Filter Bar #}
-    <div class="filter-bar">
-      <span class="filter-label">Filtrar:</span>
-      
-      <a href="{{ url_for('tasks.list_tasks', status='all') }}" 
-         class="filter-btn {% if status == 'all' %}active{% endif %}">
-        Todas
-      </a>
-      <a href="{{ url_for('tasks.list_tasks', status='pending') }}" 
-         class="filter-btn {% if status == 'pending' %}active{% endif %}">
-        Pendientes
-      </a>
-      <a href="{{ url_for('tasks.list_tasks', status='in_progress') }}" 
-         class="filter-btn {% if status == 'in_progress' %}active{% endif %}">
-        En Progreso
-      </a>
-      <a href="{{ url_for('tasks.list_tasks', status='completed') }}" 
-         class="filter-btn {% if status == 'completed' %}active{% endif %}">
-        Completadas
-      </a>
-    </div>
+    {# ADVANCED FILTER FORM #}
+    <form method="GET" action="{{ url_for('tasks.list_tasks') }}" id="filterForm">
+      <div class="filter-group-container">
+        
+        {# ROW 1: STATUS & BASIC SEARCH #}
+        <div class="filter-group" style="min-width: 180px;">
+          <label for="status">Estado</label>
+          <select name="status" id="status" class="form-control filter-input">
+            <option value="all" {% if status == 'all' %}selected{% endif %}>-- Todos --</option>
+            <option value="pending" {% if status == 'pending' %}selected{% endif %}>Pendientes</option>
+            <option value="in_progress" {% if status == 'in_progress' %}selected{% endif %}>En Progreso</option>
+            <option value="completed" {% if status == 'completed' %}selected{% endif %}>Completadas</option>
+            <option value="reviewed" {% if status == 'reviewed' %}selected{% endif %}>Revisadas</option>
+            <option value="approved" {% if status == 'approved' %}selected{% endif %}>Aprobadas</option>
+          </select>
+        </div>
+        
+        <div class="filter-group">
+          <label for="form_name_search">Nombre Formulario</label>
+          <input type="text" name="form_name_search" id="form_name_search" class="form-control filter-input" 
+                 value="{{ form_name_search or '' }}" placeholder="Buscar por nombre...">
+        </div>
 
-    {# Task Grid #}
-    {% if tasks %}
-      <div class="task-grid">
-        {% for task in tasks %}
-          <div class="task-card">
-            <div class="task-card-header">
-              <div style="flex: 1; margin-right: var(--space-md);">
-                <h3 class="task-title">
-                  <a href="{{ url_for('tasks.get_task', task_id=task.id) }}" class="task-link">
-                    {{ task.form_name }}
-                  </a>
-                </h3>
-              </div>
-              <span class="status-badge status-{{ task.status }}">
-                {{ task.status|replace('_', ' ') }}
-              </span>
-            </div>
-            
-            <div style="flex: 1;">
-              {# Record Data Preview #}
-              {% if task.record_data %}
-                <div class="record-data">
-                  {% for key, value in task.record_data.items() %}
-                    {% if loop.index <= 3 and value %}
-                      <div class="record-item">
-                        <span class="record-label">{{ key|replace('_', ' ')|capitalize }}:</span>
-                        <span>{{ value }}</span>
-                      </div>
-                    {% endif %}
-                  {% endfor %}
-                </div>
-              {% else %}
-                <p style="color: var(--color-text-tertiary); font-style: italic; font-size: 0.9rem;">
-                  Sin datos adicionales
-                </p>
-              {% endif %}
-            </div>
+        <div class="filter-group">
+          <label for="worker_username_search">Trabajador (Asignado)</label>
+          <input type="text" name="worker_username_search" id="worker_username_search" class="form-control filter-input" 
+                 value="{{ worker_username_search or '' }}" placeholder="Buscar por usuario...">
+        </div>
 
-            <div class="task-meta">
-              <div class="meta-row">
-                <span title="Tipo de Formulario">📝</span>
-                <span>{{ task.form_type or 'General' }}</span>
-              </div>
-              
-              {% if task.worker %}
-                <div class="meta-row">
-                  <span title="Asignado a">👤</span>
-                  <strong>{{ task.worker.username }}</strong>
-                </div>
-              {% endif %}
-              
-              {% if task.created_at %}
-                <div class="meta-row">
-                  <span title="Fecha de Creación">📅</span>
-                  <span>{{ task.created_at[:10] }}</span>
-                </div>
-              {% endif %}
+        <div class="filter-group">
+          <label for="container_number">N° Contenedor</label>
+          <input type="text" name="container_number" id="container_number" class="form-control filter-input" 
+                 value="{{ container_number_search or '' }}" placeholder="Buscar en datos...">
+        </div>
+        
+        {# RE-INTRODUCED: is_synced filter #}
+        <div class="filter-group" style="min-width: 120px;">
+          <label for="is_synced">Sincronizado</label>
+          <select name="is_synced" id="is_synced" class="form-control filter-input">
+              <option value="">-- Todos --</option>
+              <option value="true" {% if is_synced_filter == 'true' %}selected{% endif %}>✅ Sí</option>
+              <option value="false" {% if is_synced_filter == 'false' %}selected{% endif %}>❌ No</option>
+          </select>
+        </div>
+
+        {# ROW 2: TIMESTAMP FILTERS #}
+        <div class="filter-group">
+            <label>Creada</label>
+            <div class="date-filter-pair">
+                <input type="date" name="created_at_min" value="{{ created_at_min or '' }}" class="form-control filter-input" title="Desde">
+                <input type="date" name="created_at_max" value="{{ created_at_max or '' }}" class="form-control filter-input" title="Hasta">
             </div>
-            
-            <a href="{{ url_for('tasks.get_task', task_id=task.id) }}" class="btn btn-secondary btn-sm btn-block" style="margin-top: var(--space-md);">
-              Ver Detalles
+        </div>
+        
+        <div class="filter-group">
+            <label>Iniciada</label>
+            <div class="date-filter-pair">
+                <input type="date" name="started_at_min" value="{{ started_at_min or '' }}" class="form-control filter-input" title="Desde">
+                <input type="date" name="started_at_max" value="{{ started_at_max or '' }}" class="form-control filter-input" title="Hasta">
+            </div>
+        </div>
+
+        <div class="filter-group">
+            <label>Completada</label>
+            <div class="date-filter-pair">
+                <input type="date" name="completed_at_min" value="{{ completed_at_min or '' }}" class="form-control filter-input" title="Desde">
+                <input type="date" name="completed_at_max" value="{{ completed_at_max or '' }}" class="form-control filter-input" title="Hasta">
+            </div>
+        </div>
+
+        <div class="filter-group">
+            <label>Actualizada</label>
+            <div class="date-filter-pair">
+                <input type="date" name="updated_at_min" value="{{ updated_at_min or '' }}" class="form-control filter-input" title="Desde">
+                <input type="date" name="updated_at_max" value="{{ updated_at_max or '' }}" class="form-control filter-input" title="Hasta">
+            </div>
+        </div>
+        
+        {# RE-INTRODUCED: Sincronizada filter date range #}
+        <div class="filter-group">
+            <label>Sincronizada</label>
+            <div class="date-filter-pair">
+                <input type="date" name="synced_at_min" value="{{ synced_at_min or '' }}" class="form-control filter-input" title="Desde">
+                <input type="date" name="synced_at_max" value="{{ synced_at_max or '' }}" class="form-control filter-input" title="Hasta">
+            </div>
+        </div>
+        
+        <div style="display: flex; align-items: flex-end; gap: var(--space-sm);">
+            {# Removed redundant "Filtrar" button #}
+            <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary">
+              Limpiar
             </a>
-          </div>
-        {% endfor %}
+        </div>
+      </div>
+    </form>
+
+
+    {# TASKS TABLE #}
+    {% if tasks %}
+      <div class="table-responsive card">
+        <table class="tasks-table">
+          <thead>
+            <tr>
+              <th style="width: 20px;"></th> <th class="col-fixed-action">Acciones</th> <th style="width: 180px;">Formulario</th>
+              <th class="col-wrapping-text">Asignado a</th>
+              <th class="col-wrapping-text">Creado por</th>
+              <th class="col-fixed-status">Estado</th>
+              <th class="col-key-data">Datos Clave</th>
+              <th class="col-fixed-date">Creada</th>
+              <th class="col-fixed-date">Iniciada</th>
+              <th class="col-fixed-date">Completada</th>
+              <th class="col-fixed-date">Revisada</th>
+              <th class="col-fixed-date">Sincronizada</th> <th class="col-fixed-sync">Sync</th> </tr>
+          </thead>
+          <tbody>
+            {% for task in tasks %}
+            <tr data-task-id="{{ task.id }}" class="task-row">
+              <td>
+                {% if task.form_questions %}
+                  <span class="toggle-icon" onclick="toggleDetail('{{ task.id }}')">▶</span>
+                {% endif %}
+              </td>
+              <td class="col-fixed-action"> <a href="{{ url_for('tasks.get_task', task_id=task.id) }}" class="btn btn-sm btn-secondary">
+                  Ver / Editar
+                </a>
+              </td>
+              <td style="font-weight: 600; white-space: normal;">
+                <a href="{{ url_for('tasks.get_task', task_id=task.id) }}" class="text-primary">{{ task.form_name }}</a>
+              </td>
+              <td class="col-wrapping-text">
+                {{ task.worker.username if task.worker else 'N/A' }}
+              </td>
+              <td class="col-wrapping-text">
+                {{ task.created_by.username if task.created_by else 'N/A' }}
+              </td>
+              <td>
+                <span class="status-badge status-{{ task.status }}">
+                  {{ task.status|replace('_', ' ')|capitalize }}
+                </span>
+              </td>
+              <td class="col-key-data">
+                {% for key, value in (task.record_preview|default({})).items() %}
+                    <div style="font-size: 0.8rem;"><strong>{{ key }}:</strong> {{ value }}</div>
+                {% endfor %}
+              </td>
+              <td class="col-fixed-date" title="{{ task.created_at }}">
+                {{ task.created_at[:10] if task.created_at else 'N/A' }}
+              </td>
+              <td class="col-fixed-date" title="{{ task.started_at }}">
+                {{ task.started_at[:10] if task.started_at else 'N/A' }}
+              </td>
+              <td class="col-fixed-date" title="{{ task.completed_at }}">
+                {{ task.completed_at[:10] if task.completed_at else 'N/A' }}
+              </td>
+              <td class="col-fixed-date" title="{{ task.reviewed_at }}">
+                {{ task.reviewed_at[:10] if task.reviewed_at else 'N/A' }}
+              </td>
+              <td class="col-fixed-date" title="{{ task.synced_at }}"> {{ task.synced_at[:10] if task.synced_at else 'N/A' }}
+              </td>
+              <td class="col-fixed-sync"> {% if task.is_synced %}
+                  <span class="badge is-synced-badge">✅</span>
+                {% else %}
+                  <span class="badge not-synced-badge">❌</span>
+                {% endif %}
+              </td>
+            </tr>
+            {# Collapsible Detail Row #}
+            <tr id="detail-{{ task.id }}" class="collapsible-row" style="display: none;">
+                <td colspan="13" class="detail-row"> <div class="detail-content">
+                        {% if task.responses and task.form_questions %}
+                            {% set response_map = task.responses %}
+                            {% for question in task.form_questions %}
+                                {% set answer = response_map.get(question.id) %}
+                                {% if answer is not none and answer != '' %}
+                                <div class="qa-group">
+                                    <div class="qa-question">{{ question.text }}</div>
+                                    <div class="qa-answer">
+                                      {% if question.type == 'photo' or question.type == 'file' %}
+                                        Archivo/Foto Adjunta (Ver detalle)
+                                      {% elif answer == 'true' %}
+                                        Sí
+                                      {% elif answer == 'false' %}
+                                        No
+                                      {% else %}
+                                        {{ answer }}
+                                      {% endif %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                            {% if task.record_data|default({}) %}
+                              <div class="qa-group" style="background-color: var(--color-primary-light);">
+                                <div class="qa-question">Datos Adicionales (Carga Inicial)</div>
+                                  {% for key, value in (task.record_data|default({})).items() %}
+                                    <div class="qa-answer" style="font-size: 0.9rem;"><strong>{{ key|capitalize }}:</strong> {{ value }}</div>
+                                  {% endfor %}
+                              </div>
+                            {% endif %}
+                        {% else %}
+                            <p style="grid-column: 1 / -1; text-align: center; color: var(--color-text-tertiary);">
+                                Aún no hay respuestas registradas para esta tarea.
+                            </p>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
 
-      {# Pagination #}
+      {# Pagination (Unchanged) #}
       {% if total > limit %}
         <div style="display: flex; justify-content: center; gap: var(--space-md); margin-top: var(--space-2xl);">
+          {% set filter_params = {
+              'status': status,
+              'form_type': form_type_filter,
+              'container_number': container_number_search,
+              'worker_username': worker_username_search,
+              'form_name_search': form_name_search,
+              'created_at_min': created_at_min,
+              'created_at_max': created_at_max,
+              'updated_at_min': updated_at_min,
+              'updated_at_max': updated_at_max,
+              'started_at_min': started_at_min,
+              'started_at_max': started_at_max,
+              'completed_at_min': completed_at_min,
+              'completed_at_max': completed_at_max,
+              'reviewed_at_min': reviewed_at_min,
+              'reviewed_at_max': reviewed_at_max,
+              'synced_at_min': synced_at_min,
+              'synced_at_max': synced_at_max,
+              'is_synced': is_synced_filter,
+              'limit': limit
+          } %}
+          {% set current_url = url_for('tasks.list_tasks', **filter_params) %}
+          
           {% if offset > 0 %}
-            <a href="{{ url_for('tasks.list_tasks', status=status, offset=offset-limit, limit=limit) }}" 
+            <a href="{{ current_url }}&offset={{ offset - limit }}" 
                class="btn btn-secondary">
               ← Anterior
             </a>
@@ -348,7 +455,7 @@ Updates:
           </div>
           
           {% if offset + limit < total %}
-            <a href="{{ url_for('tasks.list_tasks', status=status, offset=offset+limit, limit=limit) }}" 
+            <a href="{{ current_url }}&offset={{ offset + limit }}" 
                class="btn btn-secondary">
               Siguiente →
             </a>
@@ -357,19 +464,15 @@ Updates:
       {% endif %}
 
     {% else %}
-      {# Empty State #}
-      <div class="empty-state">
-        <div class="empty-icon">📭</div>
-        <h2 class="empty-title">No se encontraron tareas</h2>
-        <p class="empty-desc">
-          {% if status != 'all' %}
-            No hay tareas con el estado "<strong>{{ status|replace('_', ' ') }}</strong>" en este momento.
-          {% else %}
-            Aún no hay tareas registradas en el sistema.
-          {% endif %}
+      {# Empty State (Unchanged) #}
+      <div class="empty-state card-body" style="background-color: var(--color-bg-secondary); border: 2px dashed var(--color-border); border-radius: var(--radius-xl); padding: var(--space-3xl) var(--space-xl); text-align: center;">
+        <div style="font-size: 4rem; margin-bottom: var(--space-lg); opacity: 0.3;">📭</div>
+        <h2 style="font-size: 1.5rem; font-weight: 700;">No se encontraron tareas</h2>
+        <p style="color: var(--color-text-secondary); margin-bottom: var(--space-xl);">
+          Ajuste sus filtros o cree una nueva tarea.
         </p>
         <a href="{{ url_for('tasks.create_task') }}" class="btn btn-primary btn-lg">
-          Crear Primera Tarea
+          Crear Nueva Tarea
         </a>
       </div>
     {% endif %}
@@ -379,7 +482,93 @@ Updates:
 
 {% block extra_js %}
   <script>
-    // Auto-refresh logic stays the same
+    /**
+     * Toggles the visibility of the task detail row (Q&A).
+     */
+    function toggleDetail(taskId) {
+      const detailRow = document.getElementById(`detail-${taskId}`);
+      const toggleIcon = document.querySelector(`tr[data-task-id="${taskId}"] .toggle-icon`);
+
+      if (detailRow.style.display === 'none' || detailRow.style.display === '') {
+        // Find and hide any other open detail rows first (optional, but good UX)
+        document.querySelectorAll('.collapsible-row').forEach(row => {
+          if (row.id !== `detail-${taskId}`) {
+            row.style.display = 'none';
+          }
+        });
+        document.querySelectorAll('.toggle-icon.open').forEach(icon => {
+          if (icon !== toggleIcon) {
+            icon.classList.remove('open');
+          }
+        });
+        
+        // Open the selected row
+        detailRow.style.display = 'table-row';
+        toggleIcon.classList.add('open');
+      } else {
+        // Close the row
+        detailRow.style.display = 'none';
+        toggleIcon.classList.remove('open');
+      }
+    }
+
+    // --- DYNAMIC FILTERING LOGIC (Debounce & Scroll Management) ---
+    const filterForm = document.getElementById('filterForm');
+    let debounceTimer;
+
+    /**
+     * Executes the filter action after a delay.
+     * Includes scroll position saving.
+     */
+    function triggerFilter() {
+        // Check if user is typing in a text field or has changed a select/date
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            
+            // 1. Save current scroll position before submit (FIX for scrolling to top)
+            const scrollY = window.scrollY;
+            
+            // 2. Create hidden input for scroll position
+            let scrollInput = document.getElementById('scrollPos');
+            if (!scrollInput) {
+                scrollInput = document.createElement('input');
+                scrollInput.type = 'hidden';
+                scrollInput.name = 'scroll_pos';
+                scrollInput.id = 'scrollPos';
+                filterForm.appendChild(scrollInput);
+            }
+            scrollInput.value = scrollY;
+            
+            // 3. Submit the form to reload with new parameters
+            filterForm.submit();
+        }, 400); // 400ms delay for smooth typing
+    }
+
+    // Attach listener to all input fields
+    document.querySelectorAll('.filter-input').forEach(input => {
+        input.addEventListener('input', triggerFilter);
+        input.addEventListener('change', triggerFilter); 
+    });
+
+    // --- SCROLL RESTORATION ON PAGE LOAD (Ultra-fast, imperceptible scroll) ---
+    document.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const savedScrollY = urlParams.get('scroll_pos');
+
+        if (savedScrollY) {
+            // Restore scroll position immediately (without setTimeout)
+            window.scrollTo(0, parseInt(savedScrollY));
+            
+            // OPTIONAL: Clean the URL history to remove the scroll_pos parameter
+            if (window.history.replaceState) {
+                const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + window.location.search.replace(/&?scroll_pos=[^&]*/, "");
+                window.history.replaceState(null, document.title, cleanUrl);
+            }
+        }
+    });
+
+
+    // --- Auto-refresh logic (now independent of filtering) ---
     const AUTO_REFRESH_INTERVAL = 30000;
     let autoRefreshTimer = null;
     

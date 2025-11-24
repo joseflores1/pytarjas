@@ -1,9 +1,9 @@
 // pytarjas/static/js/auth.js
 /**
  * Authentication helper for PWA
- * 
- * This module handles authentication using the JSON API.
+ * * This module handles authentication using the JSON API.
  * All functions are async and return promises.
+ * * UPDATES: Changed login from username to email.
  */
 
 const AUTH_API = {
@@ -13,14 +13,13 @@ const AUTH_API = {
 };
 
 /**
- * Login user with username and password
- * 
- * @param {string} username - User's username
+ * Login user with email and password
+ * * @param {string} email - User's email
  * @param {string} password - User's password
  * @returns {Promise<Object>} User data if successful
  * @throws {Error} If authentication fails
  */
-async function login(username, password) {
+async function login(email, password) {
   try {
     const response = await fetch(AUTH_API.LOGIN, {
       method: 'POST',
@@ -30,7 +29,8 @@ async function login(username, password) {
       // IMPORTANT: Include credentials to maintain session cookies
       credentials: 'same-origin',
       body: JSON.stringify({
-        username: username,
+        // CHANGE: Send 'email' instead of 'username'
+        email: email, 
         password: password
       })
     });
@@ -57,8 +57,7 @@ async function login(username, password) {
 
 /**
  * Logout current user
- * 
- * @returns {Promise<boolean>} True if logout successful
+ * * @returns {Promise<boolean>} True if logout successful
  */
 async function logout() {
   try {
@@ -88,8 +87,7 @@ async function logout() {
 
 /**
  * Check if user is currently authenticated
- * 
- * @returns {Promise<Object|null>} User data if authenticated, null otherwise
+ * * @returns {Promise<Object|null>} User data if authenticated, null otherwise
  */
 async function checkSession() {
   try {
@@ -129,8 +127,7 @@ async function checkSession() {
 /**
  * Get currently logged in user from localStorage
  * Useful for offline mode
- * 
- * @returns {Object|null} User data or null
+ * * @returns {Object|null} User data or null
  */
 function getCurrentUser() {
   const userStr = localStorage.getItem('user');
@@ -139,8 +136,7 @@ function getCurrentUser() {
 
 /**
  * Check if user has specific role
- * 
- * @param {string} role - Role to check (admin, worker, planner, client)
+ * * @param {string} role - Role to check (admin, worker, planner, client)
  * @returns {boolean} True if user has the role
  */
 function hasRole(role) {
@@ -162,13 +158,12 @@ async function requireAuth() {
 
 /**
  * Example: Login form handler
- * 
- * HTML:
+ * * HTML:
  * <form id="loginForm">
- *   <input type="text" name="username" required>
- *   <input type="password" name="password" required>
- *   <button type="submit">Login</button>
- *   <div id="error"></div>
+ * <input type="email" name="email" required>
+ * <input type="password" name="password" required>
+ * <button type="submit">Login</button>
+ * <div id="error"></div>
  * </form>
  */
 function setupLoginForm() {
@@ -185,7 +180,8 @@ function setupLoginForm() {
     
     // Get form data
     const formData = new FormData(form);
-    const username = formData.get('username');
+    // CHANGE: Get 'email' instead of 'username'
+    const email = formData.get('email'); 
     const password = formData.get('password');
     
     try {
@@ -195,13 +191,14 @@ function setupLoginForm() {
       submitBtn.textContent = 'Logging in...';
       
       // Attempt login
-      const user = await login(username, password);
+      const user = await login(email, password); // CHANGE: Pass email
       
       // Success! Redirect based on role
       if (user.role === 'admin') {
         window.location.href = '/admin';
       } else if (user.role === 'worker') {
-        window.location.href = '/worker/dashboard';
+        // NOTE: Redirection needs to be updated if the backend logic changes the target
+        window.location.href = '/worker/'; 
       } else {
         window.location.href = '/';
       }
