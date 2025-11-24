@@ -8,16 +8,20 @@
   
   <title>{% block title %}{% endblock %} - HGT Data Collector</title>
   
+  {# INICIO DEL FIX PARA EL FLICKER BLANCO #}
   <script>
     (function() {
       const html = document.documentElement;
-      // Determine the stored theme or system preference
       const saved = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-      // Apply the theme attribute instantly.
-      html.setAttribute('data-theme', saved);
+      if (saved === 'dark') {
+        html.setAttribute('data-theme', 'dark');
+      } else {
+        html.removeAttribute('data-theme');
+      }
     })();
   </script>
-  
+  {# FIN DEL FIX PARA EL FLICKER BLANCO #}
+
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1e293b">
   
@@ -91,25 +95,36 @@
       padding: 0 24px;
     }
 
-    /* --- LOGO & BRAND FIXES --- */
+    /* --- LOGO & BRAND FIXES (Ajuste Final de Tamaño y Estabilidad) --- */
     .navbar-brand {
       display: flex;
       align-items: center;
-      gap: 80px; 
+      gap: 10px;  
       text-decoration: none;
       margin-right: 24px; 
-      height: 100%;
+      height: 80px; 
       overflow: visible; 
+      /* RESERVA EL ESPACIO HORIZONTAL para que el logo grande no cause temblores */
+      min-width: 350px; 
     }
 
     .navbar-brand .navbar-logo {
-      height: 76px !important; 
-      width: auto !important;
-      max-height: 76px !important;
-      transform: scale(2.8); 
+      /* ALTURA MÁXIMA STABLE */
+      height: 79px !important; 
+      max-height: 79px !important; 
+      
+      /* FIX CRÍTICO: Forzamos el ancho a 100% para que el logo se estire sobre su padding interno */
+      width: 100% !important; 
+      
+      /* Aseguramos que la imagen use la altura máxima (79px) */
+      object-fit: cover; 
+      object-position: left center;
+      
+      /* Propiedades de estabilidad (transform: none) */
+      transform: none; 
       transform-origin: center;
       display: none; 
-      margin-left: 25px;
+      margin-left: 0; 
     }
 
     .brand-text {
@@ -156,6 +171,7 @@
     .navbar-nav .nav-link.active {
       background-color: var(--nav-active-bg) !important;
       color: var(--nav-active-text) !important;
+      font-weight: 600;
     }
 
     /* --- RIGHT CONTROLS --- */
@@ -260,11 +276,22 @@
   <nav class="navbar">
     <div class="navbar-container">
       
-      <a href="{{ url_for('index') }}" class="navbar-brand">
+      <a href="{% if g.user %}
+               {% if g.user.role == 'admin' %}{{ url_for('admin.index') }}
+               {% elif g.user.role == 'planner' %}{{ url_for('planner.list_planifications') }}
+               {% elif g.user.role == 'worker' %}{{ url_for('worker.index') }}
+               {% elif g.user.role == 'client' %}{{ url_for('client.index') }}
+               {% else %}{{ url_for('auth.login') }}
+               {% endif %}
+               {% else %}{{ url_for('auth.login') }}{% endif %}" class="navbar-brand">
+        
+        {# Mantenemos los atributos width y height en el HTML para el navegador, pero el tamaño real lo controla el CSS #}
         <img src="{{ url_for('static', filename='icons/HGT-Logo-white-orange-RGB-192x192.png') }}" 
-             class="navbar-logo logo-for-dark-bg" alt="HGT">
+             class="navbar-logo logo-for-dark-bg" alt="HGT"
+             width="192" height="192"> 
         <img src="{{ url_for('static', filename='icons/HGT-Logo-greyblue-orange-RGB-192x192.png') }}" 
-             class="navbar-logo logo-for-light-bg" alt="HGT">
+             class="navbar-logo logo-for-light-bg" alt="HGT"
+             width="192" height="192"> 
         <span class="brand-text">HGT Collector</span>
       </a>
 
@@ -276,12 +303,14 @@
             <li><a href="{{ url_for('admin.list_users') }}" class="nav-link {% if request.endpoint == 'admin.list_users' %}active{% endif %}">👥 Usuarios</a></li>
             <li><a href="{{ url_for('forms.list_forms') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('forms.') %}active{% endif %}">📝 Formularios</a></li>
           {% elif g.user.role == 'planner' %}
-            <li><a href="{{ url_for('planner.index') }}" class="nav-link {% if request.endpoint == 'planner.index' %}active{% endif %}">🏠 Inicio</a></li>
+            <li><a href="{{ url_for('planner.index') }}" class="nav-link {% if request.endpoint == 'planner.index' or request.endpoint.startswith('planner.') %}active{% endif %}">🏠 Inicio</a></li>
             <li><a href="{{ url_for('tasks.list_tasks') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('tasks.') %}active{% endif %}">📋 Tareas</a></li>
             <li><a href="{{ url_for('forms.list_forms') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('forms.') %}active{% endif %}">📝 Formularios</a></li>
           {% elif g.user.role == 'worker' %}
             <li><a href="{{ url_for('worker.index') }}" class="nav-link {% if request.endpoint == 'worker.index' %}active{% endif %}">🏠 Inicio</a></li>
             <li><a href="{{ url_for('tasks.list_tasks') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('tasks.') %}active{% endif %}">📋 Mis Tareas</a></li>
+          {% elif g.user.role == 'client' %}
+            <li><a href="{{ url_for('client.index') }}" class="nav-link {% if request.endpoint == 'client.index' %}active{% endif %}">🏠 Reportes</a></li>
           {% endif %}
         {% endif %}
       </ul>
@@ -349,65 +378,29 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <script>
-    // Declare setTheme for use by the themeToggle listener
-    let setTheme; 
-
-    // --- Theme Logic ---
-    // This is run outside DOMContentLoaded because the theme attribute is already set in the head script.
-    // We only need the function definition and the listener.
-    const html = document.documentElement;
-
-    setTheme = function(theme) {
-      html.setAttribute('data-theme', theme);
-      localStorage.setItem('theme', theme);
+    // --- THEME INITIALIZATION FIX ---
+    (function() {
+      const html = document.documentElement;
       
-      // Update icon if available
-      const icon = document.getElementById('themeIcon');
-      if(icon) icon.textContent = theme === 'dark' ? '🌙' : '☀';
-    }
-
-    // --- General Script Initialization ---
-    window.addEventListener('DOMContentLoaded', () => {
-        // Theme Listener Initialization
-        const saved = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        const btn = document.getElementById('themeToggle');
+      function setTheme(theme) {
+        html.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
         const icon = document.getElementById('themeIcon');
+        if(icon) icon.textContent = theme === 'dark' ? '🌙' : '☀';
+      }
+      
+      const saved = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      setTheme(saved);
 
-        if(icon) icon.textContent = saved === 'dark' ? '🌙' : '☀';
-        
-        if(btn) {
-           btn.addEventListener('click', () => {
-               const currentTheme = html.getAttribute('data-theme');
-               setTheme(currentTheme === 'light' ? 'dark' : 'light');
-           });
-        }
-        
-        // Navigation Toggle
-        const toggle = document.getElementById('navbarToggle');
-        const nav = document.getElementById('navbarNav');
-        if(toggle && nav) toggle.addEventListener('click', () => nav.classList.toggle('active'));
+      const btn = document.getElementById('themeToggle');
+      if(btn) btn.addEventListener('click', () => setTheme(html.getAttribute('data-theme') === 'light' ? 'dark' : 'light'));
+    })();
+    // --- END THEME FIX ---
 
-        // Logout Confirmation
-        const logoutBtn = document.getElementById('logoutBtn');
-        if (logoutBtn) {
-          logoutBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            const url = this.href;
-            
-            window.showConfirm(
-              '¿Está seguro que desea cerrar sesión?',
-              () => {
-                window.location.href = url;
-              },
-              'Cerrar Sesión',
-              'Salir',
-              'primary'
-            );
-          });
-        }
-    });
+    const toggle = document.getElementById('navbarToggle');
+    const nav = document.getElementById('navbarNav');
+    if(toggle && nav) toggle.addEventListener('click', () => nav.classList.toggle('active'));
 
-    // --- Global Helpers (Must be defined globally) ---
     window.addEventListener('online', () => document.getElementById('offlineBanner').style.display = 'none');
     window.addEventListener('offline', () => document.getElementById('offlineBanner').style.display = 'flex');
     
@@ -425,7 +418,7 @@
       setTimeout(() => div.remove(), 3000);
     };
 
-    // --- GLOBAL CONFIRMATION MODAL LOGIC (Global definition) ---
+    // --- GLOBAL CONFIRMATION MODAL LOGIC ---
     let confirmCallback = null;
 
     window.showConfirm = function(message, onConfirm, title="Confirmación", confirmText="Confirmar", confirmType="primary") {
@@ -454,6 +447,25 @@
       if (confirmCallback) confirmCallback();
       closeModal();
     });
+
+    // --- LOGOUT CONFIRMATION ---
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const url = this.href;
+        
+        showConfirm(
+          '¿Está seguro que desea cerrar sesión?',
+          () => {
+            window.location.href = url;
+          },
+          'Cerrar Sesión',
+          'Salir',
+          'primary' 
+        );
+      });
+    }
   </script>
   {% block extra_js %}{% endblock %}
 </body>

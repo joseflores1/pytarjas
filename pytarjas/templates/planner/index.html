@@ -1,0 +1,36 @@
+{# pytarjas/templates/planner/index.html #}
+{% extends 'base.html' %}
+
+{% block title %}Panel de Planificador{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px; margin: var(--space-xl) auto; text-align: center;">
+    
+    <div class="card" style="padding: var(--space-3xl);">
+        <h1 class="card-title" style="font-size: var(--font-size-3xl);">📋 Panel de Control de Planificación</h1>
+        
+        {% if g.user and g.user.role == 'planner' %}
+            <p style="font-size: var(--font-size-lg); color: var(--color-text-secondary); margin-bottom: var(--space-xl);">
+                Bienvenido, <strong>{{ g.user.username }}</strong>. Utiliza el menú para gestionar tareas y planificaciones.
+            </p>
+            
+            <div style="display: flex; justify-content: center; gap: var(--space-lg); flex-wrap: wrap;">
+                <a href="{{ url_for('planner.list_planifications') }}" class="btn btn-primary btn-lg">
+                    📅 Ver Planificaciones
+                </a>
+                <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary btn-lg">
+                    📋 Ver Tareas Asignadas
+                </a>
+                <a href="{{ url_for('forms.list_forms') }}" class="btn btn-secondary btn-lg">
+                    📝 Gestionar Formularios
+                </a>
+            </div>
+        {% else %}
+             <p style="font-size: var(--font-size-lg); color: var(--color-danger);">
+                Acceso restringido. Por favor, asegúrese de tener el rol correcto.
+            </p>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}

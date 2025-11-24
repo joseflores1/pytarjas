@@ -1,16 +1,7 @@
 # pytarjas/worker.py
 """
 Worker UI blueprint for field workers.
-
-This blueprint provides HTML pages and UI views for workers.
-For API operations on tasks, use the /tasks/ blueprint instead.
-
-Separation of concerns:
-- worker.py = UI pages (HTML templates)
-- tasks.py = API operations (JSON endpoints)
-
-This keeps the code organized and allows other roles (planners)
-to use the same tasks API with their own UI.
+...
 """
 
 from flask import (
@@ -24,34 +15,14 @@ from pytarjas.models.docs_models import Document
 bp = Blueprint("worker", __name__, url_prefix="/worker")
 
 
-@bp.route("/")
-@bp.route("/index")
+@bp.route("/") # NEW: The root /worker/ is now the index
 @login_required
 def index():
     """
     Worker dashboard - main landing page for workers.
-    
-    Displays:
-    - Summary statistics (pending, in progress, completed today)
-    - Quick actions
-    - Recent activity
-    - Link to task list
-    
-    This view supports both HTML and JSON responses:
-    - HTML: Renders the PWA template
-    - JSON: Returns dashboard data for AJAX calls
-    
-    Access control:
-    - Must be logged in
-    - Any authenticated user can access (workers, planners, admins)
-    - Data shown is role-based (workers see their tasks, others see all)
-    
-    Returns:
-        HTML: Rendered worker dashboard template
-        JSON: Dashboard statistics
+    ...
     """
     # FIX: Initialize all variables to 0 to prevent UnboundLocalError 
-    # for non-worker roles (Admin, Planner, Client).
     pending_count = 0
     in_progress_count = 0
     completed_today = 0
@@ -116,22 +87,6 @@ def index():
 @bp.route("/profile")
 @login_required
 def profile():
-    """
-    Worker profile page.
-    
-    Displays:
-    - User information
-    - Performance statistics
-    - Recent activity history
-    
-    Access control:
-    - Must be logged in
-    
-    Returns:
-        HTML: Rendered profile template
-    """
-    # TODO: Implement profile page
-    # For now, just show basic user info
     return render_template(
         "worker/profile.html",
         user=g.user
@@ -141,22 +96,6 @@ def profile():
 @bp.route("/help")
 @login_required
 def help_page():
-    """
-    Help and documentation page for workers.
-    
-    Displays:
-    - How to use the PWA
-    - Offline mode instructions
-    - FAQ
-    - Contact information
-    
-    Access control:
-    - Must be logged in
-    
-    Returns:
-        HTML: Rendered help template
-    """
-    # TODO: Implement help page
     return render_template(
         "worker/help.html",
         user=g.user
