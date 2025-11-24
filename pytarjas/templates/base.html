@@ -8,6 +8,16 @@
   
   <title>{% block title %}{% endblock %} - HGT Data Collector</title>
   
+  <script>
+    (function() {
+      const html = document.documentElement;
+      // Determine the stored theme or system preference
+      const saved = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      // Apply the theme attribute instantly.
+      html.setAttribute('data-theme', saved);
+    })();
+  </script>
+  
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1e293b">
   
@@ -250,7 +260,7 @@
   <nav class="navbar">
     <div class="navbar-container">
       
-      <a href="{{ url_for('auth.login') }}" class="navbar-brand">
+      <a href="{{ url_for('index') }}" class="navbar-brand">
         <img src="{{ url_for('static', filename='icons/HGT-Logo-white-orange-RGB-192x192.png') }}" 
              class="navbar-logo logo-for-dark-bg" alt="HGT">
         <img src="{{ url_for('static', filename='icons/HGT-Logo-greyblue-orange-RGB-192x192.png') }}" 
@@ -339,27 +349,65 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <script>
-    (function() {
-      const html = document.documentElement;
-      const btn = document.getElementById('themeToggle');
+    // Declare setTheme for use by the themeToggle listener
+    let setTheme; 
+
+    // --- Theme Logic ---
+    // This is run outside DOMContentLoaded because the theme attribute is already set in the head script.
+    // We only need the function definition and the listener.
+    const html = document.documentElement;
+
+    setTheme = function(theme) {
+      html.setAttribute('data-theme', theme);
+      localStorage.setItem('theme', theme);
+      
+      // Update icon if available
       const icon = document.getElementById('themeIcon');
-      
-      function setTheme(theme) {
-        html.setAttribute('data-theme', theme);
-        localStorage.setItem('theme', theme);
-        if(icon) icon.textContent = theme === 'dark' ? '🌙' : '☀';
-      }
-      
-      const saved = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-      setTheme(saved);
-      
-      if(btn) btn.addEventListener('click', () => setTheme(html.getAttribute('data-theme') === 'light' ? 'dark' : 'light'));
-    })();
+      if(icon) icon.textContent = theme === 'dark' ? '🌙' : '☀';
+    }
 
-    const toggle = document.getElementById('navbarToggle');
-    const nav = document.getElementById('navbarNav');
-    if(toggle && nav) toggle.addEventListener('click', () => nav.classList.toggle('active'));
+    // --- General Script Initialization ---
+    window.addEventListener('DOMContentLoaded', () => {
+        // Theme Listener Initialization
+        const saved = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        const btn = document.getElementById('themeToggle');
+        const icon = document.getElementById('themeIcon');
 
+        if(icon) icon.textContent = saved === 'dark' ? '🌙' : '☀';
+        
+        if(btn) {
+           btn.addEventListener('click', () => {
+               const currentTheme = html.getAttribute('data-theme');
+               setTheme(currentTheme === 'light' ? 'dark' : 'light');
+           });
+        }
+        
+        // Navigation Toggle
+        const toggle = document.getElementById('navbarToggle');
+        const nav = document.getElementById('navbarNav');
+        if(toggle && nav) toggle.addEventListener('click', () => nav.classList.toggle('active'));
+
+        // Logout Confirmation
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+          logoutBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const url = this.href;
+            
+            window.showConfirm(
+              '¿Está seguro que desea cerrar sesión?',
+              () => {
+                window.location.href = url;
+              },
+              'Cerrar Sesión',
+              'Salir',
+              'primary'
+            );
+          });
+        }
+    });
+
+    // --- Global Helpers (Must be defined globally) ---
     window.addEventListener('online', () => document.getElementById('offlineBanner').style.display = 'none');
     window.addEventListener('offline', () => document.getElementById('offlineBanner').style.display = 'flex');
     
@@ -377,7 +425,7 @@
       setTimeout(() => div.remove(), 3000);
     };
 
-    // --- GLOBAL CONFIRMATION MODAL LOGIC ---
+    // --- GLOBAL CONFIRMATION MODAL LOGIC (Global definition) ---
     let confirmCallback = null;
 
     window.showConfirm = function(message, onConfirm, title="Confirmación", confirmText="Confirmar", confirmType="primary") {
@@ -406,25 +454,6 @@
       if (confirmCallback) confirmCallback();
       closeModal();
     });
-
-    // --- LOGOUT CONFIRMATION ---
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-      logoutBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        const url = this.href;
-        
-        showConfirm(
-          '¿Está seguro que desea cerrar sesión?',
-          () => {
-            window.location.href = url;
-          },
-          'Cerrar Sesión',
-          'Salir',
-          'primary' // Not strictly destructive data loss, so primary/neutral is fine
-        );
-      });
-    }
   </script>
   {% block extra_js %}{% endblock %}
 </body>

@@ -5,6 +5,8 @@ Create Form Page
 Updates:
 - Implemented global 'showConfirm' modal for Cancel and Delete actions
 - Replaced native browser alerts
+- REMOVED 'seal_verification' form type option.
+- UPDATED: Replaced Order input with quick-reorder dropdown and move buttons.
 #}
 
 {% extends 'base.html' %}
@@ -85,6 +87,12 @@ Updates:
     .choice-item:last-child {
       margin-bottom: 0;
     }
+    
+    /* Style for Move Buttons */
+    .move-up-btn, .move-down-btn {
+      padding: 0.5rem 0.6rem;
+      min-height: 36px;
+    }
   </style>
 {% endblock %}
 
@@ -137,7 +145,6 @@ Updates:
               <option value="">-- Seleccionar tipo --</option>
               <option value="consolidado">📦 Consolidado</option>
               <option value="desconsolidado">📤 Desconsolidado</option>
-              <option value="seal_verification">🔒 Verificación de Sello</option>
             </select>
           </div>
         </div>
@@ -270,6 +277,85 @@ Updates:
     list.appendChild(div);
   }
   
+  /**
+   * Generates options for the order select dropdown.
+   * @param {number} currentOrder - The current 1-based index of the question.
+   * @param {number} totalCount - The total number of questions.
+   * @returns {string} HTML string for options.
+   */
+  function populateOrderDropdown(currentOrder, totalCount) {
+      let options = '';
+      for (let i = 1; i <= totalCount; i++) {
+          options += `<option value="${i}" ${i === currentOrder ? 'selected' : ''}>#${i}</option>`;
+      }
+      return options;
+  }
+
+  /**
+   * Handles quick reordering via the select dropdown.
+   * @param {HTMLSelectElement} selectElement
+   */
+  function handleQuickReorder(selectElement) {
+      const newOrder = parseInt(selectElement.value);
+      const card = selectElement.closest('.question-card');
+      const container = document.getElementById('questionsContainer');
+      const cards = Array.from(container.querySelectorAll('.question-card'));
+      const currentOrder = cards.indexOf(card) + 1; // 1-based index
+      
+      if (newOrder === currentOrder) return;
+      
+      const targetIndex = newOrder - 1;
+      const targetCard = cards[targetIndex];
+      
+      if (newOrder > currentOrder) {
+          // Move Down: Insert current card after target card
+          targetCard.after(card);
+      } else {
+          // Move Up: Insert current card before target card
+          targetCard.before(card);
+      }
+
+      formChanged = true;
+      updateQuestionCount(); // Re-index all questions
+  }
+  
+  /**
+   * Moves a question card up or down in the DOM and re-indexes all questions.
+   * @param {string} id The data-question-id of the card to move.
+   * @param {number} direction -1 to move up, 1 to move down.
+   */
+  function moveQuestion(id, direction) {
+    const currentCard = document.querySelector(`[data-question-id="${id}"]`);
+    if (!currentCard) return;
+
+    const container = document.getElementById('questionsContainer');
+    const cards = Array.from(container.querySelectorAll('.question-card'));
+    const currentIndex = cards.indexOf(currentCard);
+    
+    // Calculate new index
+    let newIndex = currentIndex + direction;
+
+    // Check bounds
+    if (newIndex < 0 || newIndex >= cards.length) {
+        return;
+    }
+
+    const targetCard = cards[newIndex];
+
+    // Swap the DOM elements
+    if (direction === -1) {
+        // Move Up: Insert current card before target card
+        container.insertBefore(currentCard, targetCard);
+    } else if (direction === 1) {
+        // Move Down: Insert current card after target card
+        container.insertBefore(currentCard, targetCard.nextSibling);
+    }
+
+    formChanged = true;
+    updateQuestionCount(); // Re-index all questions
+  }
+
+  
   function addNewQuestion() {
     questionCounter++;
     const container = document.getElementById('questionsContainer');
@@ -280,6 +366,7 @@ Updates:
     document.getElementById('bottomAddButtonWrapper').style.display = 'block';
     
     const tempId = 'new_' + Date.now();
+    const currentQuestionCount = document.querySelectorAll('.question-card').length + 1;
     
     const questionHtml = `
       <div class="question-card" data-question-id="${tempId}">
@@ -288,7 +375,7 @@ Updates:
             <span class="drag-handle">☰</span>
             <div style="flex: 1;">
               <div style="font-weight: var(--font-weight-semibold); color: var(--color-text-primary);">
-                Pregunta #<span class="question-number">${questionCounter}</span>
+                Pregunta #<span class="question-number">${currentQuestionCount}</span>
               </div>
             </div>
             <button type="button" class="btn btn-sm btn-ghost delete-question-btn" onclick="deleteQuestion(event, '${tempId}')">🗑️</button>
@@ -321,7 +408,13 @@ Updates:
             
             <div class="form-group">
               <label class="form-label">Orden</label>
-              <input type="number" name="question_order_${tempId}" class="form-control" value="${questionCounter}" required min="0">
+              <div style="display: flex; gap: var(--space-sm); align-items: center;">
+                <input type="hidden" name="question_order_${tempId}" class="question-order-input" value="${currentQuestionCount}" required min="1">
+                <select name="question_new_order_${tempId}" class="form-control form-control-sm reorder-select" onchange="handleQuickReorder(this)">
+                  </select>
+                <button type="button" class="btn btn-sm btn-secondary move-up-btn" onclick="moveQuestion('${tempId}', -1)" title="Mover Arriba">▲</button>
+                <button type="button" class="btn btn-sm btn-secondary move-down-btn" onclick="moveQuestion('${tempId}', 1)" title="Mover Abajo">▼</button>
+              </div>
             </div>
             
             <div class="form-group" style="grid-column: 1 / -1;">
@@ -350,7 +443,6 @@ Updates:
     `;
     
     container.insertAdjacentHTML('beforeend', questionHtml);
-    updateQuestionCount();
     formChanged = true;
     
     const newCard = container.lastElementChild;
@@ -358,6 +450,7 @@ Updates:
     toggleChoicesSection(select, tempId);
     
     newCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    updateQuestionCount();
   }
   
   function deleteQuestion(event, questionId) {
@@ -395,13 +488,46 @@ Updates:
     );
   }
   
+  /**
+   * Re-indexes all question cards by updating the visible number, the hidden input order,
+   * re-populating the reorder dropdowns, and enabling/disabling the move buttons.
+   */
   function updateQuestionCount() {
-    const count = document.querySelectorAll('.question-card').length;
-    document.querySelectorAll('.question-card').forEach((card, index) => {
-      const numberSpan = card.querySelector('.question-number');
-      if (numberSpan) numberSpan.textContent = index + 1;
+    const cards = document.querySelectorAll('.question-card');
+    const totalCount = cards.length;
+    
+    cards.forEach((card, index) => {
+        const newOrder = index + 1; // 1-based order
+        
+        // 1. Update visible question number in the header
+        const numberSpan = card.querySelector('.question-number');
+        if (numberSpan) numberSpan.textContent = newOrder;
+        
+        // 2. Update hidden order input value (important for submission)
+        const orderInput = card.querySelector('.question-order-input');
+        if (orderInput) orderInput.value = newOrder;
+        
+        // 3. Update/Re-populate the reorder dropdown
+        const reorderSelect = card.querySelector('.reorder-select');
+        if (reorderSelect) {
+            reorderSelect.innerHTML = populateOrderDropdown(newOrder, totalCount);
+        }
+        
+        // 4. Disable Up/Down buttons at boundaries
+        const moveUpBtn = card.querySelector('.move-up-btn');
+        const moveDownBtn = card.querySelector('.move-down-btn');
+
+        if (moveUpBtn) moveUpBtn.disabled = (index === 0);
+        if (moveDownBtn) moveDownBtn.disabled = (index === cards.length - 1);
     });
+    // This maintains the logical consistency of questionCounter for new questions added at the end.
+    questionCounter = totalCount;
   }
+  
+  // Attach logic to handle existing questions loaded by Jinja
+  document.addEventListener('DOMContentLoaded', () => {
+    updateQuestionCount(); 
+  });
   
   document.getElementById('createFormForm').addEventListener('submit', function(e) {
     const cards = document.querySelectorAll('.question-card');
@@ -412,6 +538,7 @@ Updates:
       const typeSelect = card.querySelector(`select[name="question_type_${qId}"]`);
       const optionsTextarea = card.querySelector(`textarea[name="question_options_${qId}"]`);
       
+      // ... (rest of form submission validation and serialization logic remains the same)
       if (typeSelect.value === 'select') {
         const choices = [];
         card.querySelectorAll('.choice-input').forEach(input => {

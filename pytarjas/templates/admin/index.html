@@ -3,8 +3,7 @@
 Admin Dashboard - Main landing page for administrators
 
 Updates:
-- Removed redundant "Gestión de Operaciones" section
-- Kept User Management section for quick access
+- Added cards for Admin and Client user counts.
 #}
 
 {% extends 'base.html' %}
@@ -53,6 +52,21 @@ Updates:
           </div>
         </a>
         
+        {# Admins Card #}
+        <a href="{{ url_for('admin.list_users', role='admin') }}" class="card card-clickable" style="text-decoration: none; color: inherit;">
+          <div class="card-body" style="text-align: center;">
+            <div style="font-size: 2rem; margin-bottom: var(--space-md); color: var(--color-danger);">
+              👑
+            </div>
+            <h3 class="card-title" style="font-size: var(--font-size-base); margin-bottom: var(--space-sm);">
+              Administradores
+            </h3>
+            <div style="font-size: 3rem; font-weight: var(--font-weight-bold); color: var(--color-danger); margin: var(--space-md) 0; line-height: 1;">
+              {{ admin_count }}
+            </div>
+          </div>
+        </a>
+        
         {# Workers Card #}
         <a href="{{ url_for('admin.list_users', role='worker') }}" class="card card-clickable" style="text-decoration: none; color: inherit;">
           <div class="card-body" style="text-align: center;">
@@ -83,12 +97,26 @@ Updates:
           </div>
         </a>
         
+        {# Clients Card #}
+        <a href="{{ url_for('admin.list_users', role='client') }}" class="card card-clickable" style="text-decoration: none; color: inherit;">
+          <div class="card-body" style="text-align: center;">
+            <div style="font-size: 2rem; margin-bottom: var(--space-md); color: var(--color-warning);">
+              🏢
+            </div>
+            <h3 class="card-title" style="font-size: var(--font-size-base); margin-bottom: var(--space-sm);">
+              Clientes
+            </h3>
+            <div style="font-size: 3rem; font-weight: var(--font-weight-bold); color: var(--color-warning); margin: var(--space-md) 0; line-height: 1;">
+              {{ client_count }}
+            </div>
+          </div>
+        </a>
+
       </div>
     </section>
     
     {# ============================================
          USER MANAGEMENT ACTIONS
-         Kept as requested, Operations section removed
          ============================================ #}
     <section>
       <h2 style="margin-bottom: var(--space-lg); color: var(--color-text-primary); display: flex; align-items: center; gap: var(--space-sm);">

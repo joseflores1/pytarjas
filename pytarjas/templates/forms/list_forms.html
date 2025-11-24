@@ -5,6 +5,7 @@ List Forms Page
 Updates:
 - Implemented global 'showConfirm' modal for Form Deactivation
 - Replaced native browser alerts
+- REMOVED 'seal_verification' filter button and display logic.
 #}
 
 {% extends 'base.html' %}
@@ -67,11 +68,7 @@ Updates:
              style="min-width: 140px;">
             📤 Desconsolidado
           </a>
-          <a href="{{ url_for('forms.list_forms', form_type='seal_verification', is_active=is_active_filter) }}" 
-             class="btn {% if form_type_filter == 'seal_verification' %}btn-primary{% else %}btn-secondary{% endif %}"
-             style="min-width: 140px;">
-            🔒 Sello
-          </a>
+          {# REMOVED: Sello Filter Button #}
         </div>
       </div>
       
@@ -119,8 +116,7 @@ Updates:
                 <span class="badge" style="background-color: #3b82f6; color: white;">📦 Consolidado</span>
               {% elif form.form_type == 'desconsolidado' %}
                 <span class="badge" style="background-color: #10b981; color: white;">📤 Desconsolidado</span>
-              {% elif form.form_type == 'seal_verification' %}
-                <span class="badge" style="background-color: #f59e0b; color: white;">🔒 Sello</span>
+              {# REMOVED: elif form.form_type == 'seal_verification' #}
               {% else %}
                 <span class="badge badge-secondary">{{ form.form_type or 'Sin tipo' }}</span>
               {% endif %}

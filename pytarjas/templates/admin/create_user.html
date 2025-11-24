@@ -5,6 +5,9 @@ Create User Page
 Updates:
 - Implemented global 'showConfirm' modal for Cancel action
 - Added form change tracking to prevent accidental data loss
+- REMOVED ability to create 'admin' user from the form
+- UPDATED username validation to allow spaces and Latin characters (tildes)
+- FIXED: Duplicate/Extra button elements introduced by previous changes.
 #}
 
 {% extends 'base.html' %}
@@ -54,16 +57,16 @@ Updates:
               name="username" 
               id="username" 
               class="form-control"
-              placeholder="ej: juan_perez"
+              placeholder="ej: José Flores"
               autocomplete="off"
               required
               minlength="3"
               maxlength="50"
-              pattern="[a-zA-Z0-9_-]+"
-              title="Solo letras, números, guiones y guiones bajos">
+              pattern="[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s_-]+"
+              title="Solo letras, números, espacios, guiones y guiones bajos">
             
             <small class="form-help">
-              Solo letras, números, guiones (-) y guiones bajos (_). Mínimo 3 caracteres.
+              Letras, números, espacios, guiones (-) y guiones bajos (_). Mínimo 3 caracteres.
             </small>
             <div class="invalid-feedback" id="username-feedback"></div>
           </div>
@@ -95,7 +98,7 @@ Updates:
             </label>
             <select name="role" id="role" class="form-select" required>
               <option value="" selected disabled>-- Seleccione un Rol --</option>
-              <option value="admin">👑 Administrador</option>
+              {# Removed Admin option for security #}
               <option value="worker">🔧 Trabajador</option>
               <option value="planner">📋 Planificador</option>
               <option value="client">🏢 Cliente</option>
@@ -357,11 +360,12 @@ Updates:
     function validateUsername() {
       const username = document.getElementById('username');
       const feedback = document.getElementById('username-feedback');
-      const pattern = /^[a-zA-Z0-9_-]+$/;
+      // Updated regex to match the new HTML pattern: [a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s_-]+
+      const pattern = /^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s_-]+$/;
       
       if (username.value.length > 0 && !pattern.test(username.value)) {
         username.classList.add('is-invalid');
-        feedback.textContent = 'Solo se permiten letras, números, guiones y guiones bajos';
+        feedback.textContent = 'Solo se permiten letras, números, espacios, guiones y guiones bajos (incluye tildes)';
         return false;
       } else if (username.value.length > 0 && username.value.length < 3) {
         username.classList.add('is-invalid');

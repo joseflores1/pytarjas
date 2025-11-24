@@ -157,8 +157,8 @@ def get_user(user_id):
             "email": "john@example.com",
             "role": "worker",
             "created_at": "2025-01-20T10:30:00Z",
-            "updated_at": "2025-01-20T10:35:00Z",
-            "login_at": "2025-01-20T14:22:00Z"
+            "updated_at": "2025-01-20T14:22:00Z",
+            "login_at": "2025-01-21T08:15:00Z"
         }
     }
     
@@ -221,7 +221,7 @@ def create_user():
             "username": "john_worker",
             "email": "john@example.com",
             "role": "worker",
-            "created_at": "2025-01-20T10:30:00Z"
+            "updated_at": null
         }
     }
     
@@ -236,7 +236,10 @@ def create_user():
     - Email is provided and unique
     - Password is provided and meets requirements
     - Password confirmation matches (if provided)
-    - Role is valid
+    - Role is valid (Worker, Planner, Client)
+    
+    Security:
+    - Creation of 'admin' role is blocked here for security.
     """
     if request.method == "POST":
         # Extract data based on content type
@@ -265,9 +268,14 @@ def create_user():
             error = "Email is required."
         elif not password:
             error = "Password is required."
-        elif not role or role not in ["worker", "planner", "client"]:
-            error = "Valid role is required."
         
+        # --- SECURITY FIX: Block 'admin' role creation ---
+        # The form only offers worker, planner, client, but we must enforce server-side
+        valid_roles = ["worker", "planner", "client"]
+        if not role or role not in valid_roles:
+            error = "Valid role is required (Worker, Planner, or Client)."
+        # -------------------------------------------------
+
         # Password confirmation validation (if provided)
         elif password_confirm and password != password_confirm:
             error = "Passwords do not match. Please ensure both password fields are identical."
@@ -387,7 +395,7 @@ def edit_user(user_id):
             "username": "john_worker",
             "email": "john.newest@example.com",
             "role": "planner",
-            "updated_at": "2025-01-20T10:35:00Z"
+            "updated_at": "2025-01-21T09:30:00Z"
         }
     }
     
@@ -445,7 +453,7 @@ def edit_user(user_id):
                 error = "Username cannot be empty."
             else:
                 found_by_username = User.query.filter_by(username=username).first()
-                if found_by_username:
+                if found_by_username and found_by_username.id != user.id:
                     error = f"Username {username} is already registered."
                 else:
                     changes.append("username")
@@ -456,14 +464,15 @@ def edit_user(user_id):
                 error = "Email cannot be empty."
             else:
                 found_by_email = User.query.filter_by(email=email).first()
-                if found_by_email:
+                if found_by_email and found_by_email.id != user.id:
                     error = f"Email {email} is already registered."
                 else:
                     changes.append("email")
         
         # Validation: Role (only if changed and allowed)
         if not error and role != user.role:
-            if not role or role not in ["worker", "planner", "client"]:
+            valid_roles = ["admin", "worker", "planner", "client"]
+            if not role or role not in valid_roles:
                 error = "Valid role is required."
             elif str(user.id) == str(g.user.id):
                 error = "You cannot change your own role."
