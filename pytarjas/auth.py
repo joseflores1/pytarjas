@@ -8,6 +8,7 @@ from flask import (
 )
 from datetime import timezone, datetime
 from pytarjas.models.user_models import db, User
+from pytarjas.helper import wants_json # NEW: Import helper for JSON check
 
 # Create blueprint with URL prefix /auth
 bp = Blueprint("auth", __name__, url_prefix="/auth")
@@ -23,8 +24,8 @@ def login():
         if g.user.role == "admin":
             return redirect(url_for("admin.index"))
         if g.user.role == "planner":
-            # Redirect to planner.list_planifications (the root of the planner blueprint)
-            return redirect(url_for("planner.list_planifications"))
+            # FIX: Redirect to the planner role's root index /planner/ 
+            return redirect(url_for("planner.index"))
         if g.user.role == "worker":
             return redirect(url_for("worker.index"))
         if g.user.role == "client":
@@ -81,7 +82,8 @@ def login():
                     if user.role=="worker":
                         return redirect(url_for("worker.index"))
                     if user.role=="planner":
-                        return redirect(url_for("planner.list_planifications"))
+                        # FIX: Redirect to the role's index /planner/ 
+                        return redirect(url_for("planner.index"))
                     if user.role=="client":
                         return redirect(url_for("client.index"))
  
@@ -192,6 +194,29 @@ def admin_required(view):
 
     return wrapped_view
 
+# NEW DECORATOR: user_management_required
+def user_management_required(view):
+    """
+    Decorator to require admin role for user management views.
+    """
+    @wraps(view)
+    def wrapped_view(**kwargs):
+        # FIX: Restrict user management to ONLY "admin" role.
+        if g.user.role != "admin": 
+            # Use wants_json() helper for cleaner checking
+            if wants_json():
+                return jsonify({
+                    "success": False,
+                    "error": "User management privileges required (Admin only)."
+                }), 403
+            else:
+                abort(403)
+
+        return view(**kwargs)
+    
+    return wrapped_view
+
+
 def task_access_required(view):
     """
     Decorator to require task access permissions.
@@ -243,6 +268,30 @@ def assignment_access_required(view):
                 return jsonify({
                     "success": False,
                     "error": "Access denied. Only admins and planners can assign tasks."
+                }), 403
+            else:
+                abort(403)
+        
+        return view(**kwargs)
+    
+    return wrapped_view
+
+# NEW: Add the planning_access_required decorator here
+def planning_access_required(view):
+    """
+    Decorator to require planning access permissions.
+    Prevents workers and clients from accessing planning routes.
+    """
+    
+    @wraps(view)
+    def wrapped_view(**kwargs):
+        # Use g.user.role as the source of truth
+        if g.user.role == "client" or g.user.role == "worker":
+            # Use the imported wants_json helper
+            if wants_json():
+                return jsonify({
+                    "success": False,
+                    "error": "Access denied. Clients and Workers cannot access plannings."
                 }), 403
             else:
                 abort(403)

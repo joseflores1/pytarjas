@@ -1,0 +1,46 @@
+{# pytarjas/templates/planner/list_plannings.html #}
+{% extends 'base.html' %}
+
+{% block title %}Listado de Planificaciones{% endblock %}
+
+{% block header %}
+  <div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-md); margin-top: var(--space-lg); margin-bottom: var(--space-lg);">
+      <div>
+        <h1 style="margin-bottom: var(--space-xs);">📅 Listado de Planificaciones</h1>
+        <p style="color: var(--color-text-secondary); margin-bottom: 0;">
+          Mostrando todas las planificaciones del sistema.
+        </p>
+      </div>
+      <a href="{{ url_for('planner.create_planning') }}" class="btn btn-primary btn-lg">
+        ➕ Crear Nueva Planificación
+      </a>
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <div class="card-body" style="text-align: center; padding: var(--space-3xl);">
+            <div style="font-size: 5rem; margin-bottom: var(--space-lg); opacity: 0.3;">
+                📋
+            </div>
+            <h3 class="card-title" style="font-size: var(--font-size-2xl);">Módulo de Planificaciones</h3>
+            <p class="card-subtitle" style="font-size: var(--font-size-lg); margin-bottom: var(--space-xl);">
+                Esta lista está en construcción. El backend está funcionando, pero el diseño de la tabla y los filtros están pendientes.
+            </p>
+            
+            <div style="margin-top: var(--space-xl); padding: var(--space-md); background-color: var(--color-bg-secondary); border-radius: var(--radius-md);">
+                <span style="color: var(--color-text-primary); font-size: var(--font-size-lg);">
+                    {% if plannings is defined and plannings|length > 0 %}
+                        Backend cargó: <strong style="color: var(--color-primary);">{{ plannings|length }}</strong> planificaciones (Total: {{ total }})
+                    {% else %}
+                        No hay planificaciones para mostrar con los filtros actuales.
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

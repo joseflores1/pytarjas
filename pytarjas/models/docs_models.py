@@ -2,12 +2,12 @@
 """
 Document and form management models for the Pytarjas application.
 
-This module defines models for managing forms, planifications, records, and documents
+This module defines models for managing forms, plannings, records, and documents
 used in the consolidation/deconsolidation tarja process.
 
 The workflow is:
-1. Planner creates a Planification and associates it with a Form
-2. System creates Records (one per row/entry in the planification)
+1. Planner creates a Planning and associates it with a Form
+2. System creates Records (one per row/entry in the planning)
 3. System auto-generates Documents (one per Record, based on the Form)
 4. Workers fill Documents during faenas
 5. System generates PDF tarjas from completed Documents
@@ -33,7 +33,7 @@ class Form(db.Model):
         created_at: When the form was created
         updated_at: Last modification timestamp
         questions: Related Question objects (one-to-many)
-        planifications: Planifications using this form (one-to-many)
+        plannings: Plannings using this form (one-to-many)
         created_by: User who created this form template (many-to-one)
     """
     __tablename__="form"
@@ -88,8 +88,8 @@ class Form(db.Model):
         back_populates="form",
         cascade="all, delete-orphan",
     )
-    planifications: Mapped[list["Planification"]]=relationship(
-        "Planification",
+    plannings: Mapped[list["Planning"]]=relationship(
+        "Planning",
         back_populates="form"
     )
     created_by: Mapped["User"]=relationship(
@@ -180,7 +180,7 @@ class Question(db.Model):
     def __repr__(self):
         return f"<Question: {self.question_text[:50]}... ({self.question_type})>"        
 
-class Planification(db.Model):
+class Planning(db.Model):
     """
     Work planning document created by Planner.
     
@@ -194,15 +194,15 @@ class Planification(db.Model):
         file_name: Original filename - empty if created via UI
         status: Processing status (uploaded, processing, completed, error)
         client_name: Client who requested this work
-        total_documents: Number of documents in this planification (was total_records)
-        created_at: When the planification was created
+        total_documents: Number of documents in this planning (was total_records)
+        created_at: When the planning was created
         updated_at: Last modification timestamp
         planner: Related User (Planner) object (many-to-one)
         form: Related Form object (many-to-one)
         documents: Related Document objects (one-to-many) - CHANGED from records
     """
 
-    __tablename__="planification"
+    __tablename__="planning"
 
     id: Mapped[str]=mapped_column(
         String(36),
@@ -271,17 +271,17 @@ class Planification(db.Model):
     )
     form: Mapped["Form"]=relationship(
         "Form",
-        back_populates="planifications",
+        back_populates="plannings",
     )
     # CHANGED: records â†’ documents (direct relationship now)
     documents: Mapped[list["Document"]]=relationship(
         "Document",
-        back_populates="planification",
+        back_populates="planning",
         cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:
-        return f"<Planification: {self.client_name} - {self.total_documents} documents>"
+        return f"<Planning: {self.client_name} - {self.total_documents} documents>"
 
 
 # RECORD CLASS REMOVED - Its functionality has been merged into Document below
@@ -291,16 +291,16 @@ class Document(db.Model):
     """
     Fillable tarja document for Workers.
     
-    SIMPLIFIED: Now contains task data directly (record_data) and references Planification.
+    SIMPLIFIED: Now contains task data directly (record_data) and references Planning.
     The Record middle layer has been removed for simplicity.
     
     Documents can be created in two ways:
-    1. Batch creation from Planification (planification_id is set)
-    2. Manual creation (planification_id can be NULL)
+    1. Batch creation from Planning (planning_id is set)
+    2. Manual creation (planning_id can be NULL)
     
     Attributes:
         id: Unique identifier (UUID)
-        planification_id: Foreign key to Planification (NULL for manual tasks)
+        planning_id: Foreign key to Planning (NULL for manual tasks)
         form_id: Foreign key to Form (which template to use)
         record_data: JSON containing all task-specific data (merged from Record)
         worker_id: Foreign key to User (Worker who fills it)
@@ -316,7 +316,7 @@ class Document(db.Model):
         is_synced: Whether offline changes are synced
         created_at: When the document was created
         updated_at: Last modification timestamp
-        planification: Related Planification object (many-to-one) - CHANGED from record
+        planning: Related Planning object (many-to-one) - CHANGED from record
         form: Related Form object (many-to-one) - NEW direct relationship
         worker: Related User (Worker) object (many-to-one)
         created_by: Related User object who created this task (many-to-one)
@@ -334,16 +334,16 @@ class Document(db.Model):
         default=lambda: str(uuid.uuid4()),
     )
     
-    # CHANGED: record_id â†’ planification_id (direct reference now)
-    # NULLABLE: Allows manual task creation without planification
-    planification_id: Mapped[str | None] = mapped_column(
+    # CHANGED: record_id â†’ planning_id (direct reference now)
+    # NULLABLE: Allows manual task creation without planning
+    planning_id: Mapped[str | None] = mapped_column(
         String(36),
-        ForeignKey("planification.id", ondelete="CASCADE"),
-        nullable=True,  # NULL = manual task, not from planification
+        ForeignKey("planning.id", ondelete="CASCADE"),
+        nullable=True,  # NULL = manual task, not from planning
         index=True,
     )
     
-    # NEW: Direct reference to Form (was accessed via record.planification.form)
+    # NEW: Direct reference to Form (was accessed via record.planning.form)
     form_id: Mapped[str] = mapped_column(
         String(36),
         ForeignKey("form.id", ondelete="RESTRICT"),
@@ -429,9 +429,9 @@ class Document(db.Model):
         nullable=True,
     )
     
-    # CHANGED: record â†’ planification (direct relationship now)
-    planification: Mapped["Planification"] = relationship(
-        "Planification",
+    # CHANGED: record â†’ planning (direct relationship now)
+    planning: Mapped["Planning"] = relationship(
+        "Planning",
         back_populates="documents",
     )
     

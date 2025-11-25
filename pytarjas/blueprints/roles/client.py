@@ -2,7 +2,7 @@
 """
 Client UI blueprint for read-only access.
 """
-from flask import Blueprint, render_template, g, url_for, redirect
+from flask import Blueprint, url_for, redirect
 from pytarjas.auth import login_required
 
 # Create blueprint with URL prefix /client

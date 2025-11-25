@@ -1,13 +1,13 @@
-{# pytarjas/templates/admin/create_user.html #}
+{# pytarjas/templates/users/create_users.html #}
 {#
-Create User Page
+Create User Page - Moved to agnostic /users/ resource folder
 
 Updates:
 - Implemented global 'showConfirm' modal for Cancel action
 - Added form change tracking to prevent accidental data loss
 - REMOVED ability to create 'admin' user from the form
 - UPDATED username validation to allow spaces and Latin characters (tildes)
-- FIXED: Duplicate/Extra button elements introduced by previous changes.
+- FIXED: All links now point to the correct users.list_users endpoint.
 #}
 
 {% extends 'base.html' %}
@@ -27,7 +27,8 @@ Updates:
           Complete los datos del nuevo usuario del sistema
         </p>
       </div>
-      <a href="{{ url_for('admin.list_users') }}" class="btn btn-secondary" id="headerBackBtn">
+      {# FIX: Link to users.list_users #}
+      <a href="{{ url_for('users.list_users') }}" class="btn btn-secondary" id="headerBackBtn">
         ← Volver al Listado
       </a>
     </div>
@@ -45,7 +46,8 @@ Updates:
       </div>
       
       <div class="card-body">
-        <form method="POST" id="createUserForm" autocomplete="off">
+        {# FIX: Action should point to users.create_user (which defaults to /users/create) #}
+        <form method="POST" action="{{ url_for('users.create_user') }}" id="createUserForm" autocomplete="off">
           
           {# USERNAME #}
           <div class="form-group">
@@ -181,7 +183,8 @@ Updates:
             <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
               ✅ Crear Usuario
             </button>
-            <a href="{{ url_for('admin.list_users') }}" class="btn btn-secondary btn-lg" id="cancelBtn">
+            {# FIX: Link to users.list_users #}
+            <a href="{{ url_for('users.list_users') }}" class="btn btn-secondary btn-lg" id="cancelBtn">
               Cancelar
             </a>
           </div>

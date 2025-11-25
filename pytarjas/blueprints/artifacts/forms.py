@@ -231,7 +231,8 @@ def create_form():
         else:
             flash(error, "error")
     
-    return render_template("forms/create_form.html")
+    # FIX: Corrected template path from "forms/create_form.html" to "forms/create_forms.html"
+    return render_template("forms/create_forms.html")
 
 
 # ============================================================================
@@ -399,7 +400,8 @@ def edit_form(form_id):
             }
         }), 200
     else:
-        return render_template("forms/edit_form.html", form=form)
+        # FIX: Corrected template path from "forms/edit_form.html" to "forms/edit_forms.html"
+        return render_template("forms/edit_forms.html", form=form)
 
 
 # ============================================================================

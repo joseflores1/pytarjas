@@ -1,6 +1,6 @@
 # pytarjas/__init__.py
 import os
-from flask import Flask, redirect, url_for, session, g
+from flask import Flask, redirect, url_for, session
 from .models.user_models import User
 
 def create_app(test_config=None):
@@ -11,9 +11,11 @@ def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
     
     if test_config is None:
+        # FIX: Load configuration dynamically based on FLASK_ENV
         app_env = os.getenv('FLASK_ENV', 'development')
-        config_class = f'config.{app_env.capitalize()}Config'
-        app.config.from_object(config_class)
+        config_class_path = f'config.{app_env.capitalize()}Config'
+        
+        app.config.from_object(config_class_path)
         app.config.from_pyfile('config.py', silent=True)
     else:
         app.config.from_mapping(test_config)
@@ -39,28 +41,29 @@ def create_app(test_config=None):
     with app.app_context():
         db.create_all()
     
-    # Register blueprints
+    # Register blueprints (UPDATED PATHS and REGISTRATION)
     from . import auth
     app.register_blueprint(auth.bp)
     
-    from . import admin
+    # Blueprints from blueprints/roles
+    from .blueprints.roles import admin 
     app.register_blueprint(admin.bp)
-    
-    from . import tasks
-    app.register_blueprint(tasks.bp)
-
-    from . import worker
+    from .blueprints.roles import worker 
     app.register_blueprint(worker.bp)
-
-    from . import forms
-    app.register_blueprint(forms.bp)
-    
-    # NEW/RENAME REGISTRATION
-    from . import planner
+    from .blueprints.roles import planner 
     app.register_blueprint(planner.bp)
-
-    from . import client
+    from .blueprints.roles import client 
     app.register_blueprint(client.bp)
+
+    # Blueprints from blueprints/artifacts
+    from .blueprints.artifacts import tasks 
+    app.register_blueprint(tasks.bp)
+    from .blueprints.artifacts import forms 
+    app.register_blueprint(forms.bp)
+    from .blueprints.artifacts import users 
+    app.register_blueprint(users.bp)
+    from .blueprints.artifacts import plannings # <-- NEW REGISTRATION
+    app.register_blueprint(plannings.bp) # <-- NEW REGISTRATION
 
     # FIX DE SEGURIDAD: DESHABILITAR CACHÉ DEL NAVEGADOR (BFCACHE)
     @app.after_request
@@ -78,12 +81,6 @@ def create_app(test_config=None):
     def index():
         """
         Root route handler.
-        
-        Redirects to:
-        - /admin/ (admin.index)
-        - /planner/ (planner.list_planifications)
-        - /worker/ (worker.index)
-        - /client/ (client.index)
         """
         
         if "user_id" not in session:
@@ -99,11 +96,11 @@ def create_app(test_config=None):
         if user.role == "admin":
             return redirect(url_for("admin.index"))
         elif user.role == "planner":
-            return redirect(url_for("planner.list_planifications")) # Updated endpoint
+            return redirect(url_for("planner.index")) 
         elif user.role == "worker":
             return redirect(url_for("worker.index"))
         elif user.role == "client":
-            return redirect(url_for("client.index")) # New client endpoint
+            return redirect(url_for("client.index")) 
         else:
             session.clear()
             return redirect(url_for("auth.login"))

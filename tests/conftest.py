@@ -94,7 +94,7 @@ def _db(app):
         
         # Begin a transaction (all subsequent DB operations will be part of this)
         transaction = connection.begin() #noqa
-        
+         
         # Create a session factory bound to this connection
         # sessionmaker creates a factory for Session objects
         session_factory = sessionmaker(bind=connection)

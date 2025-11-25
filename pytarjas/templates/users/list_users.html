@@ -1,15 +1,23 @@
-{# pytarjas/templates/admin/list_users.html #}
 {#
 List Users Page
 
 Updates:
+- Template moved from 'admin/' folder to 'users/' resource folder.
+- FIXED: All internal links now use the agnostic 'users' blueprint (e.g., users.list_users).
 - Implemented global 'showConfirm' modal for Delete User action
 - Replaced native browser alerts
+- FIX CRÍTICO: Moved table styling to external file (users_list.css) to fix FOUC and IDE errors.
 #}
 
 {% extends 'base.html' %}
 
 {% block title %}Gestión de Usuarios{% endblock %}
+
+{% block extra_css %}
+{# Link to external CSS file to prevent IDE/Linter parser errors and ensure clean HTML #}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/users_list.css') }}">
+{% endblock %}
+
 
 {% block header %}
   <div class="container">
@@ -24,7 +32,8 @@ Updates:
           {% endif %}
         </p>
       </div>
-      <a href="{{ url_for('admin.create_user') }}" class="btn btn-primary btn-lg">
+      {# FIX: Use users.create_user #}
+      <a href="{{ url_for('users.create_user') }}" class="btn btn-primary btn-lg">
         + Crear Nuevo Usuario
       </a>
     </div>
@@ -38,35 +47,40 @@ Updates:
     <div style="margin-bottom: var(--space-xl);">
       <div style="display: flex; flex-wrap: wrap; gap: var(--space-sm);">
         
-        <a href="{{ url_for('admin.list_users') }}" 
+        {# FIX: Use users.list_users #}
+        <a href="{{ url_for('users.list_users') }}" 
            class="btn {% if not role_filter %}btn-primary{% else %}btn-secondary{% endif %}"
            style="min-width: 120px;">
           <span style="margin-right: var(--space-xs);">👥</span>
           Todos
         </a>
         
-        <a href="{{ url_for('admin.list_users', role='admin') }}" 
+        {# FIX: Use users.list_users #}
+        <a href="{{ url_for('users.list_users', role='admin') }}" 
            class="btn {% if role_filter == 'admin' %}btn-primary{% else %}btn-secondary{% endif %}"
            style="min-width: 120px;">
           <span style="margin-right: var(--space-xs);">👑</span>
           Administradores
         </a>
         
-        <a href="{{ url_for('admin.list_users', role='worker') }}" 
+        {# FIX: Use users.list_users #}
+        <a href="{{ url_for('users.list_users', role='worker') }}" 
            class="btn {% if role_filter == 'worker' %}btn-primary{% else %}btn-secondary{% endif %}"
            style="min-width: 120px;">
           <span style="margin-right: var(--space-xs);">🔧</span>
           Trabajadores
         </a>
         
-        <a href="{{ url_for('admin.list_users', role='planner') }}" 
+        {# FIX: Use users.list_users #}
+        <a href="{{ url_for('users.list_users', role='planner') }}" 
            class="btn {% if role_filter == 'planner' %}btn-primary{% else %}btn-secondary{% endif %}"
            style="min-width: 120px;">
           <span style="margin-right: var(--space-xs);">📋</span>
           Planificadores
         </a>
         
-        <a href="{{ url_for('admin.list_users', role='client') }}" 
+        {# FIX: Use users.list_users #}
+        <a href="{{ url_for('users.list_users', role='client') }}" 
            class="btn {% if role_filter == 'client' %}btn-primary{% else %}btn-secondary{% endif %}"
            style="min-width: 120px;">
           <span style="margin-right: var(--space-xs);">🏢</span>
@@ -166,15 +180,17 @@ Updates:
               <td style="padding: var(--space-md); text-align: center;">
                 <div style="display: flex; gap: var(--space-sm); justify-content: center; flex-wrap: wrap;">
                   
-                  <a href="{{ url_for('admin.edit_user', user_id=user.id) }}" 
+                  {# FIX: Use users.edit_user #}
+                  <a href="{{ url_for('users.edit_user', user_id=user.id) }}" 
                      class="btn btn-sm btn-secondary"
                      title="Editar usuario">
                     ✏️ Editar
                   </a>
                   
                   {% if user.id != g.user.id %}
+                    {# FIX: Use users.delete_user #}
                     <form method="POST" 
-                          action="{{ url_for('admin.delete_user', user_id=user.id) }}" 
+                          action="{{ url_for('users.delete_user', user_id=user.id) }}" 
                           style="display: inline;"
                           class="delete-user-form"
                           data-username="{{ user.username }}">
@@ -228,11 +244,13 @@ Updates:
           </p>
           
           {% if role_filter %}
-            <a href="{{ url_for('admin.list_users') }}" class="btn btn-secondary">
+            {# FIX: Use users.list_users #}
+            <a href="{{ url_for('users.list_users') }}" class="btn btn-secondary">
               Ver Todos los Usuarios
             </a>
           {% else %}
-            <a href="{{ url_for('admin.create_user') }}" class="btn btn-primary">
+            {# FIX: Use users.create_user #}
+            <a href="{{ url_for('users.create_user') }}" class="btn btn-primary">
               + Crear Primer Usuario
             </a>
           {% endif %}
@@ -243,7 +261,9 @@ Updates:
     
   </div>
 
-  {% block extra_js %}
+{% endblock %}
+
+{% block extra_js %}
   <script>
     // Handle Delete Confirmation with custom modal
     document.querySelectorAll('.delete-user-form').forEach(form => {
@@ -267,7 +287,8 @@ Updates:
     document.addEventListener('keydown', function(e) {
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
         e.preventDefault();
-        window.location.href = "{{ url_for('admin.create_user') }}";
+        // FIX: Use users.create_user
+        window.location.href = "{{ url_for('users.create_user') }}";
       }
     });
 
@@ -283,50 +304,4 @@ Updates:
       });
     });
   </script>
-  {% endblock %}
-
-  <style>
-    /* Mobile: Stack table cells vertically */
-    @media (max-width: 767px) {
-      table { display: block; }
-      thead { display: none; }
-      tbody { display: block; }
-      
-      tr {
-        display: block;
-        margin-bottom: var(--space-lg);
-        border: 1px solid var(--color-border) !important;
-        border-radius: var(--radius-md);
-        padding: var(--space-md);
-        background-color: var(--color-bg-primary) !important;
-      }
-      
-      td {
-        display: block;
-        text-align: left !important;
-        padding: var(--space-sm) 0 !important;
-        border-bottom: 1px solid var(--color-border);
-      }
-      
-      td:last-child { border-bottom: none; }
-      
-      /* Add labels before each cell on mobile */
-      td:nth-child(1)::before { content: "Usuario: "; font-weight: bold; }
-      td:nth-child(2)::before { content: "Email: "; font-weight: bold; }
-      td:nth-child(3)::before { content: "Rol: "; font-weight: bold; }
-      td:nth-child(4)::before { content: "Creado: "; font-weight: bold; }
-      td:nth-child(5)::before { content: "Último Login: "; font-weight: bold; }
-      td:nth-child(6)::before { content: "Última Actualización: "; font-weight: bold; }
-      td:nth-child(7)::before { content: "Acciones: "; font-weight: bold; display: block; margin-bottom: var(--space-xs); }
-      
-      /* Action buttons full width on mobile */
-      td:nth-child(7) > div { flex-direction: column; }
-      td:nth-child(7) .btn { width: 100%; }
-    }
-    
-    /* Tablet: Reduce padding */
-    @media (min-width: 768px) and (max-width: 1199px) {
-      th, td { padding: var(--space-sm) !important; font-size: var(--font-size-sm); }
-    }
-  </style>
 {% endblock %}

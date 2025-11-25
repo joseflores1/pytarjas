@@ -1,1 +1,1 @@
-DROP TABLE question, form, document, users, planification CASCADE;
+DROP TABLE question, form, document, users, planning CASCADE;

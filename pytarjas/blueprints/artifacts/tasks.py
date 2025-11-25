@@ -13,10 +13,9 @@ from flask import Blueprint, request, jsonify, render_template, g, abort, redire
 from datetime import datetime, timezone
 from pytarjas.auth import login_required, task_access_required
 from pytarjas.models.user_models import User, db
-from pytarjas.models.docs_models import Document, Planification, Form, Question #noqa
+from pytarjas.models.docs_models import Document, Form
 from pytarjas.helper import wants_json
 import uuid
-from sqlalchemy.orm import joinedload # Explicit import for clarity
 from sqlalchemy import cast, Date, or_ # Explicit import for date filtering
 
 # Create blueprint with URL prefix /tasks
@@ -28,7 +27,7 @@ bp = Blueprint("tasks", __name__, url_prefix="/tasks")
 @task_access_required
 def create_task():
     """
-    Create a standalone task (not from planification).
+    Create a standalone task (not from planning).
     """
     if request.method == "GET":
         # Get active forms
@@ -84,7 +83,7 @@ def create_task():
     # Create the document
     document = Document(
         id=str(uuid.uuid4()),
-        planification_id=None,
+        planning_id=None,
         form_id=form_id,
         record_data={},
         worker_id=worker_id,
@@ -157,7 +156,7 @@ def list_tasks():
     # Build base query
     query = Document.query.options(
         db.joinedload(Document.form).joinedload(Form.questions), # Eagerly load questions for Q&A view
-        db.joinedload(Document.planification),
+        db.joinedload(Document.planning),
         db.joinedload(Document.worker),
         db.joinedload(Document.created_by) # Load created_by for the table
     )
@@ -325,7 +324,7 @@ def list_tasks():
 def get_task(task_id):
     document = Document.query.options(
         db.joinedload(Document.form).joinedload(Form.questions),
-        db.joinedload(Document.planification),
+        db.joinedload(Document.planning),
         db.joinedload(Document.worker)
     ).filter_by(id=task_id).first()  
 

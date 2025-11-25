@@ -1,101 +1,63 @@
-# pytarjas/planner.py
+# pytarjas/plannings.py
 """
-Planner blueprint for managing work planifications and documents.
+Plannings API blueprint for managing work plannings and documents.
+
+This module defines the resource-centric endpoints /plannings/, /plannings/create, etc.
 """
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for, jsonify, g, abort, current_app
+from flask import Blueprint, flash, redirect, render_template, request, url_for, jsonify, g, abort 
 from sqlalchemy.orm import joinedload
 from datetime import datetime, timezone
 import uuid
-from functools import wraps
-from sqlalchemy import cast, Date, or_
 
 # Import database and models
 from pytarjas.models.user_models import db, User
-from pytarjas.models.docs_models import Planification, Document, Form, Question 
+from pytarjas.models.docs_models import Planning, Document, Form   
 
 # Import authentication decorators
-from pytarjas.auth import login_required
+from pytarjas.auth import login_required, planning_access_required
 
 # Import helper functions
 from pytarjas.helper import wants_json
 
-# Create blueprint with URL prefix /planner
-bp = Blueprint("planner", __name__, url_prefix="/planner")
+# FIX: Define blueprint for the resource (plannings) with its name/prefix
+bp = Blueprint("plannings", __name__, url_prefix="/plannings")
 
 
 # ============================================================================
-# DECORATOR HELPERS
+# DECORATOR HELPERS (Kept for check_planning_access logic)
 # ============================================================================
 
-def check_planification_access(planification_id: str) -> Planification:
+def check_planning_access(planning_id: str) -> Planning:
     """
-    Check if current user has access to a planification and return it.
+    Check if current user has access to a planning and return it.
     """
-    planification = Planification.query.options(
-        joinedload(Planification.planner),
-        joinedload(Planification.form),
-        joinedload(Planification.documents)
-    ).get_or_404(planification_id)
+    planning = Planning.query.options(
+        joinedload(Planning.planner),
+        joinedload(Planning.form),
+        joinedload(Planning.documents)
+    ).get_or_404(planning_id)
     
     if g.user.role == "admin":
-        return planification
+        return planning
     
-    elif g.user.role == "planner" and g.user.id == planification.planner_id:
-        return planification
+    elif g.user.role == "planner" and g.user.id == planning.planner_id:
+        return planning
     
     else:
         abort(403)
 
 
-def planification_access_required(view):
-    """
-    Decorator to require planification access permissions.
-    """
-    
-    @wraps(view)
-    def wrapped_view(**kwargs):
-        if g.user.role == "client" or g.user.role == "worker":
-            if wants_json():
-                return jsonify({
-                    "success": False,
-                    "error": "Access denied. Clients cannot access planifications."
-                }), 403
-            else:
-                abort(403)
-        
-        return view(**kwargs)
-    
-    return wrapped_view
-
-
 # ============================================================================
-# ROUTE: Homepage/Dashboard (Placeholder)
+# ROUTE: List all plannings (The resource index: GET /plannings/)
 # ============================================================================
 
-@bp.route("/") # NEW: The root /planner/ is now the homepage
+@bp.route("/", methods=["GET"]) # FIX: Map to root /
 @login_required
-def index():
+@planning_access_required
+def list_plannings():
     """
-    Planner Dashboard - Placeholder page.
-    """
-    if wants_json():
-         return jsonify({"success": True, "message": "Planner Dashboard accessed"}), 200
-    
-    # Renders the new placeholder template
-    return render_template("planner/index.html", user=g.user)
-
-
-# ============================================================================
-# ROUTE: List all planifications (The actual list content)
-# ============================================================================
-
-@bp.route("/list") 
-@login_required
-@planification_access_required
-def list_planifications():
-    """
-    List all planifications (Actual list page).
+    List all plannings (The default view for /plannings/).
     """
     status_filter = request.args.get('status', 'all')
     planner_id_filter = request.args.get('planner_id')
@@ -105,35 +67,35 @@ def list_planifications():
     limit = min(int(request.args.get('limit', 50)), 100)
     offset = int(request.args.get('offset', 0))
     
-    query = Planification.query.options(
-        joinedload(Planification.planner),
-        joinedload(Planification.form),
-        joinedload(Planification.documents)
+    query = Planning.query.options(
+        joinedload(Planning.planner),
+        joinedload(Planning.form),
+        joinedload(Planning.documents)
     )
     
     if status_filter != 'all':
-        query = query.filter(Planification.status == status_filter)
+        query = query.filter(Planning.status == status_filter)
     
     if planner_id_filter and g.user.role in ['admin', 'planner']:
-        query = query.filter(Planification.planner_id == planner_id_filter)
+        query = query.filter(Planning.planner_id == planner_id_filter)
     
     if client_name_search:
-        query = query.filter(Planification.client_name.ilike(f'%{client_name_search}%'))
+        query = query.filter(Planning.client_name.ilike(f'%{client_name_search}%'))
     
     if form_type_filter:
         query = query.join(Form).filter(Form.form_type == form_type_filter)
     
     if form_id_filter:
-        query = query.filter(Planification.form_id == form_id_filter)
+        query = query.filter(Planning.form_id == form_id_filter)
 
     total = query.count()
     
-    planifications = query.order_by(
-        Planification.created_at.desc()
+    plannings = query.order_by(
+        Planning.created_at.desc()
     ).offset(offset).limit(limit).all()
     
-    planifications_data = []
-    for plan in planifications:
+    plannings_data = []
+    for plan in plannings:
         completed_docs = sum(
             1 for doc in plan.documents 
             if doc.status == 'completed'
@@ -153,14 +115,14 @@ def list_planifications():
             } if plan.planner else None,
             "created_at": plan.created_at.isoformat() if plan.created_at else None,
             "updated_at": plan.updated_at.isoformat() if plan.updated_at else None,
-            "_planification": plan
+            "_planning": plan
         }
-        planifications_data.append(plan_dict)
+        plannings_data.append(plan_dict)
     
     if wants_json():
         return jsonify({
             "success": True,
-            "planifications": planifications_data,
+            "plannings": plannings_data,
             "total": total,
             "limit": limit,
             "offset": offset,
@@ -180,8 +142,8 @@ def list_planifications():
     form_types = [ft[0] for ft in form_types if ft[0]]
     
     return render_template(
-        "planner/list_planifications.html", # FIX TEMPLATE PATH
-        planifications=planifications_data,
+        "planner/list_plannings.html",
+        plannings=plannings_data,
         total=total,
         limit=limit,
         offset=offset,
@@ -196,17 +158,17 @@ def list_planifications():
 
 
 # ============================================================================
-# ROUTE: Get single planification with details (Remaining routes adjusted)
+# ROUTE: Get single planning with details (GET /plannings/<id>)
 # ============================================================================
 
-@bp.route("/<planification_id>", methods=["GET"])
+@bp.route("/<planning_id>", methods=["GET"])
 @login_required
-@planification_access_required
-def get_planification(planification_id):
-    planification = check_planification_access(planification_id)
+@planning_access_required
+def get_planning(planning_id):
+    planning = check_planning_access(planning_id)
     
     progress = {
-        "total": planification.total_documents,
+        "total": planning.total_documents,
         "pending": 0,
         "in_progress": 0,
         "completed": 0,
@@ -214,7 +176,7 @@ def get_planification(planification_id):
         "approved": 0
     }
     
-    for document in planification.documents:
+    for document in planning.documents:
         status = document.status
         if status in progress:
             progress[status] += 1
@@ -222,7 +184,7 @@ def get_planification(planification_id):
             progress["pending"] += 1
     
     documents_data = []
-    for document in planification.documents:
+    for document in planning.documents:
         doc_dict = {
             "id": document.id,
             "record_data": document.record_data,
@@ -242,17 +204,17 @@ def get_planification(planification_id):
     if wants_json():
         return jsonify({
             "success": True,
-            "planification": {
-                "id": planification.id,
-                "client_name": planification.client_name,
-                "status": planification.status,
-                "total_documents": planification.total_documents,
-                "file_name": planification.file_name if planification.file_name else None,
+            "planning": {
+                "id": planning.id,
+                "client_name": planning.client_name,
+                "status": planning.status,
+                "total_documents": planning.total_documents,
+                "file_name": planning.file_name if planning.file_name else None,
                 "form": {
-                    "id": planification.form.id,
-                    "name": planification.form.name,
-                    "form_type": planification.form.form_type,
-                    "description": planification.form.description,
+                    "id": planning.form.id,
+                    "name": planning.form.name,
+                    "form_type": planning.form.form_type,
+                    "description": planning.form.description,
                     "questions": [
                         {
                             "id": q.id,
@@ -262,24 +224,25 @@ def get_planification(planification_id):
                             "order": q.order,
                             "options": q.options
                         }
-                        for q in sorted(planification.form.questions, key=lambda x: x.order)
+                        for q in sorted(planning.form.questions, key=lambda x: x.order)
                     ]
-                } if planification.form else None,
+                } if planning.form else None,
                 "documents": documents_data,
                 "planner": {
-                    "id": planification.planner.id,
-                    "username": planification.planner.username,
-                    "email": planification.planner.email
-                } if planification.planner else None,
+                    "id": planning.planner.id,
+                    "username": planning.planner.username,
+                    "email": planning.planner.email
+                } if planning.planner else None,
                 "progress": progress,
-                "created_at": planification.created_at.isoformat() if planification.created_at else None,
-                "updated_at": planification.updated_at.isoformat() if planification.updated_at else None
+                "created_at": planning.created_at.isoformat() if planning.created_at else None,
+                "updated_at": planning.updated_at.isoformat() if planning.updated_at else None
             }
         }), 200
     
+    # NOTE: This uses the existing placeholder template name
     return render_template(
-        "planner/view_planification.html", # FIX TEMPLATE PATH
-        planification=planification,
+        "planner/view_planning.html",
+        planning=planning,
         documents=documents_data,
         progress=progress,
         user=g.user
@@ -287,20 +250,21 @@ def get_planification(planification_id):
 
 
 # ============================================================================
-# ROUTE: Create new planification
+# ROUTE: Create new planning (GET/POST /plannings/create)
 # ============================================================================
 
 @bp.route("/create", methods=["GET", "POST"])
 @login_required
-@planification_access_required
-def create_planification():
+@planning_access_required
+def create_planning():
     if g.user.role not in ['planner', 'admin']:
-        error_msg = "Access denied. Only planners and admins can create planifications."
+        error_msg = "Access denied. Only planners and admins can create plannings."
         if wants_json():
             return jsonify({"success": False, "error": error_msg}), 403
         else:
             flash(error_msg, "error")
-            return redirect(url_for("planner.list_planifications"))
+            # FIX: Redirect to the resource index
+            return redirect(url_for("plannings.list_plannings"))
     
     if request.method == "GET":
         if wants_json():
@@ -320,7 +284,7 @@ def create_planification():
         else:
             active_forms = Form.query.filter_by(is_active=True).order_by(Form.name).all()
             return render_template(
-                "planner/create_planification.html", # FIX TEMPLATE PATH
+                "planner/create_planning.html",
                 forms=active_forms,
                 user=g.user
             )
@@ -373,7 +337,7 @@ def create_planification():
     
     if error is None:
         try:
-            planification = Planification(
+            planning = Planning(
                 id=str(uuid.uuid4()),
                 planner_id=g.user.id,
                 form_id=form_id,
@@ -384,13 +348,13 @@ def create_planification():
                 file_name="",
                 created_at=datetime.now(timezone.utc)
             )
-            db.session.add(planification)
+            db.session.add(planning)
             
             created_documents = []
             for record_data in records_data:
                 document = Document(
                     id=str(uuid.uuid4()),
-                    planification_id=planification.id,
+                    planning_id=planning.id,
                     form_id=form_id,
                     record_data=record_data,
                     created_by_id=g.user.id,
@@ -404,35 +368,36 @@ def create_planification():
                 db.session.add(document)
                 created_documents.append(document)
             
-            planification.total_documents = len(records_data)
-            planification.status = "completed"
-            planification.updated_at = datetime.now(timezone.utc)
+            planning.total_documents = len(records_data)
+            planning.status = "completed"
+            planning.updated_at = datetime.now(timezone.utc)
             
             db.session.commit()
             
             success_message = (
-                f"Planification created successfully with {len(records_data)} documents."
+                f"Planning created successfully with {len(records_data)} documents."
             )
             
             if wants_json():
                 return jsonify({
                     "success": True,
                     "message": success_message,
-                    "planification": {
-                        "id": planification.id,
-                        "client_name": planification.client_name,
-                        "total_documents": planification.total_documents,
-                        "status": planification.status,
-                        "created_at": planification.created_at.isoformat()
+                    "planning": {
+                        "id": planning.id,
+                        "client_name": planning.client_name,
+                        "total_documents": planning.total_documents,
+                        "status": planning.status,
+                        "created_at": planning.created_at.isoformat()
                     }
                 }), 201
             else:
                 flash(success_message, "success")
-                return redirect(url_for("planner.get_planification", planification_id=planification.id))
+                # FIX: Use correct endpoint name for redirect
+                return redirect(url_for("plannings.get_planning", planning_id=planning.id))
         
         except Exception as e:
             db.session.rollback()
-            error = f"An error occurred while creating planification: {str(e)}"
+            error = f"An error occurred while creating planning: {str(e)}"
     
     if wants_json():
         return jsonify({
@@ -443,7 +408,7 @@ def create_planification():
         flash(error, "error")
         active_forms = Form.query.filter_by(is_active=True).order_by(Form.name).all()
         return render_template(
-            "planner/create_planification.html", # FIX TEMPLATE PATH
+            "planner/create_planning.html",
             forms=active_forms,
             user=g.user,
             error=error
@@ -451,38 +416,40 @@ def create_planification():
 
 
 # ============================================================================
-# ROUTE: Delete planification
+# ROUTE: Delete planning (POST/DELETE /plannings/<id>/delete)
 # ============================================================================
 
-@bp.route("/<planification_id>/delete", methods=["POST", "DELETE"])
+@bp.route("/<planning_id>/delete", methods=["POST", "DELETE"])
 @login_required
-@planification_access_required
-def delete_planification(planification_id):
+@planning_access_required
+def delete_planning(planning_id):
     if g.user.role not in ['planner', 'admin']:
-        error_msg = "Access denied. Only planners and admins can delete planifications."
+        error_msg = "Access denied. Only planners and admins can delete plannings."
         if wants_json():
             return jsonify({"success": False, "error": error_msg}), 403
         else:
             flash(error_msg, "error")
-            return redirect(url_for("planner.list_planifications"))
+            # FIX: Redirect to the resource index
+            return redirect(url_for("plannings.list_plannings"))
     
-    planification = check_planification_access(planification_id)
+    planning = check_planning_access(planning_id)
     
-    if g.user.role == 'planner' and planification.planner_id != g.user.id:
-        error_msg = "Access denied. You can only delete planifications you created."
+    if g.user.role == 'planner' and planning.planner_id != g.user.id:
+        error_msg = "Access denied. You can only delete plannings you created."
         if wants_json():
             return jsonify({"success": False, "error": error_msg}), 403
         else:
             flash(error_msg, "error")
-            return redirect(url_for("planner.list_planifications"))
+            # FIX: Redirect to the resource index
+            return redirect(url_for("plannings.list_plannings"))
     
     try:
-        planification.status = "deleted"
-        planification.updated_at = datetime.now(timezone.utc)
+        planning.status = "deleted"
+        planning.updated_at = datetime.now(timezone.utc)
         
         db.session.commit()
         
-        success_message = f"Planification '{planification.client_name}' deleted successfully."
+        success_message = f"Planning '{planning.client_name}' deleted successfully."
         
         if wants_json():
             return jsonify({
@@ -491,7 +458,8 @@ def delete_planification(planification_id):
             }), 200
         else:
             flash(success_message, "success")
-            return redirect(url_for("planner.list_planifications"))
+            # FIX: Redirect to the resource index
+            return redirect(url_for("plannings.list_plannings"))
     
     except Exception as e:
         db.session.rollback()
@@ -504,17 +472,18 @@ def delete_planification(planification_id):
             }), 500
         else:
             flash(error_message, "error")
-            return redirect(url_for("planner.list_planifications"))
+            # FIX: Redirect to the resource index
+            return redirect(url_for("plannings.list_plannings"))
 
 
 # ============================================================================
-# ROUTE: Update planification status
+# ROUTE: Update planning status (PUT/PATCH /plannings/<id>/status)
 # ============================================================================
 
-@bp.route("/<planification_id>/status", methods=["PUT", "PATCH"])
+@bp.route("/<planning_id>/status", methods=["PUT", "PATCH"])
 @login_required
-@planification_access_required
-def update_planification_status(planification_id):
+@planning_access_required
+def update_planning_status(planning_id):
     if g.user.role not in ['planner', 'admin']:
         return jsonify({
             "success": False,
@@ -527,7 +496,7 @@ def update_planification_status(planification_id):
             "error": "This endpoint only accepts JSON requests."
         }), 400
     
-    planification = check_planification_access(planification_id)
+    planning = check_planning_access(planning_id)
     
     data = request.get_json()
     new_status = data.get("status")
@@ -540,19 +509,19 @@ def update_planification_status(planification_id):
         }), 400
     
     try:
-        old_status = planification.status
-        planification.status = new_status
-        planification.updated_at = datetime.now(timezone.utc)
+        old_status = planning.status
+        planning.status = new_status
+        planning.updated_at = datetime.now(timezone.utc)
         
         db.session.commit()
         
         return jsonify({
             "success": True,
             "message": f"Status updated from '{old_status}' to '{new_status}'.",
-            "planification": {
-                "id": planification.id,
-                "status": planification.status,
-                "updated_at": planification.updated_at.isoformat()
+            "planning": {
+                "id": planning.id,
+                "status": planning.status,
+                "updated_at": planning.updated_at.isoformat()
             }
         }), 200
     

@@ -15,7 +15,7 @@ Fixtures are defined at the module level for user model testing.
 
 import pytest
 from datetime import datetime 
-from pytarjas.models.user_models import db, User, Admin, Worker, Planner, Client #noqa
+from pytarjas.models.user_models import User, Admin, Worker, Planner, Client 
 from helper import is_valid_uuid4
 from werkzeug.security import generate_password_hash
 from sqlalchemy.exc import SAWarning, IntegrityError

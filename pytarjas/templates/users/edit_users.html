@@ -1,0 +1,188 @@
+{# pytarjas/templates/users/edit_users.html #}
+{% extends 'base.html' %}
+
+{% block title %}Editar Usuario: {{ user.username }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* AGGRESSIVE INLINE STYLES FOR CONSISTENT APPEARANCE ACROSS THEMES */
+    
+    /* Layout */
+    .form-group { margin-bottom: var(--space-lg); }
+    .form-row { display: flex; gap: var(--space-lg); }
+    .form-row > * { flex: 1; }
+    .card { padding: 0 !important; }
+
+    /* Core Form Elements: These styles are typically found in forms.css and ensure inputs look correct. */
+    label {
+        display: block;
+        font-weight: var(--font-weight-medium);
+        margin-bottom: var(--space-xs);
+        color: var(--color-text-secondary); /* Use secondary text color */
+        font-size: var(--font-size-sm);
+    }
+    
+    input[type="text"], 
+    input[type="email"], 
+    input[type="password"], 
+    select {
+        width: 100%;
+        padding: var(--space-md);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        background-color: var(--color-bg-input, var(--color-bg-secondary)); /* Use input background variable */
+        color: var(--color-text-primary);
+        font-size: var(--font-size-base);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        box-sizing: border-box;
+    }
+    
+    input[type="text"]:focus, 
+    input[type="email"]:focus, 
+    input[type="password"]:focus, 
+    select:focus {
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 2px var(--color-primary-light);
+        outline: none;
+    }
+    
+    /* ALERT WARNING FIX (Visibility in Dark Mode) */
+    .alert-warning { 
+        padding: var(--space-md); 
+        border-radius: var(--radius-md); 
+        margin-bottom: var(--space-lg); 
+        font-weight: var(--font-weight-semibold);
+
+        /* Light Mode Default: Using explicit, visible colors */
+        background-color: #ffda79; 
+        color: #724300;           
+        border: 1px solid #ffbe0b;
+    }
+
+    [data-theme="dark"] .alert-warning {
+        /* Dark Mode Override: High contrast for dark background */
+        background-color: #ff9f00; /* Bright orange background */
+        color: var(--color-text-primary); /* Light text */
+        border-color: #f7a73a;
+    }
+
+    /* Responsive adjustments for form-row */
+    @media (max-width: 600px) {
+        .form-row {
+            flex-direction: column;
+            gap: 0;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block header %}
+<div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-md); margin-top: var(--space-lg); margin-bottom: var(--space-lg);">
+        <div>
+            <a href="{{ url_for('users.list_users') }}" class="btn btn-secondary" id="headerBackBtn">
+                ← Volver a Usuarios
+            </a>
+            <h1 style="margin-bottom: var(--space-xs); margin-top: var(--space-md);">Editar Usuario: {{ user.username }}</h1>
+            <p style="color: var(--color-text-secondary); margin-bottom: 0;">ID: {{ user.id }} | Rol Actual: <strong>{{ user.role | capitalize }}</strong></p>
+        </div>
+        <div>
+            <form method="POST" action="{{ url_for('users.delete_user', user_id=user.id) }}" style="display: inline;" class="delete-user-form">
+                <button type="submit" class="btn btn-danger btn-lg" {% if user.id == g.user.id %}disabled title="No puedes eliminar tu propia cuenta"{% elif user.role == 'admin' %}disabled title="No puedes eliminar a otro administrador"{% endif %}>
+                    🗑️ Eliminar Usuario
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    
+    <div class="card" style="max-width: 800px; margin: 0 auto;">
+        
+        <form method="post" action="{{ url_for('users.edit_user', user_id=user.id) }}" style="padding: var(--space-2xl);">
+            
+            <div class="alert-warning" style="margin-bottom: var(--space-lg);">
+                ⚠️ Advertencia: El rol de **Administrador** no se puede modificar ni asignar por seguridad. Los campos de contraseña se dejan vacíos si no deseas cambiarlos.
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="username">Nombre de Usuario</label>
+                    <input type="text" id="username" name="username" value="{{ user.username }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" value="{{ user.email }}" required>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group" style="flex: 2;">
+                    <label for="role">Rol</label>
+                    <select id="role" name="role" required {% if user.id == g.user.id %}disabled{% endif %}>
+                        {# UX/SECURITY FIX: If the user is an Admin, only display and select the disabled Admin option #}
+                        {% if user.role == 'admin' %}
+                            <option value="admin" selected>👑 Administrador (Rol Fijo)</option>
+                        {% else %}
+                            <option value="planner" {% if user.role == 'planner' %}selected{% endif %}>📋 Planificador</option>
+                            <option value="worker" {% if user.role == 'worker' %}selected{% endif %}>🔧 Trabajador</option>
+                            <option value="client" {% if user.role == 'client' %}selected{% endif %}>🏢 Cliente</option>
+                        {% endif %}
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    {# Hidden field to ensure role is passed if the select is disabled (for self-edit or admin-edit) #}
+                    {% if user.id == g.user.id %}
+                        <input type="hidden" name="role" value="{{ user.role }}">
+                    {% endif %}
+                </div>
+            </div>
+            
+            <h2>Cambiar Contraseña (Opcional)</h2>
+            <p style="color: var(--color-text-secondary); margin-bottom: var(--space-lg);">Solo rellena estos campos si deseas cambiar la contraseña de {{ user.username }}.</p>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="password">Nueva Contraseña</label>
+                    <input type="password" id="password" name="password" placeholder="Dejar vacío para no cambiar">
+                </div>
+                <div class="form-group">
+                    <label for="password_confirm">Confirmar Nueva Contraseña</label>
+                    <input type="password" id="password_confirm" name="password_confirm" placeholder="Dejar vacío para no cambiar">
+                </div>
+            </div>
+
+            <div style="text-align: right; margin-top: var(--space-xl);">
+                <button type="submit" class="btn btn-primary btn-lg">Guardar Cambios</button>
+            </div>
+        </form>
+    </div>
+    
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // JS for Delete Confirmation (copied from list_users.html)
+    document.querySelectorAll('.delete-user-form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const username = '{{ user.username }}';
+            
+            showConfirm(
+                `¿Está seguro que desea eliminar al usuario "${username}"?\n\nEsta acción no se puede deshacer y eliminará todos los datos asociados.`,
+                () => {
+                    this.submit();
+                },
+                'Eliminar Usuario',
+                'Sí, eliminar',
+                'danger'
+            );
+        });
+    });
+</script>
+{% endblock %}

@@ -15,7 +15,8 @@
             </p>
             
             <div style="display: flex; justify-content: center; gap: var(--space-lg); flex-wrap: wrap;">
-                <a href="{{ url_for('planner.list_planifications') }}" class="btn btn-primary btn-lg">
+                {# FIX: Link to the new plannings resource endpoint (List) #}
+                <a href="{{ url_for('plannings.list_plannings') }}" class="btn btn-primary btn-lg">
                     📅 Ver Planificaciones
                 </a>
                 <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary btn-lg">
@@ -23,6 +24,10 @@
                 </a>
                 <a href="{{ url_for('forms.list_forms') }}" class="btn btn-secondary btn-lg">
                     📝 Gestionar Formularios
+                </a>
+                {# ADD: Link to the agnostic Users resource endpoint #}
+                <a href="{{ url_for('users.list_users') }}" class="btn btn-secondary btn-lg">
+                    👥 Gestionar Usuarios
                 </a>
             </div>
         {% else %}
