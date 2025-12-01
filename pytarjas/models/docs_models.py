@@ -105,6 +105,7 @@ class Question(db.Model):
         id: Unique identifier (UUID)
         form_id: Foreign key to parent Form
         question_text: The question to display to the worker
+        question_description: Detailed helper text shown below the question (NEW)
         question_type: Type of input (text, number, datetime, photo, select, file)
         is_required: Whether this question must be answered
         order: Display order within the form (lower numbers first)
@@ -142,6 +143,13 @@ class Question(db.Model):
         String(500),
         nullable=False,
     )
+    
+    # NEW FIELD: Description for the question
+    question_description: Mapped[str | None]=mapped_column(
+        Text,
+        nullable=True,
+    )
+    
     question_type: Mapped[str]=mapped_column(
         String(50),
         nullable=False,
@@ -248,7 +256,7 @@ class Planning(db.Model):
         index=True,
     )
     
-    # RENAMED: total_records â†’ total_documents (more accurate now)
+    # RENAMED: total_records → total_documents (more accurate now)
     total_documents: Mapped[int]=mapped_column(
         Integer,
         nullable=False,
@@ -273,7 +281,7 @@ class Planning(db.Model):
         "Form",
         back_populates="plannings",
     )
-    # CHANGED: records â†’ documents (direct relationship now)
+    # CHANGED: records → documents (direct relationship now)
     documents: Mapped[list["Document"]]=relationship(
         "Document",
         back_populates="planning",
@@ -334,7 +342,7 @@ class Document(db.Model):
         default=lambda: str(uuid.uuid4()),
     )
     
-    # CHANGED: record_id â†’ planning_id (direct reference now)
+    # CHANGED: record_id → planning_id (direct reference now)
     # NULLABLE: Allows manual task creation without planning
     planning_id: Mapped[str | None] = mapped_column(
         String(36),
@@ -429,7 +437,7 @@ class Document(db.Model):
         nullable=True,
     )
     
-    # CHANGED: record â†’ planning (direct relationship now)
+    # CHANGED: record → planning (direct relationship now)
     planning: Mapped["Planning"] = relationship(
         "Planning",
         back_populates="documents",

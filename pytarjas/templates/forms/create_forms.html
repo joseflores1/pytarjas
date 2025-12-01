@@ -249,15 +249,23 @@ Updates:
     const choicesContainer = document.getElementById(`choices_container_${questionId}`);
     const optionsTextarea = document.getElementById(`options_wrapper_${questionId}`);
     
+    // Logic for Select type (uses visual builder)
     if (selectElement.value === 'select') {
       choicesContainer.style.display = 'block';
-      optionsTextarea.style.display = 'none';
+      optionsTextarea.style.display = 'none'; // Keep raw options visible as an advanced setting
       
       const list = document.getElementById(`choices_list_${questionId}`);
       if (list.children.length === 0) {
         addChoiceInput(questionId);
       }
-    } else {
+    } 
+    // New Logic for Client Select type (no options/choices needed)
+    else if (selectElement.value === 'client_select') {
+        choicesContainer.style.display = 'none';
+        optionsTextarea.style.display = 'none';
+    }
+    // Logic for other types (uses raw JSON options)
+    else {
       choicesContainer.style.display = 'none';
       optionsTextarea.style.display = 'block';
     }
@@ -391,6 +399,12 @@ Updates:
               <input type="text" name="question_text_${tempId}" class="form-control" required placeholder="Ej: ¿Número de contenedor?">
             </div>
             
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label class="form-label">Descripción de la Pregunta (Opcional)</label>
+              <textarea name="question_description_${tempId}" class="form-control" rows="2" placeholder="Ej: Registrar el valor del sello que se encuentra en la puerta."></textarea>
+              <small class="form-help">Este texto aparecerá bajo la pregunta en el formulario de campo.</small>
+            </div>
+
             <div class="form-group">
               <label class="form-label">Tipo de Pregunta <span style="color: var(--color-danger);">*</span></label>
               <select name="question_type_${tempId}" class="form-control" required onchange="toggleChoicesSection(this, '${tempId}')">
@@ -403,6 +417,7 @@ Updates:
                 <option value="boolean">✓ Sí/No (Radio)</option>
                 <option value="select">📋 Selección Múltiple</option>
                 <option value="file">📁 Archivo</option>
+                <option value="client_select">🏢 Selector de Cliente</option>
               </select>
             </div>
             
@@ -559,6 +574,10 @@ Updates:
         
         existingOpts.choices = choices;
         optionsTextarea.value = JSON.stringify(existingOpts);
+      } 
+      // NEW LOGIC: Ensure options are explicitly cleared for client_select upon submission
+      else if (typeSelect.value === 'client_select') {
+          optionsTextarea.value = '';
       }
     });
 

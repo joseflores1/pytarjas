@@ -279,6 +279,8 @@ def edit_user(user_id):
                 # CRITICAL FIX STEP 1: Store ID before commit invalidates the object
                 current_user_id = user.id
                 
+                is_self_edit = str(user.id) == str(g.user.id)
+
                 db.session.commit()
                 
                 # CRITICAL FIX STEP 2: Expunge the stale object and re-fetch it to resolve DetachedInstanceError
@@ -287,6 +289,10 @@ def edit_user(user_id):
                 
                 # CRITICAL FIX STEP 3: Re-fetch the fresh object using the stored ID
                 user = User.query.get(current_user_id) 
+                
+                # NEW FIX: If current user was edited, ensure g.user points to the fresh object
+                if is_self_edit:
+                    g.user = user 
                 
                 user_data = {
                     "id": user.id,
@@ -324,6 +330,7 @@ def edit_user(user_id):
                 if request.is_json:
                     return jsonify({"success": False, "error": error}), 500
                 else:
+                    
                     flash(error, "error")
                     return render_template("users/edit_users.html", user=user)
 

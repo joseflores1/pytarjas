@@ -1,4 +1,4 @@
-# pytarjas/tasks.py
+# pytarjas/blueprints/artifacts/tasks.py
 """
 Tasks API blueprint for managing documents/tasks.
 
@@ -6,7 +6,7 @@ Updates:
 - Implemented enhanced filtering options for all common fields (timestamps, sync status, form name).
 - Added override edit permission for Admin/Planner roles in get_task and update_task.
 - Included full response data and form structure in list_tasks output for table view.
-- RE-INTRODUCED all synchronization-related fields (is_synced, synced_at) into list_tasks.
+- RE-INTRODUCED all synchronization-related fields and filters.
 """
 
 from flask import Blueprint, request, jsonify, render_template, g, abort, redirect, url_for, flash
@@ -14,9 +14,10 @@ from datetime import datetime, timezone
 from pytarjas.auth import login_required, task_access_required
 from pytarjas.models.user_models import User, db
 from pytarjas.models.docs_models import Document, Form
-from pytarjas.helper import wants_json
+from pytarjas.helper import wants_json, save_file_to_disk # Correct helper imports
 import uuid
 from sqlalchemy import cast, Date, or_ # Explicit import for date filtering
+from sqlalchemy.orm import joinedload # Ensure joinedload is imported if needed in get_task
 
 # Create blueprint with URL prefix /tasks
 bp = Blueprint("tasks", __name__, url_prefix="/tasks")
@@ -68,7 +69,8 @@ def create_task():
     
     form_id = data.get("form_id")
     worker_id = data.get("worker_id")
-    
+    client_name_input = data.get("client_name_input") 
+
     # Validation
     if not form_id:
         return (jsonify({"success": False, "error": "Form is required"}), 400) if wants_json() else abort(400)
@@ -80,12 +82,17 @@ def create_task():
     if not worker_id:
         worker_id = g.user.id
     
+    # NEW: Store client_name in record_data if provided
+    record_data = {}
+    if client_name_input:
+        record_data["client_name"] = client_name_input
+        
     # Create the document
     document = Document(
         id=str(uuid.uuid4()),
         planning_id=None,
         form_id=form_id,
-        record_data={},
+        record_data=record_data, 
         worker_id=worker_id,
         created_by_id=g.user.id,
         status="pending",
@@ -120,23 +127,25 @@ def create_task():
 @task_access_required
 def list_tasks():
     """
-    Get list of tasks with role-based filtering.
-    
-    UPDATES:
-    - RE-INTRODUCED sync related fields and filters into context.
+    Get list of tasks with role-based filtering and dynamic search fields.
     """
     status = request.args.get('status', 'all')
     limit = min(int(request.args.get('limit', 50)), 100)
     offset = int(request.args.get('offset', 0))
-    worker_id_filter = request.args.get('worker_id')
     
-    # EXISTING FILTERS
+    # EXISTING & NEW FILTERS
+    worker_id_filter = request.args.get('worker_id')
+    created_by_id_filter = request.args.get('created_by_id') 
+    
     form_type_filter = request.args.get('form_type')
-    container_number_search = request.args.get('container_number', '').strip()
-    worker_username_search = request.args.get('worker_username', '').strip()
+    worker_username_search = request.args.get('worker_username', '').strip() 
+    
+    # Dropdown Filter
+    form_id_filter = request.args.get('form_id_filter') 
 
-    # COMMON FIELD FILTERS
+    # Dynamic filter (free text search, kept for URL cleanup handling)
     form_name_search = request.args.get('form_name_search', '').strip()
+    
     created_at_min = request.args.get('created_at_min')
     created_at_max = request.args.get('created_at_max')
     updated_at_min = request.args.get('updated_at_min')
@@ -148,60 +157,88 @@ def list_tasks():
     reviewed_at_min = request.args.get('reviewed_at_min')
     reviewed_at_max = request.args.get('reviewed_at_max')
     
-    # RE-INTRODUCED SYNC FILTERS
+    # SYNC FILTERS
     synced_at_min = request.args.get('synced_at_min')
     synced_at_max = request.args.get('synced_at_max')
     is_synced_filter = request.args.get('is_synced')
     
+    # DYNAMIC QUESTION FILTERS: Collect all parameters starting with 'q_'
+    dynamic_filters = {k: v.strip() for k, v in request.args.items() if k.startswith('q_') and v.strip()}
+
     # Build base query
     query = Document.query.options(
-        db.joinedload(Document.form).joinedload(Form.questions), # Eagerly load questions for Q&A view
+        db.joinedload(Document.form).joinedload(Form.questions),
         db.joinedload(Document.planning),
         db.joinedload(Document.worker),
-        db.joinedload(Document.created_by) # Load created_by for the table
+        db.joinedload(Document.created_by)
     )
     
-    # Role-based filtering
+    # --- Role-based Access Control (Initial Filter) ---
     if g.user.role == "worker":
+        # Workers ONLY see tasks assigned to them OR created by them
         query = query.filter(
             or_(
                 Document.worker_id == g.user.id,
                 Document.created_by_id == g.user.id
             )
         )
-    elif g.user.role in ["planner", "admin"]:
-        if worker_id_filter:
-            query = query.filter(Document.worker_id == worker_id_filter)
-    
+
+    # --- Specific Filter Application (Applies AFTER Role Control) ---
     if status != 'all':
         query = query.filter(Document.status == status)
 
-    # Apply EXISTING Filters
-    if form_type_filter:
+    # 1. Assigned To Filter (worker_id): Only available to Admin/Planner
+    if g.user.role in ["planner", "admin"] and worker_id_filter:
+        query = query.filter(Document.worker_id == worker_id_filter)
+    
+    # 2. Created By Filter (created_by_id): Available to Admin/Planner/Worker
+    if created_by_id_filter:
+        query = query.filter(Document.created_by_id == created_by_id_filter)
+    
+    # 3. Form Filters (Priority: form_id_filter)
+    if form_id_filter:
+        query = query.filter(Document.form_id == form_id_filter)
+    elif form_type_filter:
         query = query.join(Document.form).filter(Form.form_type == form_type_filter)
 
-    if container_number_search:
-        # Check for non-empty string and apply filter
-        query = query.filter(
-            Document.record_data.op('->>')('container_number').ilike(f'%{container_number_search}%')
-        )
-        
+    # 4. Search Filters (Legacy/Text Search)
     if worker_username_search:
-        # We explicitly join to avoid issues with joinedload
         query = query.join(Document.worker).filter(
             User.username.ilike(f'%{worker_username_search}%')
         )
         
-    # Apply NEW Filters (Common Fields)
     if form_name_search:
         query = query.join(Document.form).filter(Form.name.ilike(f'%{form_name_search}%'))
+
+    # 5. DYNAMIC QUESTION FILTERS (CRITICAL FIX: Filtering logic was simplified and correctly applied)
+    for key, value in dynamic_filters.items():
+        if not value:
+            continue
+            
+        # Dynamic filter keys are either 'q_<question_id>' (for responses)
+        # or 'q_record_<field_name>' (for record_data, like client_name or container_number)
+        
+        # NOTE: This dynamic filtering correctly relies on the value being a partial match (%value%)
+        if key.startswith('q_record_'):
+             record_field = key[9:] 
+             # Fix: Ensure JSON string extraction works before applying LIKE
+             query = query.filter(
+                 Document.record_data.op('->>')(record_field).ilike(f'%{value}%')
+             )
+        else:
+             question_id = key[2:] 
+             # Fix: Ensure JSON string extraction works before applying LIKE
+             query = query.filter(
+                 Document.responses.op('->>')(question_id).ilike(f'%{value}%')
+             )
+
 
     # RE-INTRODUCED SYNC FILTER
     if is_synced_filter is not None and is_synced_filter != '':
         is_synced_bool = is_synced_filter.lower() == 'true'
         query = query.filter(Document.is_synced == is_synced_bool)
 
-    # --- TIMESTAMP FILTERS (created_at, updated_at, started_at, completed_at, reviewed_at, synced_at) ---
+    # --- TIMESTAMP FILTERS ---
     def apply_timestamp_filter(query, field, min_val, max_val):
         if min_val:
             try:
@@ -222,7 +259,6 @@ def list_tasks():
     query = apply_timestamp_filter(query, Document.started_at, started_at_min, started_at_max)
     query = apply_timestamp_filter(query, Document.completed_at, completed_at_min, completed_at_max)
     query = apply_timestamp_filter(query, Document.reviewed_at, reviewed_at_min, reviewed_at_max)
-    # RE-INTRODUCED
     query = apply_timestamp_filter(query, Document.synced_at, synced_at_min, synced_at_max)
         
     total = query.count()
@@ -263,20 +299,30 @@ def list_tasks():
             "form_name": doc.form.name if doc.form else "Deleted Form",
             "responses": doc.responses or {}, 
             "form_questions": form_questions, 
-            "is_synced": doc.is_synced, # RE-INTRODUCED
+            "is_synced": doc.is_synced, 
             "created_at": doc.created_at.isoformat() if doc.created_at else None,
             "updated_at": doc.updated_at.isoformat() if doc.updated_at else None,
             "started_at": doc.started_at.isoformat() if doc.started_at else None,
             "completed_at": doc.completed_at.isoformat() if doc.completed_at else None,
             "reviewed_at": doc.reviewed_at.isoformat() if doc.reviewed_at else None,
-            "synced_at": doc.synced_at.isoformat() if doc.synced_at else None, # RE-INTRODUCED
+            "synced_at": doc.synced_at.isoformat() if doc.synced_at else None, 
             "_document": doc
         }
         tasks.append(task_data)
     
-    # Get all forms and workers for the UI filters
-    all_forms = Form.query.order_by(Form.name).all()
-    all_workers = User.query.filter(User.role == 'worker').order_by(User.username).all()
+    # Get all forms and assignable users for the UI filters
+    all_forms = Form.query.options(joinedload(Form.questions)).order_by(Form.name).all()
+    
+    # Determine the list of assignable users for the filter dropdown
+    assignable_roles = ["worker", "planner"]
+    if g.user.role == 'admin':
+        assignable_roles = ["admin", "worker", "planner"]
+    
+    all_assignable_users = User.query.filter(User.role.in_(assignable_roles)).order_by(User.username).all()
+
+    # Determine the list of users who can be set as CREATOR (same set as assignable users, excluding client)
+    all_creators = User.query.filter(User.role.in_(assignable_roles)).order_by(User.username).all()
+
     
     if wants_json():
         # Clean tasks data for JSON output (remove _document which is for internal use)
@@ -297,10 +343,13 @@ def list_tasks():
         user=g.user,
         # CONTEXT FOR FILTERS
         all_forms=all_forms,
+        all_assignable_users=all_assignable_users,
+        all_creators=all_creators, 
+        form_id_filter=form_id_filter,
         form_type_filter=form_type_filter,
-        all_workers=all_workers,
+        worker_id_filter=worker_id_filter, 
+        created_by_id_filter=created_by_id_filter, 
         worker_username_filter=worker_username_search, 
-        container_number_search=container_number_search,
         form_name_search=form_name_search,
         created_at_min=created_at_min,
         created_at_max=created_at_max,
@@ -315,6 +364,8 @@ def list_tasks():
         synced_at_min=synced_at_min,
         synced_at_max=synced_at_max,
         is_synced_filter=is_synced_filter,
+        # NEW: Pass dynamic filters to pre-fill the form
+        dynamic_filters=dynamic_filters
     )
 
 
@@ -322,81 +373,75 @@ def list_tasks():
 @login_required
 @task_access_required
 def get_task(task_id):
+    """
+    Display a single task for viewing and editing.
+    """
+    # Load task with necessary relationships
     document = Document.query.options(
         db.joinedload(Document.form).joinedload(Form.questions),
-        db.joinedload(Document.planning),
-        db.joinedload(Document.worker)
-    ).filter_by(id=task_id).first()  
+        db.joinedload(Document.worker),
+    ).get(task_id)
 
     if not document:
         return (jsonify({"success": False, "error": "Task not found"}), 404) if wants_json() else abort(404)
+
+    # --- CRITICAL DATA INTEGRITY CHECK (FIXED ATTRIBUTE NAME) ---
+    if document.form and document.form.questions:
+        for question in document.form.questions:
+            # FIX: Changed 'question.type' to 'question.question_type'
+            if not isinstance(question.question_type, str) or len(question.question_type.strip()) == 0:
+                error_msg = (
+                    f"Data Integrity Error: Question ID {question.id} ('{question.question_text}') "
+                    f"in Form '{document.form.name}' has invalid or empty type. "
+                    f"Please update the database record for this question."
+                )
+                print(f"!!! DIAGNOSTIC FAILURE: {error_msg}")
+                return (jsonify({"success": False, "error": error_msg}), 500) if wants_json() else abort(500, description=error_msg)
+    # --- END DATA INTEGRITY CHECK ---
+
+    # Permission Check: Who can edit/view this?
+    is_admin_or_planner = g.user.role in ["admin", "planner"]
+    can_override_edit = is_admin_or_planner
     
-    # Role-based check for override edit permission
-    can_override_edit = g.user.role in ["admin", "planner"]
+    # Basic view access check: worker is assigned, worker is creator, or user is admin/planner
+    has_view_access = (document.worker_id == g.user.id or 
+                       document.created_by_id == g.user.id or 
+                       is_admin_or_planner)
     
-    # Worker can only view their own tasks (unless they are admin/planner)
-    if g.user.role == "worker" and document.worker_id != g.user.id and not can_override_edit:
+    if not has_view_access:
         return (jsonify({"success": False, "error": "Access denied"}), 403) if wants_json() else abort(403)
-    
-    questions = []
-    # Handle case where form might have been deleted/detached (unlikely but safe)
-    if document.form:
-        for q in sorted(document.form.questions, key=lambda x: x.order):
-            questions.append({
-                "id": q.id,
-                "text": q.question_text,
-                "type": q.question_type,
-                "is_required": q.is_required,
-                "order": q.order,
-                "options": q.options or {},
-                "_question": q
-            })
-    
-    task_data = {
-        "id": document.id,
-        "status": document.status,
-        "record_data": document.record_data or {},
-        "form": {
-            "id": document.form.id if document.form else None,
-            "name": document.form.name if document.form else "Deleted Form",
-            "type": document.form.form_type if document.form else "unknown",
-            "questions": questions
-        },
-        "responses": document.responses or {},
-        "photos": document.photos or [],
-        "worker": {"id": document.worker.id, "username": document.worker.username} if document.worker else None,
-        "timestamps": {
-            "created_at": document.created_at.isoformat() if document.created_at else None,
-            "started_at": document.started_at.isoformat() if document.started_at else None,
-            "completed_at": document.completed_at.isoformat() if document.completed_at else None,
-            "reviewed_at": document.reviewed_at.isoformat() if document.reviewed_at else None,
-            "synced_at": document.synced_at.isoformat() if document.synced_at else None, # LEFT HERE FOR DETAIL VIEW
-        },
-        "is_synced": document.is_synced, # LEFT HERE FOR DETAIL VIEW
-        "can_override_edit": can_override_edit, # NEW FIELD
-        "_document": document
-    }
-    
+
     if wants_json():
-        return jsonify({"success": True, "task": task_data}), 200
-    
-    # Pass the new flag to the template
-    return render_template("tasks/task_detail.html", task=task_data, user=g.user)
+        # Minimal JSON response for viewing, if needed by the client
+        return jsonify({
+            "success": True,
+            "task_id": document.id,
+            "status": document.status,
+            "form_name": document.form.name if document.form else "Deleted Form",
+            "responses": document.responses,
+            "can_override_edit": can_override_edit
+        }), 200
+    else:
+        # Fetch clients for the client_select input (Placeholder: Assuming all users with 'client' role)
+        all_clients = User.query.filter_by(role='client').order_by(User.username).all()
+
+        return render_template(
+            "tasks/task_detail.html",
+            task=document,
+            user=g.user,
+            can_override_edit=can_override_edit, # Pass the flag directly
+            all_clients=all_clients 
+        )
 
 
-@bp.route("/<task_id>/update", methods=["PUT", "PATCH"])
+@bp.route("/<task_id>/update", methods=["PUT", "PATCH", "POST"])
 @login_required
 @task_access_required
 def update_task(task_id):
-    if not request.is_json:
-        return jsonify({"success": False, "error": "JSON required"}), 400
-    
     document = Document.query.get(task_id)
     if not document:
         return jsonify({"success": False, "error": "Task not found"}), 404
         
-    # Check if worker is attempting to edit a finalized task (completed, reviewed, approved)
-    # UNLESS the user is an Admin or Planner (the override edit permission)
     is_admin_or_planner = g.user.role in ["admin", "planner"]
     is_finalized = document.status in ["completed", "reviewed", "approved"]
     
@@ -404,9 +449,52 @@ def update_task(task_id):
         return jsonify({"success": False, "error": "Access denied"}), 403
     
     if is_finalized and not is_admin_or_planner:
-        # This is the new logic: Admins/Planners can bypass this restriction
         return jsonify({"success": False, "error": f"Task is already {document.status}. Only Admins or Planners can modify finalized tasks."}), 403
     
+    
+    # ------------------------------------------------------------------------
+    # FILE UPLOAD HANDLING (POST/MULTIPART-FORM-DATA)
+    # ------------------------------------------------------------------------
+    if request.method == 'POST' and request.files:
+        
+        responses = document.responses if document.responses is not None else {}
+        files_uploaded = False
+        
+        for key, file in request.files.items():
+            if key.startswith('response_') and file.filename != '':
+                # Use imported helper function
+                saved_path = save_file_to_disk(file)
+                if saved_path:
+                    question_id = key.replace('response_', '')
+                    # Store the path in the responses dictionary
+                    responses[question_id] = saved_path
+                    files_uploaded = True
+                    
+        # Update JSON field data only if files were successfully uploaded
+        if files_uploaded:
+            # CRITICAL FIX: Assign the updated dictionary back to the SQLAlchemy object
+            # and set the updated_at timestamp before committing.
+            document.responses = responses
+            document.updated_at = datetime.now(timezone.utc)
+            
+            try:
+                db.session.commit()
+                # SUCCESS: Reload is required on the client side after this POST
+                return jsonify({"success": True, "message": "Files uploaded successfully"}), 200
+            except Exception as e:
+                db.session.rollback()
+                return jsonify({"success": False, "error": str(e)}), 500
+                
+        # If no files were uploaded but method was POST, treat as error or ignore
+        return jsonify({"success": False, "error": "No valid files were attached or saved"}), 400
+
+    
+    # ------------------------------------------------------------------------
+    # JSON DATA HANDLING (PATCH/PUT)
+    # ------------------------------------------------------------------------
+    if not request.is_json:
+        return jsonify({"success": False, "error": "JSON required for non-file updates"}), 400
+        
     data = request.get_json()
     
     if "status" in data:
@@ -428,14 +516,21 @@ def update_task(task_id):
     if "responses" in data:
         if document.responses is None:
             document.responses = {}
-        document.responses.update(data["responses"])
+        
+        # CRITICAL FIX: Filter out empty string values from the JSON update payload.
+        # This prevents the client-side form submission from overwriting saved file paths.
+        filtered_responses = {
+            k: v for k, v in data["responses"].items() if v is not None and v != ""
+        }
+        
+        document.responses.update(filtered_responses)
+        
         # Use explicit SQLAlchemy update call to force JSON field modification detection
         db.session.query(Document).filter_by(id=task_id).update(
             {"responses": document.responses}, synchronize_session=False
         )
     
     if "photos" in data:
-        # For simplicity, we just add new photos, actual PWA logic might replace/manage them better
         if document.photos is None:
             document.photos = []
         document.photos.extend(data["photos"])

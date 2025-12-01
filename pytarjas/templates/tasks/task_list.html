@@ -4,11 +4,11 @@ Task List Template
 
 UPDATES:
 - Implemented Dynamic Filtering using JavaScript Debouncing (auto-submits form).
-- Fixed excessive table width by adjusting column widths and removing min-width.
-- FIX: Removed Sync columns and filters to simplify table and save horizontal space.
-- FIX: MOVED 'Acciones' (Ver/Editar button) to the far left (second column) to improve UX and eliminate horizontal scroll for core actions.
-- FIX: Removed redundant "Filtrar" button and implemented scroll position restoration on page reload.
-- FIX: Removed setTimeout(..., 10) on scroll restoration for imperceptible scrolling.
+- Replaced text search for Form and Worker with selectable dropdowns.
+- Introduced Dynamic Question Filters based on selected Form.
+- Removed the 'container_number' filter.
+- JavaScript now cleans the URL of empty query parameters before submission.
+- FIXED: Custom Cascading Searchable User Filter (sub-dropdown menus) for Created By and Assigned To.
 #}
 
 {% extends 'base.html' %}
@@ -184,6 +184,100 @@ UPDATES:
     
     .is-synced-badge { background-color: var(--color-secondary); color: white; }
     .not-synced-badge { background-color: var(--color-danger); color: white; }
+    
+    /* --- Custom Filter Styles for Grouped Toggles FIX --- */
+    .custom-filter-container {
+        position: relative;
+        min-width: 180px;
+    }
+    
+    .custom-filter-display {
+        padding: var(--space-xs) var(--space-md);
+        min-height: 36px;
+        background-color: var(--color-bg-primary);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        font-size: var(--font-size-base);
+    }
+    
+    .custom-filter-menu {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: 1050; 
+        margin-top: 4px;
+        background-color: var(--color-bg-primary);
+        border: 1px solid var(--color-border-dark);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-lg);
+        max-height: 300px;
+        overflow-y: auto;
+        display: none;
+        padding: var(--space-sm);
+    }
+    
+    .custom-filter-menu.active { display: block; }
+    
+    .filter-search-input {
+        width: 100%;
+        margin-bottom: var(--space-sm);
+        padding: var(--space-sm);
+    }
+    
+    .filter-role-group {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .filter-role-category {
+        font-weight: var(--font-weight-semibold);
+        padding: var(--space-sm) var(--space-xs);
+        cursor: pointer;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: background-color var(--transition-fast);
+        border-radius: var(--radius-sm);
+    }
+    
+    .filter-role-category:hover { background-color: var(--color-bg-secondary); }
+    
+    .filter-role-category .arrow {
+        transition: transform var(--transition-fast);
+        margin-left: auto;
+    }
+    
+    .filter-role-category.expanded .arrow {
+        transform: rotate(90deg);
+    }
+
+    .filter-user-list {
+        list-style: none;
+        padding: 0 0 0 var(--space-lg);
+        display: none; /* Controlled by JS toggle */
+    }
+
+    .filter-user-list li {
+        padding: var(--space-xs) var(--space-sm);
+        cursor: pointer;
+        font-weight: var(--font-weight-normal);
+        color: var(--color-text-secondary);
+        border-radius: var(--radius-sm);
+        font-size: var(--font-size-sm);
+    }
+    
+    .filter-user-list li:hover {
+        background-color: var(--color-primary-light);
+        color: var(--color-primary);
+    }
+
   </style>
 {% endblock %}
 
@@ -206,11 +300,56 @@ UPDATES:
 {% block content %}
   <div class="container">
     
+    {# HIDDEN JSON DATA BLOCK (For JavaScript dynamic filtering) #}
+    <textarea id="allFormsData" style="display:none;">
+        {% set form_data = {} %}
+        {% for form in all_forms %}
+            {% set questions_list = [] %}
+            {% for q in form.questions|sort(attribute='order') %}
+                {# Determine key for filtering. Use a fixed key for record_data fields (like client_name) or q_UUID for responses #}
+                {% set filter_key = 'q_record_client_name' if q.question_type|default('')|string|trim == 'client_select' %}
+                {% set filter_key = filter_key if filter_key else 'q_' + q.id %}
+                
+                {% set questions_list = questions_list.append({
+                    'id': q.id, 
+                    'text': q.question_text, 
+                    'type': q.question_type,
+                    'name_key': filter_key
+                }) or questions_list %}
+            {% endfor %}
+            
+            {% set form_data = form_data.update({
+                form.id: {
+                    'name': form.name,
+                    'questions': questions_list
+                }
+            }) or form_data %}
+        {% endfor %}
+        {{ form_data | tojson | safe }}
+    </textarea>
+    
+    {# Utility to group users by role for the custom dropdowns #}
+    {% set all_users_for_filters = all_assignable_users %}
+    {% set grouped_users = {
+        'admin': [], 
+        'planner': [], 
+        'worker': [] 
+    } %}
+    {% for user_obj in all_users_for_filters %}
+        {% if user_obj.role == 'admin' %}
+            {% set _ = grouped_users['admin'].append(user_obj) %}
+        {% elif user_obj.role == 'planner' %}
+            {% set _ = grouped_users['planner'].append(user_obj) %}
+        {% elif user_obj.role == 'worker' %}
+            {% set _ = grouped_users['worker'].append(user_obj) %}
+        {% endif %}
+    {% endfor %}
+    
     {# ADVANCED FILTER FORM #}
     <form method="GET" action="{{ url_for('tasks.list_tasks') }}" id="filterForm">
       <div class="filter-group-container">
         
-        {# ROW 1: STATUS & BASIC SEARCH #}
+        {# ROW 1: STATUS, FORM, ASSIGNED USER #}
         <div class="filter-group" style="min-width: 180px;">
           <label for="status">Estado</label>
           <select name="status" id="status" class="form-control filter-input">
@@ -223,26 +362,95 @@ UPDATES:
           </select>
         </div>
         
+        {# Form Dropdown (Filter by ID) #}
         <div class="filter-group">
-          <label for="form_name_search">Nombre Formulario</label>
-          <input type="text" name="form_name_search" id="form_name_search" class="form-control filter-input" 
-                 value="{{ form_name_search or '' }}" placeholder="Buscar por nombre...">
+          <label for="form_id_filter">Formulario</label>
+          <select name="form_id_filter" id="form_id_filter" class="form-control filter-input">
+            <option value="">-- Todos los formularios --</option>
+            {% for form in all_forms %}
+              <option value="{{ form.id }}" {% if form.id == form_id_filter %}selected{% endif %}>
+                {{ form.name }} ({{ form.form_type | capitalize }})
+              </option>
+            {% endfor %}
+          </select>
         </div>
 
+        {# NEW: Created By Filter (Custom Cascading Component) #}
+        {% if user.role != 'client' %}
         <div class="filter-group">
-          <label for="worker_username_search">Trabajador (Asignado)</label>
-          <input type="text" name="worker_username_search" id="worker_username_search" class="form-control filter-input" 
-                 value="{{ worker_username_search or '' }}" placeholder="Buscar por usuario...">
+          <label>Creado por</label>
+          <div class="custom-filter-container" id="created-by-filter-container">
+            <input type="hidden" name="created_by_id" id="created_by_id_input" class="filter-input" value="{{ created_by_id_filter or '' }}">
+            <div class="custom-filter-display" id="created-by-display" onclick="toggleMenu('created-by')">
+                {% set selected_creator = all_creators | selectattr('id', '==', created_by_id_filter) | first %}
+                {{ selected_creator.username if selected_creator else '-- Todos --' }}
+                <span>▼</span>
+            </div>
+            
+            <div class="custom-filter-menu" id="created-by-menu">
+                <input type="text" class="form-control filter-search-input" placeholder="Buscar creador..." id="created-by-search">
+                <ul class="filter-role-group" id="created-by-list">
+                    <li class="filter-role-item filter-user-list-item all-option" data-id="" data-username="-- Todos --" onclick="selectUser(this, 'created-by')">-- Todos --</li>
+                    
+                    {% for role, users in grouped_users.items() %}
+                        {% if users %}
+                        <li class="filter-role-item filter-role-category" data-role="{{ role }}" onclick="toggleGroupList(this)">
+                            {% if role == 'admin' %}👑 Administradores{% elif role == 'planner' %}📋 Planificadores{% elif role == 'worker' %}🔧 Trabajadores{% endif %} <span class="arrow">▶</span>
+                        </li>
+                        <ul class="filter-user-list" data-role="{{ role }}">
+                            {% for user_obj in users %}
+                                <li data-id="{{ user_obj.id }}" data-username="{{ user_obj.username }}" data-role="{{ user_obj.role }}" onclick="selectUser(this, 'created-by')">
+                                    {{ user_obj.username }}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+          </div>
         </div>
+        {% endif %}
 
+        {# RESTRICTED: Assigned To Filter (Custom Cascading Component - Only Admin/Planner) #}
+        {% if user.role in ['admin', 'planner'] %}
         <div class="filter-group">
-          <label for="container_number">N° Contenedor</label>
-          <input type="text" name="container_number" id="container_number" class="form-control filter-input" 
-                 value="{{ container_number_search or '' }}" placeholder="Buscar en datos...">
+          <label>Asignado a</label>
+          <div class="custom-filter-container" id="assigned-to-filter-container">
+            <input type="hidden" name="worker_id" id="worker_id_input" class="filter-input" value="{{ worker_id_filter or '' }}">
+            <div class="custom-filter-display" id="assigned-to-display" onclick="toggleMenu('assigned-to')">
+                {% set selected_worker = all_assignable_users | selectattr('id', '==', worker_id_filter) | first %}
+                {{ selected_worker.username if selected_worker else '-- Todos --' }}
+                <span>▼</span>
+            </div>
+            
+            <div class="custom-filter-menu" id="assigned-to-menu">
+                <input type="text" class="form-control filter-search-input" placeholder="Buscar asignado..." id="assigned-to-search">
+                <ul class="filter-role-group" id="assigned-to-list">
+                    <li class="filter-role-item filter-user-list-item all-option" data-id="" data-username="-- Todos --" onclick="selectUser(this, 'assigned-to')">-- Todos --</li>
+                    
+                    {% for role, users in grouped_users.items() %}
+                        {% if users %}
+                        <li class="filter-role-item filter-role-category" data-role="{{ role }}" onclick="toggleGroupList(this)">
+                            {% if role == 'admin' %}👑 Administradores{% elif role == 'planner' %}📋 Planificadores{% elif role == 'worker' %}🔧 Trabajadores{% endif %} <span class="arrow">▶</span>
+                        </li>
+                        <ul class="filter-user-list" data-role="{{ role }}">
+                            {% for user_obj in users %}
+                                <li data-id="{{ user_obj.id }}" data-username="{{ user_obj.username }}" data-role="{{ user_obj.role }}" onclick="selectUser(this, 'assigned-to')">
+                                    {{ user_obj.username }}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+          </div>
         </div>
-        
+        {% endif %}
+
         {# RE-INTRODUCED: is_synced filter #}
-        <div class="filter-group" style="min-width: 120px;">
+        <div class="filter-group" style="min-width: 180px;">
           <label for="is_synced">Sincronizado</label>
           <select name="is_synced" id="is_synced" class="form-control filter-input">
               <option value="">-- Todos --</option>
@@ -251,7 +459,27 @@ UPDATES:
           </select>
         </div>
 
-        {# ROW 2: TIMESTAMP FILTERS #}
+        
+        {# DYNAMIC QUESTION FILTERS CONTAINER #}
+        <div id="dynamic-question-filters" style="display: flex; gap: var(--space-md); flex-wrap: wrap;">
+            {# Dynamic fields will be injected here by JS #}
+            {% for key, value in dynamic_filters.items() %}
+                {% if key.startswith('q_') %}
+                    {# Attempt to derive a user-friendly name, otherwise use the key #}
+                    {% set display_name = key | replace('q_record_client_name', 'Cliente Asignado') %}
+                    {% set display_name = display_name if 'q_' not in display_name else 'Campo Dinámico' %}
+                    
+                    <div class="filter-group dynamic-filter-group" data-filter-key="{{ key }}">
+                        <label for="{{ key }}">{{ display_name | capitalize }}</label>
+                        <input type="text" name="{{ key }}" id="{{ key }}" value="{{ value }}" class="form-control filter-input" placeholder="Buscar texto...">
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {# END DYNAMIC QUESTION FILTERS CONTAINER #}
+
+
+        {# TIMESTAMP FILTERS #}
         <div class="filter-group">
             <label>Creada</label>
             <div class="date-filter-pair">
@@ -324,6 +552,7 @@ UPDATES:
             {% for task in tasks %}
             <tr data-task-id="{{ task.id }}" class="task-row">
               <td>
+                {# FIX: Reference the correct key 'form_questions' #}
                 {% if task.form_questions %}
                   <span class="toggle-icon" onclick="toggleDetail('{{ task.id }}')">▶</span>
                 {% endif %}
@@ -375,6 +604,7 @@ UPDATES:
             {# Collapsible Detail Row #}
             <tr id="detail-{{ task.id }}" class="collapsible-row" style="display: none;">
                 <td colspan="13" class="detail-row"> <div class="detail-content">
+                        {# FIX: Reference the correct key 'form_questions' #}
                         {% if task.responses and task.form_questions %}
                             {% set response_map = task.responses %}
                             {% for question in task.form_questions %}
@@ -383,7 +613,8 @@ UPDATES:
                                 <div class="qa-group">
                                     <div class="qa-question">{{ question.text }}</div>
                                     <div class="qa-answer">
-                                      {% if question.type == 'photo' or question.type == 'file' %}
+                                      {% set q_type = question.type|default('')|string|trim %}
+                                      {% if q_type == 'photo' or q_type == 'file' %}
                                         Archivo/Foto Adjunta (Ver detalle)
                                       {% elif answer == 'true' %}
                                         Sí
@@ -422,10 +653,9 @@ UPDATES:
         <div style="display: flex; justify-content: center; gap: var(--space-md); margin-top: var(--space-2xl);">
           {% set filter_params = {
               'status': status,
-              'form_type': form_type_filter,
-              'container_number': container_number_search,
-              'worker_username': worker_username_search,
-              'form_name_search': form_name_search,
+              'form_id_filter': form_id_filter,
+              'worker_id': worker_id_filter,
+              'created_by_id': created_by_id_filter,
               'created_at_min': created_at_min,
               'created_at_max': created_at_max,
               'updated_at_min': updated_at_min,
@@ -441,6 +671,11 @@ UPDATES:
               'is_synced': is_synced_filter,
               'limit': limit
           } %}
+          {# Add dynamic filters to pagination links if they exist #}
+          {% for key, value in dynamic_filters.items() %}
+              {% set filter_params = filter_params.update({key: value}) or filter_params %}
+          {% endfor %}
+
           {% set current_url = url_for('tasks.list_tasks', **filter_params) %}
           
           {% if offset > 0 %}
@@ -514,43 +749,275 @@ UPDATES:
 
     // --- DYNAMIC FILTERING LOGIC (Debounce & Scroll Management) ---
     const filterForm = document.getElementById('filterForm');
+    const formIdSelect = document.getElementById('form_id_filter');
+    const dynamicFilterContainer = document.getElementById('dynamic-question-filters');
+    const allFormsDataTextarea = document.getElementById('allFormsData');
+    let allFormsData = {};
+
+    try {
+        const dataStr = allFormsDataTextarea.value.trim();
+        // The inner content of the textarea is a JSON string of a dictionary 
+        // that wraps the actual form_data dictionary (due to how Jinja 'set' works inside template blocks).
+        const jsonObject = JSON.parse(dataStr);
+        // We attempt to extract the inner dictionary safely.
+        // If the structure is complex due to Jinja set, we try to access the first key or use the object itself.
+        // Note: We use jsonObject directly here since the Jinja code above stores the full dict/dict as the string.
+        allFormsData = jsonObject; 
+    } catch (e) {
+        console.error("Error parsing allFormsData:", e);
+    }
+    
+    // --- STEP 1: Implement Dynamic Filter Injection ---
+    function updateDynamicFilters() {
+        const selectedFormId = formIdSelect.value;
+        const currentFilters = new URLSearchParams(window.location.search);
+        
+        // Remove old dynamic filters based on the class 'dynamic-filter-group'
+        document.querySelectorAll('.dynamic-filter-group').forEach(el => el.remove());
+        
+        if (!selectedFormId || !allFormsData[selectedFormId]) return;
+
+        const form = allFormsData[selectedFormId];
+        
+        form.questions.forEach(q => {
+            const type = q.type ? q.type.trim().toLowerCase() : '';
+            const isTextType = type === 'text' || type === 'textarea';
+            const isNumberType = type === 'number';
+            const isSelectType = type === 'select';
+            const isClientSelectType = type === 'client_select';
+            
+            // Only filter on basic text, numeric, and specific types.
+            if (isTextType || isNumberType || isSelectType || isClientSelectType) {
+                
+                const nameKey = q.name_key; // e.g., 'q_UUID' or 'q_record_client_name'
+                const currentValue = currentFilters.get(nameKey) || '';
+                
+                const filterGroup = document.createElement('div');
+                filterGroup.className = 'filter-group dynamic-filter-group';
+                filterGroup.setAttribute('data-filter-key', nameKey);
+                filterGroup.setAttribute('style', 'min-width: 180px;');
+
+                let inputHtml = '';
+                
+                // Determine user-friendly label
+                let labelText = q.text.replace(/[\*\?]/g, '').trim(); 
+                if (isClientSelectType) labelText = 'Cliente Asignado';
+                if (q.text.toLowerCase().includes('contenedor')) labelText = 'N° Contenedor';
+
+
+                if (isNumberType) {
+                    inputHtml = `
+                        <label for="${nameKey}">${labelText}</label>
+                        <input type="number" name="${nameKey}" id="${nameKey}" 
+                               value="${currentValue}" class="form-control filter-input" 
+                               placeholder="Buscar número">
+                    `;
+                } else {
+                    // Standard text search (used for text, select, and client select)
+                    inputHtml = `
+                        <label for="${nameKey}">${labelText}</label>
+                        <input type="text" name="${nameKey}" id="${nameKey}" 
+                               value="${currentValue}" class="form-control filter-input" 
+                               placeholder="Buscar texto...">
+                    `;
+                }
+
+                filterGroup.innerHTML = inputHtml;
+                dynamicFilterContainer.appendChild(filterGroup);
+            }
+        });
+        
+        // Re-attach event listeners to the newly created inputs
+        document.querySelectorAll('.dynamic-filter-group .filter-input').forEach(input => {
+            input.addEventListener('input', triggerFilter);
+            input.addEventListener('change', triggerFilter);
+        });
+    }
+
+    // Call once on load to populate if a form is already selected
+    document.addEventListener('DOMContentLoaded', updateDynamicFilters);
+    formIdSelect.addEventListener('change', () => {
+        // Clear all dynamic filters when changing the form
+        document.querySelectorAll('.dynamic-filter-group').forEach(el => el.remove());
+        updateDynamicFilters();
+        triggerFilter();
+    });
+
+    // --- STEP 2: Custom Dropdown/Search Logic FIX ---
+
+    // Function to handle the simple vertical toggle (show/hide the user list below the header)
+    window.toggleGroupList = function(item) {
+        const userList = item.nextElementSibling;
+        
+        if (userList && userList.classList.contains('filter-user-list')) {
+            // Toggle visibility of the user list below the header
+            userList.style.display = userList.style.display === 'block' ? 'none' : 'block';
+            item.classList.toggle('expanded');
+        }
+    }
+
+    // Function to handle the main menu visibility (clicking the display box)
+    window.toggleMenu = function(type) {
+        const menuElement = document.getElementById(`${type}-menu`);
+        const searchInput = document.getElementById(`${type}-search`);
+
+        // Close the other menu if it's open
+        const otherType = type === 'created-by' ? 'assigned-to' : 'created-by';
+        const otherMenu = document.getElementById(`${otherType}-menu`);
+        if (otherMenu) otherMenu.classList.remove('active');
+
+        // Toggle visibility of the current menu
+        menuElement.classList.toggle('active');
+        if (menuElement.classList.contains('active')) {
+             searchInput.focus();
+             // Reset search on open
+             searchInput.value = '';
+             filterUsers(searchInput.id, `${type}-list`);
+        }
+        
+        // Collapse all sub-lists when the main menu opens/closes
+        menuElement.querySelectorAll('.filter-user-list').forEach(list => list.style.display = 'none');
+        menuElement.querySelectorAll('.filter-role-category').forEach(header => header.classList.remove('expanded'));
+    }
+
+    // Function to handle selection of a user
+    window.selectUser = function(selectedItem, type) {
+        const id = selectedItem.dataset.id;
+        const username = selectedItem.dataset.username;
+        const displayElement = document.getElementById(`${type}-display`);
+        // The input element name depends on the type (worker_id or created_by_id)
+        const inputElementId = type === 'assigned-to' ? 'worker_id_input' : 'created_by_id_input';
+        const inputElement = document.getElementById(inputElementId);
+        const menuElement = document.getElementById(`${type}-menu`);
+
+        displayElement.textContent = username;
+        inputElement.value = id;
+        menuElement.classList.remove('active');
+        
+        // Trigger the filter immediately after selection
+        triggerFilter(); 
+    }
+
+    // Function to handle search filtering
+    function filterUsers(searchInputId, listId) {
+        const input = document.getElementById(searchInputId);
+        const filter = input.value.toUpperCase();
+        const list = document.getElementById(listId);
+        
+        // Process categories and users
+        list.querySelectorAll('.filter-role-category').forEach(categoryHeader => {
+            const userList = categoryHeader.nextElementSibling; // The UL sibling
+            const categoryText = categoryHeader.textContent.toUpperCase();
+            
+            let categoryHasVisibleUsers = false;
+            
+            if (userList) {
+                // Filter individual users in the list
+                userList.querySelectorAll('li').forEach(userItem => {
+                    // Check user list against the search filter
+                    const userMatches = userItem.dataset.username.toUpperCase().indexOf(filter) > -1;
+                    if (userMatches) {
+                        userItem.style.display = "";
+                        categoryHasVisibleUsers = true;
+                    } else {
+                        userItem.style.display = "none";
+                    }
+                });
+            }
+            
+            const categoryMatchesFilter = categoryText.indexOf(filter) > -1;
+
+            if (categoryMatchesFilter || categoryHasVisibleUsers) {
+                categoryHeader.style.display = "";
+                
+                // If the user searches by role name, expand the list automatically
+                if (filter.length > 0) {
+                     if (userList) userList.style.display = 'block';
+                     categoryHeader.classList.add('expanded');
+                } else {
+                    // When search is cleared, revert to default collapsed view
+                    if (userList) userList.style.display = 'none';
+                    categoryHeader.classList.remove('expanded');
+                }
+            } else {
+                categoryHeader.style.display = "none";
+                if (userList) userList.style.display = 'none';
+                categoryHeader.classList.remove('expanded');
+            }
+        });
+
+        // Handle the '-- Todos --' option visibility
+        list.querySelectorAll('.all-option').forEach(item => {
+             const matchesFilter = item.textContent.toUpperCase().indexOf(filter) > -1;
+             item.style.display = matchesFilter ? "" : "none";
+        });
+    }
+
+    // Attach search input handlers
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('created-by-search')?.addEventListener('input', (e) => filterUsers(e.target.id, 'created-by-list'));
+        document.getElementById('assigned-to-search')?.addEventListener('input', (e) => filterUsers(e.target.id, 'assigned-to-list'));
+    });
+
+
+    // --- STEP 4: URL Cleanup Logic (Unchanged from previous fix) ---
+
     let debounceTimer;
 
     /**
      * Executes the filter action after a delay.
-     * Includes scroll position saving.
      */
     function triggerFilter() {
-        // Check if user is typing in a text field or has changed a select/date
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
             
-            // 1. Save current scroll position before submit (FIX for scrolling to top)
-            const scrollY = window.scrollY;
+            const data = new FormData(filterForm);
+            const newParams = new URLSearchParams();
             
-            // 2. Create hidden input for scroll position
-            let scrollInput = document.getElementById('scrollPos');
-            if (!scrollInput) {
-                scrollInput = document.createElement('input');
-                scrollInput.type = 'hidden';
-                scrollInput.name = 'scroll_pos';
-                scrollInput.id = 'scrollPos';
-                filterForm.appendChild(scrollInput);
+            // 1. Process form data and only keep non-empty/non-default values
+            for (const [key, value] of data.entries()) {
+                const trimmedValue = value.trim();
+                
+                // Determine if this key should be kept
+                const isDefault = (key === 'status' && trimmedValue === 'all') || 
+                                  (key === 'form_id_filter' && trimmedValue === '') || 
+                                  (key === 'worker_id' && trimmedValue === '') || 
+                                  (key === 'created_by_id' && trimmedValue === '') || 
+                                  (key === 'is_synced' && trimmedValue === '') || 
+                                  (key.includes('_min') && trimmedValue === '') || 
+                                  (key.includes('_max') && trimmedValue === '') ||
+                                  (key.startsWith('q_') && trimmedValue === '');
+                
+                // Exclude empty values AND default values for cleanliness
+                if (!isDefault && trimmedValue !== '') {
+                    newParams.set(key, trimmedValue);
+                }
+                // Explicitly keep status if it's 'all'
+                else if (key === 'status' && trimmedValue === 'all') {
+                     newParams.set(key, trimmedValue);
+                }
             }
-            scrollInput.value = scrollY;
             
-            // 3. Submit the form to reload with new parameters
-            filterForm.submit();
+            // 2. Submit the form to reload with clean parameters
+            const url = `${window.location.pathname}?${newParams.toString()}`;
+            window.location.href = url;
+
         }, 400); // 400ms delay for smooth typing
     }
 
-    // Attach listener to all input fields
+    // Attach listener to all relevant fields
     document.querySelectorAll('.filter-input').forEach(input => {
-        input.addEventListener('input', triggerFilter);
-        input.addEventListener('change', triggerFilter); 
+        // Use change for select/date fields to trigger filter immediately after selection
+        if (input.tagName === 'SELECT' || input.type === 'date' || input.type === 'hidden') {
+             input.addEventListener('change', triggerFilter);
+        } else {
+             // Use input event for text fields for debounce searching
+             input.addEventListener('input', triggerFilter); 
+        }
+        
     });
 
-    // --- SCROLL RESTORATION ON PAGE LOAD (Ultra-fast, imperceptible scroll) ---
+    // --- SCROLL RESTORATION ON PAGE LOAD (Unchanged) ---
     document.addEventListener('DOMContentLoaded', () => {
         const urlParams = new URLSearchParams(window.location.search);
         const savedScrollY = urlParams.get('scroll_pos');
@@ -568,7 +1035,7 @@ UPDATES:
     });
 
 
-    // --- Auto-refresh logic (now independent of filtering) ---
+    // --- Auto-refresh logic (Unchanged) ---
     const AUTO_REFRESH_INTERVAL = 30000;
     let autoRefreshTimer = null;
     

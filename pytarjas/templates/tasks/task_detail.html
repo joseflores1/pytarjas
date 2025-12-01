@@ -84,6 +84,8 @@
       font-weight: 500;
       color: var(--color-text-primary);
       margin-bottom: var(--space-md);
+      display: flex;
+      align-items: center;
     }
 
     .radio-group { display: flex; gap: var(--space-lg); }
@@ -116,11 +118,60 @@
       justify-content: flex-end;
       z-index: 100; box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
     }
+    
+    /* NEW: Badge style for question type */
+    .question-type-badge {
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-normal);
+      margin-left: var(--space-md);
+      background-color: var(--color-info);
+      color: white;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+
+    /* NEW: Style for question description */
+    .question-description-text {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        margin-top: var(--space-xs);
+        margin-bottom: var(--space-md);
+        padding-left: calc(var(--space-md) + 24px); /* Align with content */
+    }
+    
+    .file-display-box {
+        margin-top: var(--space-sm);
+        padding: var(--space-md);
+        background: var(--color-bg-secondary);
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .file-display-box a {
+        font-weight: var(--font-weight-medium);
+        color: var(--color-info);
+        word-break: break-all;
+    }
+    
+    /* FIX: New class for dynamic hiding to solve linter issue */
+    .hidden-by-jinja {
+        display: none !important;
+    }
   </style>
 {% endblock %}
 
 {% block content %}
 <div class="container" style="max-width: 900px; margin: var(--space-xl) auto;">
+  
+  {# Define type map for icons #}
+  {% set type_map = {
+    'text': '📝', 'textarea': '📄', 'number': '🔢', 'date': '📅', 
+    'datetime': '🕐', 'photo': '📷', 'boolean': '✓', 'select': '📋', 
+    'file': '📁', 'client_select': '🏢'
+  } %}
   
   {# Header #}
   <div class="task-header">
@@ -145,54 +196,77 @@
   </div>
 
   {# Form #}
-  <form id="taskForm" data-task-id="{{ task.id }}" data-total-questions="{{ task.form.questions|length }}">
-    {# Determine read-only state for inputs, allowing override for Admin/Planner #}
-    {% set is_read_only = (task.status in ['completed', 'reviewed', 'approved']) and not task.can_override_edit %}
+  <form id="taskForm" 
+        data-task-id="{{ task.id }}" 
+        data-total-questions="{{ task.form.questions|length }}"
+        enctype="multipart/form-data"> 
     
+    {# Determine effective read-only state #}
+    {% set is_finalized = task.status in ['completed', 'reviewed', 'approved'] %}
+    {% set is_pending = task.status == 'pending' %}
+    {# Use top-level variable 'can_override_edit' #}
+    {% set is_locked = (is_finalized and not can_override_edit) or is_pending %}
+
     {% for question in task.form.questions %}
       {% set current_answer = task.responses.get(question.id, '') %}
-      {# is_readonly now controlled by the variable defined above #}
-      {% set is_input_disabled = is_read_only %}
+      {% set is_input_disabled = is_locked %}
       
       <div class="question-card">
         <div class="question-text">
           <span class="question-number">{{ loop.index }}</span>
-          {{ question.text }} {% if question.is_required %}<span style="color:var(--color-danger)">*</span>{% endif %}
+          {{ question.text }} 
+          
+          {# NEW: Display Question Type with Icon #}
+          <span class="question-type-badge">
+            {# FIX: Use question.question_type #}
+            {{ type_map.get(question.question_type|default(''), '?') }} {{ question.question_type|default('Tipo Desconocido') | capitalize }}
+          </span>
+          
+          {% if question.is_required %}<span style="color:var(--color-danger)">*</span>{% endif %}
         </div>
 
+        {# NEW: Display Question Description #}
+        {% if question.description %}
+            <p class="question-description-text">{{ question.description }}</p>
+        {% endif %}
+
+        {# Use q_type for robust comparison (handles None/Undefined/Whitespace safely) #}
+        {# FIX: Use question.question_type #}
+        {% set q_type = question.question_type|default('')|string|trim %}
+        
         {# TEXT (Short) #}
-        {% if question.type == 'text' %}
+        {% if q_type == 'text' %}
           <input type="text" name="response_{{ question.id }}" id="response_{{ question.id }}"
                  class="form-control response-input" value="{{ current_answer }}"
-                 {% if question.is_required %}required{% endif %} {% if is_input_disabled %}readonly{% endif %}>
+                 {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
         
         {# TEXTAREA (Long) #}
-        {% elif question.type == 'textarea' %}
+        {% elif q_type == 'textarea' %}
           <textarea name="response_{{ question.id }}" id="response_{{ question.id }}"
                     class="form-control response-input" rows="4"
                     {% if question.is_required %}required{% endif %} 
-                    {% if is_input_disabled %}readonly{% endif %}>{{ current_answer }}</textarea>
+                    {% if is_input_disabled %}disabled{% endif %}>{{ current_answer }}</textarea>
 
         {# NUMBER #}
-        {% elif question.type == 'number' %}
+        {% elif q_type == 'number' %}
           <input type="number" name="response_{{ question.id }}" id="response_{{ question.id }}"
                  class="form-control response-input" value="{{ current_answer }}"
-                 {% if question.is_required %}required{% endif %} {% if is_input_disabled %}readonly{% endif %}>
+                 {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
 
         {# DATE #}
-        {% elif question.type == 'date' %}
+        {% elif q_type == 'date' %}
           <input type="date" name="response_{{ question.id }}" id="response_{{ question.id }}"
                  class="form-control response-input" value="{{ current_answer }}"
-                 {% if question.is_required %}required{% endif %} {% if is_input_disabled %}readonly{% endif %}>
+                 {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
 
         {# DATETIME #}
-        {% elif question.type == 'datetime' %}
+        {% elif q_type == 'datetime' %}
           <input type="datetime-local" name="response_{{ question.id }}" id="response_{{ question.id }}"
                  class="form-control response-input" value="{{ current_answer }}"
-                 {% if question.is_required %}required{% endif %} {% if is_input_disabled %}readonly{% endif %}>
+                 {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
 
         {# SELECT #}
-        {% elif question.type == 'select' %}
+        {% elif q_type == 'select' %}
           <select name="response_{{ question.id }}" id="response_{{ question.id }}"
                   class="form-control response-input"
                   {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
@@ -205,7 +279,7 @@
           </select>
 
         {# BOOLEAN (Radio) #}
-        {% elif question.type == 'boolean' %}
+        {% elif q_type == 'boolean' %}
           <div class="radio-group">
             <label class="radio-option">
               <input type="radio" name="response_{{ question.id }}" value="true" class="response-input"
@@ -221,48 +295,122 @@
             </label>
           </div>
           
-        {# PHOTO #}
-        {% elif question.type == 'photo' %}
-          <input type="file" name="response_{{ question.id }}" class="form-control response-input" accept="image/*"
-                 {% if is_input_disabled %}disabled{% endif %}>
-        
-        {# GENERIC FILE #}
-        {% elif question.type == 'file' %}
-          <input type="file" name="response_{{ question.id }}" class="form-control response-input"
-                 {% if is_input_disabled %}disabled{% endif %}>
-                 
+        {# CLIENT SELECT #}
+        {% elif q_type == 'client_select' %}
+          {% set pre_assigned_client = task.record_data.get('client_name', '') %}
+          {% set selected_client = current_answer or pre_assigned_client %}
+
+          <select name="response_{{ question.id }}" id="response_{{ question.id }}"
+                  class="form-control response-input"
+                  {% if question.is_required %}required{% endif %} 
+                  {% if is_input_disabled %}disabled{% endif %}>
+            <option value="">-- Seleccionar Cliente --</option>
+            
+            {% if pre_assigned_client and not current_answer %}
+                <option value="{{ pre_assigned_client }}" selected>🏢 Cliente (Pre-asignado): {{ pre_assigned_client }}</option>
+            {% endif %}
+
+            {% for client in all_clients %}
+              <option value="{{ client.username }}" 
+                      {% if client.username == selected_client %}selected{% endif %}>
+                🏢 {{ client.username }}
+              </option>
+            {% endfor %}
+            
+            {% if pre_assigned_client and pre_assigned_client != selected_client and not current_answer %}
+                <option value="{{ pre_assigned_client }}" selected>🏢 Cliente (Manual): {{ pre_assigned_client }}</option>
+            {% endif %}
+
+          </select>
+          <small class="form-help">
+            Seleccione el cliente final para esta tarea. El valor pre-asignado se usa como sugerencia.
+          </small>
+
+        {# FILE UPLOAD TYPES: PHOTO and GENERIC FILE #}
+        {% elif q_type == 'photo' or q_type == 'file' %}
+            
+            {% set accepted_types = 'image/*' if q_type == 'photo' else '.pdf,.doc,.docx,.jpg,.jpeg,.png' %}
+            {% set display_placeholder = 'Seleccionar o tomar fotografía' if q_type == 'photo' else 'Seleccionar archivo (PDF, DOC, Imagen)' %}
+            {% set current_filename = current_answer.split('/')[-1] if '/' in current_answer else current_answer %}
+
+            {# Show the existing file/path display if an answer is saved #}
+            {% if current_answer and current_answer != 'file_uploaded' %}
+                <div class="file-display-box mb-md">
+                    <span>
+                        <span style="font-size: var(--font-size-xl); margin-right: var(--space-sm);">
+                            {{ '📷' if q_type == 'photo' else '📄' }}
+                        </span>
+                        Archivo subido: 
+                        <a href="/{{ current_answer }}" target="_blank" title="Ver archivo">
+                            {{ current_filename }}
+                        </a>
+                    </span>
+                    
+                    {% if not is_input_disabled %}
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('file-input-{{ question.id }}').click();">
+                            Reemplazar
+                        </button>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            {# File Input: Only displayed if no current answer OR if we are overriding an existing answer (via click/JS) #}
+            <input type="file" 
+                   name="response_{{ question.id }}" 
+                   id="file-input-{{ question.id }}" 
+                   {# Append conditional class instead of inline style #}
+                   class="form-control response-input file-input-watcher{% if current_answer and current_answer != 'file_uploaded' and not is_input_disabled %} hidden-by-jinja{% endif %}" 
+                   accept="{{ accepted_types }}" 
+                   {% if q_type == 'photo' %}capture="camera"{% endif %}
+                   {% if is_input_disabled %}disabled{% endif %}
+                   >
+                   
+            <small class="form-help file-name-display" data-name="response_{{ question.id }}" 
+                   {# Add class attribute and apply conditional class instead of inline style #}
+                   class="{% if current_answer and current_answer != 'file_uploaded' %}hidden-by-jinja{% endif %}"
+                   >
+                {{ display_placeholder }}
+            </small>
+
         {% else %}
-           <input type="text" class="form-control" value="Tipo no soportado: {{ question.type }}" readonly>
+           <input type="text" 
+                  class="form-control" 
+                  {# Now correctly showing the question ID, which helps pinpoint the issue #}
+                  value="Tipo no soportado: {{ question.id }} ({{ q_type or 'Vacío/Desconocido' }})" 
+                  disabled>
         {% endif %}
       </div>
     {% endfor %}
   </form>
 
-  {# Action Bar - Show save/complete options only if UI is NOT fully read-only OR if status allows transitions #}
+  {# Action Bar Logic #}
   {% set can_transition = task.status not in ['completed', 'reviewed', 'approved'] %}
-  {% set show_action_bar = can_transition or task.can_override_edit %}
+  {# Use top-level variable 'can_override_edit' #}
+  {% set show_action_bar = can_transition or can_override_edit %}
   
   {% if show_action_bar %}
   <div class="action-bar">
     <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary" id="backBtn">Volver</a>
     
-    {# If Admin/Planner can override, show Save button #}
-    {% if task.can_override_edit or task.status not in ['completed', 'reviewed', 'approved'] %}
-      <button type="button" class="btn btn-secondary" id="saveBtn">💾 Guardar</button>
+    {% if task.status == 'pending' %}
+        <button type="button" class="btn btn-primary" id="startBtn">▶️ Iniciar Faena</button>
+    {% endif %}
+
+    {% if task.status == 'in_progress' or can_override_edit %}
+        {# Attach Save logic to a generic button, logic will check for files #}
+        <button type="button" class="btn btn-secondary" id="saveBtn">💾 Guardar Progreso</button>
     {% endif %}
     
-    {# Show Start/Complete buttons only if status allows transitions, or if Admin/Planner can force transition #}
-    {% if can_transition or task.can_override_edit %}
-      
-      {% if task.status == 'pending' %}
-        <button type="button" class="btn btn-primary" id="startBtn">▶️ Iniciar</button>
-      {% elif task.status == 'in_progress' %}
-        <button type="button" class="btn btn-success" id="completeBtn">✓ Completar</button>
-      {% endif %}
-      
-      {# OPTIONAL: Add Review/Approve buttons for Admin/Planner here if needed #}
-      
+    {% if task.status == 'in_progress' %}
+        <button type="button" class="btn btn-success" id="completeBtn">✓ Completar Faena</button>
     {% endif %}
+
+    {% if is_finalized and can_override_edit and task.status != 'in_progress' %}
+      <button type="button" class="btn btn-primary" id="saveBtnOverride" style="margin-left: 20px;">
+        💾 Guardar (Admin Override)
+      </button>
+    {% endif %}
+
   </div>
   {% endif %}
   
@@ -290,9 +438,8 @@
   // --- INITIALIZATION ---
   const taskStatus = '{{ task.status }}';
   
-  // FIX: Use JSON.parse and surrounding quotes to robustly pass the JSON string 
-  // "true"/"false" from Jinja into a JavaScript boolean, satisfying the linter.
-  const canOverrideEdit = JSON.parse("{{ task.can_override_edit | tojson }}"); 
+  // Use top-level variable 'can_override_edit'
+  const canOverrideEdit = JSON.parse("{{ can_override_edit | tojson }}"); 
   const isTaskReadonly = taskStatus in ['completed', 'reviewed', 'approved'] && !canOverrideEdit;
   
   let hasUnsavedChanges = false;
@@ -300,14 +447,13 @@
   let totalQuestions = parseInt(document.getElementById('taskForm').dataset.totalQuestions);
 
   // Set default current date/time for empty fields on load
-  if (!isTaskReadonly) {
+  if (taskStatus === 'in_progress' || canOverrideEdit) {
       const now = new Date();
       const formattedDate = getFormattedDate(now);
       const formattedDateTime = getFormattedDateTime(now);
 
       // Set default for DATE inputs
       document.querySelectorAll('input.response-input[type="date"]').forEach(input => {
-          // Check if value is truly empty before setting default
           if (!input.value) {
               input.value = formattedDate;
           }
@@ -330,7 +476,8 @@
        if(i.disabled || i.readOnly) return; 
 
        if((i.type==='radio'||i.type==='checkbox') && i.checked) answered.add(i.name);
-       else if(i.value.trim()) answered.add(i.name);
+       // Files and text/number inputs are counted if they have a value
+       else if(i.value.trim() || (i.type === 'file' && i.files.length > 0)) answered.add(i.name);
     });
     const pct = (answered.size / totalQuestions) * 100;
     document.getElementById('progressBar').style.width = pct + '%';
@@ -338,7 +485,7 @@
   }
 
   document.querySelectorAll('.response-input').forEach(input => {
-    // Skip attaching listeners to readOnly or disabled fields
+    // Skip attaching listeners to disabled fields (pending or finalized without override)
     if(input.disabled || input.readOnly) return;
 
     input.addEventListener('change', () => {
@@ -346,9 +493,20 @@
       updateProgress();
       scheduleAutoSave();
     });
-    if(input.type==='text' || input.type==='number' || input.type==='textarea' || input.type==='date' || input.type==='datetime-local') {
+    // For text/number/textarea, also listen for input event
+    if(input.type!=='file') {
        input.addEventListener('input', () => { hasUnsavedChanges = true; });
     }
+  });
+  
+  // File input change watcher to update the display text
+  document.querySelectorAll('input[type="file"].file-input-watcher').forEach(input => {
+    input.addEventListener('change', function() {
+        // We no longer rely on the small tag for the file path, but still track change
+        hasUnsavedChanges = true;
+        updateProgress();
+        scheduleAutoSave();
+    });
   });
   
   updateProgress(); // Init
@@ -359,24 +517,30 @@
     document.querySelectorAll('.response-input').forEach(input => {
       const qId = input.name.replace('response_', '');
       
-      // Handle disabled/readonly fields: we still send their content if they have a value
+      // We skip file inputs here, as they must be handled by FormData later
+      if(input.type==='file') return;
+
+      // Handle other input types
       if(input.type==='radio') { 
           if(input.checked) responses[qId] = input.value; 
-      }
-      else if(input.type==='file') { 
-          // For file inputs, we assume the server handles the actual file upload separately 
-          // Here we just indicate that a file was handled if we're in the frontend save logic.
-          if(input.files.length || input.value) responses[qId] = 'file_uploaded'; 
-          else if (input.readOnly || input.disabled) responses[qId] = input.value; // Preserve existing value
       }
       else responses[qId] = input.value;
     });
     return responses;
   }
+  
+  // Helper to check if any file input has a file selected
+  function hasFilesToUpload() {
+      return Array.from(document.querySelectorAll('input[type="file"]')).some(
+          input => input.files.length > 0
+      );
+  }
 
   async function saveTask(statusChange = null) {
-    // Only attempt save if there are changes OR if a status change is forced (Admin/Planner)
-    if (!hasUnsavedChanges && !statusChange) {
+    const filesPresent = hasFilesToUpload();
+    
+    // Check if we can skip saving text data/status via JSON
+    if (!hasUnsavedChanges && !statusChange && !filesPresent) {
         console.log("No changes to save.");
         return;
     }
@@ -384,15 +548,41 @@
     const indicator = document.getElementById('saveIndicator');
     const text = document.getElementById('saveIndicatorText');
     indicator.classList.add('show'); 
-    indicator.classList.remove('saved'); // Reset saved state before starting
+    indicator.classList.remove('saved'); 
     text.textContent = 'Guardando...';
     
     try {
+      if (filesPresent) {
+          // --- Submission with Files (Multi-part Form) ---
+          const formData = new FormData(document.getElementById('taskForm'));
+          
+          const fileRes = await fetch(`/tasks/${taskId}/update`, {
+              method: 'POST', 
+              body: formData 
+          });
+
+          if (!fileRes.ok) {
+              const errorData = await fileRes.json();
+              throw new Error(errorData.error || 'Error uploading files');
+          }
+          
+          // CRITICAL: File uploaded successfully. Clear file inputs and reload to show saved path.
+          document.querySelectorAll('input[type="file"]').forEach(input => {
+              input.value = ''; 
+          });
+          // Force reload to update the UI with the saved file path/link from the DB
+          window.location.reload(); 
+          return; // Exit saveTask as reload will handle the rest
+      }
+
+      // --- Submission of Text/Status (JSON/PATCH) ---
+      // Send text data and status (even if files were just uploaded, to ensure status changes are recorded)
       const payload = { responses: collectResponses() };
-      if(statusChange) payload.status = statusChange;
+      if (statusChange) payload.status = statusChange;
       
       const res = await fetch(`/tasks/${taskId}/update`, {
-        method: 'PATCH', headers: {'Content-Type': 'application/json'},
+        method: 'PATCH', 
+        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(payload)
       });
       
@@ -402,17 +592,14 @@
         text.textContent = '✓ Guardado';
         hasUnsavedChanges = false; // Clear flag on success
         
-        // Hide the indicator after 2 seconds
         setTimeout(() => indicator.classList.remove('show', 'saved'), 2000); 
         
         if(statusChange) window.location.reload();
       } else {
-        // FAILURE: Show red text and remain visible
         const errorData = await res.json();
-        throw new Error(errorData.error || 'Error saving');
+        throw new Error(errorData.error || 'Error saving data');
       }
     } catch(e) {
-      // CATCH: Show warning text
       text.textContent = `⚠️ Error: ${e.message} (Guardando offline)`;
       indicator.classList.add('show');
       indicator.classList.remove('saved');
@@ -421,23 +608,27 @@
 
   let saveTimeout;
   function scheduleAutoSave() {
-    clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => { if(hasUnsavedChanges) saveTask(); }, 5000);
+    if (taskStatus === 'in_progress' || hasFilesToUpload()) {
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => { if(hasUnsavedChanges || hasFilesToUpload()) saveTask(); }, 5000);
+    }
   }
 
   // --- BUTTON HANDLERS ---
   
   document.getElementById('saveBtn')?.addEventListener('click', () => saveTask());
+  document.getElementById('saveBtnOverride')?.addEventListener('click', () => saveTask());
+
 
   // Start Task - Custom Confirmation
   document.getElementById('startBtn')?.addEventListener('click', () => {
     showConfirm(
-      '¿Estás seguro que deseas iniciar esta tarea? El tiempo comenzará a correr.',
+      '¿Estás seguro que deseas iniciar esta faena? El tiempo de llenado comenzará a contarse.',
       () => {
-        hasUnsavedChanges = false; // Allow reload
+        hasUnsavedChanges = true; 
         saveTask('in_progress');
       },
-      'Iniciar Tarea',
+      'Iniciar Faena',
       'Sí, iniciar',
       'primary'
     );
@@ -446,7 +637,6 @@
   // Complete Task - Custom Confirmation
   document.getElementById('completeBtn')?.addEventListener('click', () => {
     const form = document.getElementById('taskForm');
-    // Check form validity only if the user is a regular worker or if the task is not yet completed
     if(!canOverrideEdit && !form.checkValidity()) { 
         form.reportValidity(); 
         return; 
@@ -455,10 +645,10 @@
     showConfirm(
       '¿Confirmas que has completado la tarea? Una vez completada, pasará a revisión y no podrás editarla (a menos que seas Planificador/Administrador).',
       () => {
-        hasUnsavedChanges = false; // Allow reload
+        hasUnsavedChanges = true; 
         saveTask('completed');
       },
-      'Completar Tarea',
+      'Completar Faena',
       'Sí, completar',
       'success'
     );
@@ -469,11 +659,11 @@
     e.preventDefault();
     const targetUrl = this.href;
     
-    if (hasUnsavedChanges) {
+    if (hasUnsavedChanges || hasFilesToUpload()) {
       showConfirm(
         'Hay cambios sin guardar en esta tarea. ¿Seguro que deseas salir? Los cambios no guardados se perderán.',
         () => {
-          hasUnsavedChanges = false; // Disable native check
+          hasUnsavedChanges = false; 
           window.location.href = targetUrl;
         },
         'Cambios sin guardar',
@@ -487,7 +677,7 @@
 
   // --- BROWSER LEAVE WARNING (Native fallback) ---
   window.addEventListener('beforeunload', (e) => {
-    if (hasUnsavedChanges && !canOverrideEdit) { // Only warn regular users
+    if ((hasUnsavedChanges || hasFilesToUpload()) && (taskStatus === 'in_progress' || canOverrideEdit)) { 
       e.preventDefault();
       e.returnValue = ''; 
     }

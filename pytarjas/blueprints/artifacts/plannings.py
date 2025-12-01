@@ -142,7 +142,7 @@ def list_plannings():
     form_types = [ft[0] for ft in form_types if ft[0]]
     
     return render_template(
-        "planner/list_plannings.html",
+        "plannings/list_plannings.html", # FIX: Changed path from "planner/list_plannings.html"
         plannings=plannings_data,
         total=total,
         limit=limit,

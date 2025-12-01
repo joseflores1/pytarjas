@@ -208,6 +208,13 @@ Updates:
                         <label class="form-label">Texto <span style="color: var(--color-danger);">*</span></label>
                         <input type="text" name="question_text_{{ question.id }}" class="form-control" value="{{ question.question_text }}" required>
                       </div>
+
+                      {# NEW FIELD: Description #}
+                      <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Descripción de la Pregunta (Opcional)</label>
+                        <textarea name="question_description_{{ question.id }}" class="form-control" rows="2" placeholder="Ej: Registrar el valor del sello que se encuentra en la puerta.">{{ question.question_description or '' }}</textarea>
+                        <small class="form-help">Este texto aparecerá bajo la pregunta en el formulario de campo.</small>
+                      </div>
                       
                       <div class="form-group">
                         <label class="form-label">Tipo <span style="color: var(--color-danger);">*</span></label>
@@ -221,6 +228,7 @@ Updates:
                           <option value="boolean" {% if question.question_type == 'boolean' %}selected{% endif %}>✓ Sí/No (Radio)</option>
                           <option value="select" {% if question.question_type == 'select' %}selected{% endif %}>📋 Selección Múltiple</option>
                           <option value="file" {% if question.question_type == 'file' %}selected{% endif %}>📁 Archivo</option>
+                          <option value="client_select" {% if question.question_type == 'client_select' %}selected{% endif %}>🏢 Selector de Cliente</option>
                         </select>
                       </div>
                       
@@ -263,7 +271,7 @@ Updates:
                       </div>
 
                       {# Raw JSON Options - Toggled via class #}
-                      <div class="form-group raw-options-wrapper {% if question.question_type == 'select' %}hidden{% endif %}" 
+                      <div class="form-group raw-options-wrapper {% if question.question_type == 'select' or question.question_type == 'client_select' %}hidden{% endif %}" 
                            id="options_wrapper_{{ question.id }}">
                         <label class="form-label">Opciones Avanzadas (JSON)</label>
                         <textarea name="question_options_{{ question.id }}" class="form-control" rows="2" style="font-family: monospace;">{{ question.options|tojson if question.options else '' }}</textarea>
@@ -352,7 +360,12 @@ Updates:
       if (document.getElementById(`choices_list_${qId}`).children.length === 0) {
         addChoiceInput(qId);
       }
-    } else {
+    } else if (select.value === 'client_select') {
+        // NEW LOGIC: Client select has no options configuration
+        choicesContainer.classList.add('hidden');
+        optionsWrapper.classList.add('hidden');
+    }
+    else {
       choicesContainer.classList.add('hidden');
       optionsWrapper.classList.remove('hidden');
     }
@@ -478,6 +491,13 @@ Updates:
               <label class="form-label">Texto *</label>
               <input type="text" name="question_text_${tempId}" class="form-control" required>
             </div>
+            
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label class="form-label">Descripción de la Pregunta (Opcional)</label>
+              <textarea name="question_description_${tempId}" class="form-control" rows="2" placeholder="Ej: Registrar el valor del sello que se encuentra en la puerta."></textarea>
+              <small class="form-help">Este texto aparecerá bajo la pregunta en el formulario de campo.</small>
+            </div>
+
             <div class="form-group">
               <label class="form-label">Tipo *</label>
               <select name="question_type_${tempId}" class="form-control" required onchange="toggleChoicesSection(this, '${tempId}')">
@@ -490,6 +510,7 @@ Updates:
                 <option value="boolean">✓ Sí/No (Radio)</option>
                 <option value="select">📋 Selección Múltiple</option>
                 <option value="file">📁 Archivo</option>
+                <option value="client_select">🏢 Selector de Cliente</option>
               </select>
             </div>
             <div class="form-group">
@@ -587,7 +608,7 @@ Updates:
   }
 
   // Submit Handler: Serialize choices to JSON
-  document.getElementById('editFormForm').addEventListener('submit', function(e) {
+  document.getElementById('createFormForm').addEventListener('submit', function(e) {
     const cards = document.querySelectorAll('.question-card');
     let isValid = true;
 
@@ -614,25 +635,32 @@ Updates:
         opts.choices = choices;
         optionsArea.value = JSON.stringify(opts);
       }
+      else if (typeSelect.value === 'client_select') {
+          optionsArea.value = '';
+      }
     });
 
     if (!isValid) e.preventDefault();
     else {
       formChanged = false;
-      this.querySelector('button[type="submit"]').textContent = '💾 Guardando...';
+      this.querySelector('button[type="submit"]').textContent = '💾 Creando...';
     }
   });
 
   // Initialize: Collapse all and ensure choices visible for existing selects + button states
   document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.question-card').forEach(card => {
-      card.classList.add('collapsed');
-      // Ensure select types have choice builder visible even if collapsed (for when they expand)
-      const qId = card.getAttribute('data-question-id');
-      const select = card.querySelector('select');
-      if (select) toggleChoicesSection(select, qId);
-    });
-    updateQuestionCount(); // Set initial order numbers and button states
+    // We only need to attach event listeners if there are existing forms
+    if (document.getElementById('questionsContainer').children.length > 1) { // >1 because of noQuestionsMessage
+      document.querySelectorAll('.question-card').forEach(card => {
+        card.classList.add('collapsed');
+        const qId = card.getAttribute('data-question-id');
+        const select = card.querySelector('select');
+        if (select) toggleChoicesSection(select, qId);
+      });
+      document.getElementById('noQuestionsMessage').style.display = 'none';
+      document.getElementById('bottomAddButtonWrapper').style.display = 'block';
+    }
+
+    updateQuestionCount(); 
   });
 </script>
-{% endblock %}

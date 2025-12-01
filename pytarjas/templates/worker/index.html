@@ -1,137 +1,274 @@
 {# pytarjas/templates/worker/index.html #}
 {# 
 Worker Dashboard Template
-
-This is the main landing page for field workers.
-It displays statistics about their assigned tasks and provides
-quick access to task lists and other features.
-
-This template is designed to work both online and offline as part of the PWA.
-
-Variables passed from worker.py:
-- user: Current user object (g.user)
-- pending_count: Number of pending tasks
-- in_progress_count: Number of tasks in progress
-- completed_today: Number of tasks completed today
-- total_assigned: Total number of tasks assigned to this worker
 #}
 
 {% extends 'base.html' %}
 
-{% block title %}Worker Dashboard{% endblock %}
+{% block title %}Panel de Trabajador{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Worker Dashboard Styles (Prettified based on HGT theme) */
+  .worker-dashboard {
+    max-width: 1200px;
+    margin: var(--space-xl) auto;
+    padding: 0 var(--space-lg);
+  }
+  
+  .dashboard-header h1 {
+    font-size: var(--font-size-3xl);
+    margin-bottom: var(--space-sm);
+    color: var(--color-text-primary);
+  }
+  
+  .dashboard-header p {
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-xl);
+  }
+
+  /* Statistics Cards - Using Card component style */
+  .dashboard-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-lg);
+    margin-bottom: var(--space-3xl);
+  }
+  
+  /* Applying .stat-card styling to the anchor tag itself */
+  .stat-card-link {
+    /* Inherit all card properties from the original .stat-card styles */
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    transition: all var(--transition-fast);
+    cursor: pointer;
+    background: var(--color-bg-primary);
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+    box-shadow: var(--shadow-md);
+    text-decoration: none; /* Remove underline */
+    color: inherit; /* Inherit text color */
+  }
+  
+  .stat-card-link:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+  
+  .stat-icon {
+    font-size: 2.5rem;
+    line-height: 1;
+    color: var(--color-primary);
+    margin-bottom: var(--space-sm);
+  }
+  
+  .stat-content h3 {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-bold);
+    margin: 0;
+    color: var(--color-text-primary);
+  }
+  
+  .stat-content p {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-base);
+  }
+  
+  /* Colored headers/borders for distinction */
+  .stat-card-link.pending { border-top: 4px solid var(--color-warning); }
+  .stat-card-link.in-progress { border-top: 4px solid var(--color-info); }
+  .stat-card-link.completed { border-top: 4px solid var(--color-secondary); }
+  .stat-card-link.total { border-top: 4px solid var(--color-primary); }
+
+  /* Quick Actions Section */
+  .quick-actions {
+    margin-bottom: var(--space-3xl);
+  }
+  
+  .quick-actions h2 {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    margin-bottom: var(--space-lg);
+    color: var(--color-text-primary);
+  }
+  
+  .action-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-md);
+  }
+  
+  .action-btn {
+    padding: var(--space-lg) var(--space-md);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    box-shadow: var(--shadow-md);
+    text-align: center;
+    transition: transform 0.2s;
+  }
+  
+  .action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+  
+  .action-btn .btn-icon {
+    display: block;
+    font-size: 2rem;
+    margin-bottom: var(--space-sm);
+  }
+  
+  /* Button Color Variants matching your image's colors */
+  .action-btn.primary { background-color: var(--color-primary); color: white; }
+  .action-btn.secondary { background-color: #6366f1; color: white; } /* Purple/Blue from image */
+  .action-btn.success { background-color: var(--color-secondary); color: white; }
+  .action-btn.info { background-color: var(--color-warning); color: white; } /* Orange for Help */
+
+  /* Connection Status */
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-md) var(--space-lg);
+    border-radius: var(--radius-md);
+    font-weight: var(--font-weight-medium);
+  }
+  
+  .status-indicator.online {
+    background-color: var(--color-secondary-dark);
+    color: white;
+  }
+  
+  .status-indicator.offline {
+    background-color: var(--color-danger);
+    color: white;
+  }
+
+</style>
+{% endblock %}
 
 {% block header %}
-  <h1>ðŸ‘‹ Welcome, {{ user.username }}!</h1>
-  <p>Field Worker Dashboard</p>
+  {# Using the base.html layout, so the actual header block content is minimal #}
 {% endblock %}
 
 {% block content %}
 <div class="worker-dashboard">
   
+  {# DASHBOARD HEADER #}
+  <div class="dashboard-header">
+    <h1 style="margin-top: 0; padding-top: var(--space-lg);">👋 Bienvenido, {{ user.username }}!</h1>
+    <p>Panel de Control de Faenas</p>
+  </div>
+  
   {# Statistics Cards #}
   <section class="dashboard-stats">
-    <div class="stat-card pending">
-      <div class="stat-icon">ðŸ“‹</div>
+    
+    {# FIX: Converted div+onclick to anchor tag for clean navigation #}
+    <a href="{{ url_for('tasks.list_tasks', status='pending') }}" class="stat-card-link pending">
+      <div class="stat-icon">📥</div>
       <div class="stat-content">
         <h3>{{ pending_count }}</h3>
-        <p>Pending Tasks</p>
+        <p>Tareas Pendientes</p>
       </div>
-    </div>
+    </a>
     
-    <div class="stat-card in-progress">
-      <div class="stat-icon">âš™ï¸</div>
+    {# FIX: Converted div+onclick to anchor tag for clean navigation #}
+    <a href="{{ url_for('tasks.list_tasks', status='in_progress') }}" class="stat-card-link in-progress">
+      <div class="stat-icon">⚙️</div>
       <div class="stat-content">
         <h3>{{ in_progress_count }}</h3>
-        <p>In Progress</p>
+        <p>En Progreso</p>
       </div>
-    </div>
+    </a>
     
-    <div class="stat-card completed">
-      <div class="stat-icon">âœ…</div>
+    {# FIX: Converted div+onclick to anchor tag for clean navigation #}
+    <a href="{{ url_for('tasks.list_tasks', status='completed') }}" class="stat-card-link completed">
+      <div class="stat-icon">✅</div>
       <div class="stat-content">
         <h3>{{ completed_today }}</h3>
-        <p>Completed Today</p>
+        <p>Completadas Hoy</p>
       </div>
-    </div>
+    </a>
     
-    <div class="stat-card total">
-      <div class="stat-icon">ðŸ“Š</div>
+    {# FIX: Converted div+onclick to anchor tag for clean navigation #}
+    <a href="{{ url_for('tasks.list_tasks') }}" class="stat-card-link total">
+      <div class="stat-icon">📊</div>
       <div class="stat-content">
         <h3>{{ total_assigned }}</h3>
-        <p>Total Assigned</p>
+        <p>Total Asignadas</p>
       </div>
-    </div>
+    </a>
   </section>
   
   {# Quick Actions #}
   <section class="quick-actions">
-    <h2>Quick Actions</h2>
+    <h2>Acciones Rápidas</h2>
     <div class="action-buttons">
+      
       <a href="{{ url_for('tasks.create_task') }}" class="action-btn primary">
         <span class="btn-icon">➕</span>
-        <span class="btn-text">Create Task</span>
+        <span class="btn-text">Crear Tarea</span>
       </a>
       
-      <a href="{{ url_for('tasks.list_tasks', status='pending') }}" class="action-btn primary">
-        <span class="btn-icon">ðŸ“</span>
-        <span class="btn-text">View Pending Tasks</span>
+      <a href="{{ url_for('tasks.list_tasks', status='pending') }}" class="action-btn info">
+        <span class="btn-icon">📋</span>
+        <span class="btn-text">Ver Pendientes</span>
       </a>
       
       <a href="{{ url_for('tasks.list_tasks', status='in_progress') }}" class="action-btn secondary">
-        <span class="btn-icon">ðŸ”„</span>
-        <span class="btn-text">Continue Working</span>
+        <span class="btn-icon">▶️</span>
+        <span class="btn-text">Continuar Faena</span>
       </a>
       
       <a href="{{ url_for('tasks.list_tasks', status='completed') }}" class="action-btn success">
-        <span class="btn-icon">ðŸ“‹</span>
-        <span class="btn-text">View Completed</span>
+        <span class="btn-icon">🗓️</span>
+        <span class="btn-text">Ver Completadas</span>
       </a>
       
-      <a href="{{ url_for('worker.help_page') }}" class="action-btn info">
-        <span class="btn-icon">â“</span>
-        <span class="btn-text">Help & Guide</span>
+      <a href="{{ url_for('worker.profile') }}" class="action-btn primary" style="background-color: var(--color-text-secondary);">
+        <span class="btn-icon">👤</span>
+        <span class="btn-text">Mi Perfil</span>
       </a>
+
+      <a href="{{ url_for('worker.help_page') }}" class="action-btn secondary" style="background-color: var(--color-text-tertiary);">
+        <span class="btn-icon">❓</span>
+        <span class="btn-text">Ayuda & Guía</span>
+      </a>
+
     </div>
   </section>
   
-  {# Offline Status Indicator #}
+  {# Connection Status Indicator #}
   <section class="connection-status">
     <div id="online-status" class="status-indicator online">
-      <span class="status-icon">ðŸŸ¢</span>
-      <span class="status-text">Connected</span>
+      <span class="status-icon">🟢</span>
+      <span class="status-text">Conectado. Sincronización OK.</span>
     </div>
     <div id="offline-status" class="status-indicator offline" style="display: none;">
-      <span class="status-icon">ðŸ”´</span>
-      <span class="status-text">Offline Mode - Changes will sync when reconnected</span>
-    </div>
-  </section>
-  
-  {# Recent Activity (Optional - can be implemented later) #}
-  <section class="recent-activity">
-    <h2>Recent Activity</h2>
-    <div class="activity-placeholder">
-      <p>Recent task updates will appear here...</p>
-      <small>This feature will show your most recent task interactions</small>
+      <span class="status-icon">🔴</span>
+      <span class="status-text">Modo Offline. Guardando progreso localmente.</span>
     </div>
   </section>
   
   {# Tips for Field Workers #}
-  <section class="worker-tips">
-    <h2>ðŸ’¡ Tips</h2>
-    <ul class="tips-list">
-      <li>
-        <strong>Working Offline:</strong> This app works without internet! Your progress is saved locally and syncs automatically when you reconnect.
-      </li>
-      <li>
-        <strong>Save Progress:</strong> Your form answers are saved as you type. You can safely close and reopen tasks.
-      </li>
-      <li>
-        <strong>Take Photos:</strong> Photos are stored on your device until you have internet connection to upload them.
-      </li>
-      <li>
-        <strong>Install as App:</strong> Add this to your home screen for a better experience (look for "Install App" in your browser menu).
-      </li>
-    </ul>
+  <section class="card" style="margin-top: var(--space-xl);">
+    <div class="card-body">
+      <h2 class="card-title" style="margin-bottom: var(--space-md);">💡 Consejos para Faenas</h2>
+      <ul class="tips-list" style="list-style-type: none; padding-left: 0;">
+        <li style="margin-bottom: var(--space-sm);">
+          <strong>Trabajo Offline:</strong> Esta PWA funciona sin internet. Su progreso se guarda localmente y sincroniza automáticamente al reconectar.
+        </li>
+        <li style="margin-bottom: var(--space-sm);">
+          <strong>Guardado Automático:</strong> Las respuestas se guardan en su dispositivo al instante. Puede cerrar y reabrir tareas de forma segura.
+        </li>
+        <li>
+          <strong>Instalar como App:</strong> Para la mejor experiencia, instale la aplicación en su pantalla de inicio (busque "Instalar App" en el menú del navegador).
+        </li>
+      </ul>
+    </div>
   </section>
   
 </div>
@@ -139,241 +276,30 @@ Variables passed from worker.py:
 {# JavaScript for online/offline detection #}
 <script>
   // Online/Offline status detection
-  // This provides real-time feedback about connection status
-  
   const onlineIndicator = document.getElementById('online-status');
   const offlineIndicator = document.getElementById('offline-status');
   
-  // Function to update UI based on connection status
   function updateConnectionStatus() {
     if (navigator.onLine) {
-      // We're online
       onlineIndicator.style.display = 'flex';
       offlineIndicator.style.display = 'none';
     } else {
-      // We're offline
       onlineIndicator.style.display = 'none';
       offlineIndicator.style.display = 'flex';
     }
   }
   
-  // Update status on page load
   updateConnectionStatus();
-  
-  // Listen for online/offline events
-  // These fire when browser detects network changes
   window.addEventListener('online', updateConnectionStatus);
   window.addEventListener('offline', updateConnectionStatus);
   
-  // Optional: Check connection periodically (every 30 seconds)
-  // This catches cases where browser events don't fire
-  setInterval(updateConnectionStatus, 30000);
+  document.addEventListener('DOMContentLoaded', () => {
+      // Small adjustment for the link class to match the div styling.
+      document.querySelectorAll('.stat-card-link').forEach(link => {
+          // Re-apply visual styling that might be lost when switching from div to a
+          link.classList.add('card'); 
+      });
+  });
 </script>
-
-<style>
-  /* Worker Dashboard Styles */
-  /* These styles make the dashboard mobile-friendly and easy to use in field conditions */
-  
-  .worker-dashboard {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 1rem;
-  }
-  
-  /* Statistics Cards */
-  .dashboard-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-bottom: 2rem;
-  }
-  
-  .stat-card {
-    background: white;
-    border-radius: 8px;
-    padding: 1.5rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    transition: transform 0.2s;
-  }
-  
-  .stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-  }
-  
-  .stat-icon {
-    font-size: 2.5rem;
-  }
-  
-  .stat-content h3 {
-    font-size: 2rem;
-    margin: 0;
-    color: #333;
-  }
-  
-  .stat-content p {
-    margin: 0;
-    color: #666;
-    font-size: 0.9rem;
-  }
-  
-  /* Colored borders for different card types */
-  .stat-card.pending { border-left: 4px solid #fbbf24; }
-  .stat-card.in-progress { border-left: 4px solid #3b82f6; }
-  .stat-card.completed { border-left: 4px solid #10b981; }
-  .stat-card.total { border-left: 4px solid #6366f1; }
-  
-  /* Quick Actions Section */
-  .quick-actions {
-    margin-bottom: 2rem;
-  }
-  
-  .quick-actions h2 {
-    margin-bottom: 1rem;
-    color: #333;
-  }
-  
-  .action-buttons {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-  }
-  
-  .action-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 1rem 1.5rem;
-    border-radius: 8px;
-    text-decoration: none;
-    color: white;
-    font-weight: 500;
-    transition: all 0.2s;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-  
-  .action-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  }
-  
-  .btn-icon {
-    font-size: 1.5rem;
-  }
-  
-  /* Button color variants */
-  .action-btn.primary { background-color: #3b82f6; }
-  .action-btn.primary:hover { background-color: #2563eb; }
-  
-  .action-btn.secondary { background-color: #6366f1; }
-  .action-btn.secondary:hover { background-color: #4f46e5; }
-  
-  .action-btn.success { background-color: #10b981; }
-  .action-btn.success:hover { background-color: #059669; }
-  
-  .action-btn.info { background-color: #f59e0b; }
-  .action-btn.info:hover { background-color: #d97706; }
-  
-  /* Connection Status */
-  .connection-status {
-    margin-bottom: 2rem;
-  }
-  
-  .status-indicator {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    border-radius: 8px;
-    font-weight: 500;
-  }
-  
-  .status-indicator.online {
-    background-color: #d1fae5;
-    color: #065f46;
-  }
-  
-  .status-indicator.offline {
-    background-color: #fee2e2;
-    color: #991b1b;
-  }
-  
-  /* Recent Activity */
-  .recent-activity {
-    margin-bottom: 2rem;
-  }
-  
-  .recent-activity h2 {
-    margin-bottom: 1rem;
-    color: #333;
-  }
-  
-  .activity-placeholder {
-    background: white;
-    padding: 2rem;
-    border-radius: 8px;
-    text-align: center;
-    color: #666;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-  
-  /* Worker Tips */
-  .worker-tips {
-    background: #eff6ff;
-    padding: 1.5rem;
-    border-radius: 8px;
-    border-left: 4px solid #3b82f6;
-  }
-  
-  .worker-tips h2 {
-    margin-top: 0;
-    color: #1e40af;
-  }
-  
-  .tips-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-  
-  .tips-list li {
-    padding: 0.75rem 0;
-    border-bottom: 1px solid #dbeafe;
-  }
-  
-  .tips-list li:last-child {
-    border-bottom: none;
-  }
-  
-  .tips-list strong {
-    color: #1e40af;
-  }
-  
-  /* Mobile responsiveness */
-  @media (max-width: 768px) {
-    .dashboard-stats {
-      grid-template-columns: repeat(2, 1fr);
-    }
-    
-    .action-buttons {
-      grid-template-columns: 1fr;
-    }
-    
-    .stat-card {
-      padding: 1rem;
-    }
-    
-    .stat-icon {
-      font-size: 2rem;
-    }
-    
-    .stat-content h3 {
-      font-size: 1.5rem;
-    }
-  }
-</style>
 
 {% endblock %}

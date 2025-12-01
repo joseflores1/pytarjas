@@ -94,6 +94,7 @@ def get_form(form_id):
                     {
                         "id": q.id,
                         "question_text": q.question_text,
+                        "question_description": q.question_description, # NEW FIELD
                         "question_type": q.question_type,
                         "is_required": q.is_required,
                         "order": q.order,
@@ -143,6 +144,7 @@ def create_form():
 
                 question_data = {
                     "question_text": request.form.get(f"question_text_{q_id}"),
+                    "question_description": request.form.get(f"question_description_{q_id}"), # NEW FIELD
                     "question_type": request.form.get(f"question_type_{q_id}"),
                     "order": int(request.form.get(f"question_order_{q_id}", 0)),
                     "is_required": request.form.get(f"question_required_{q_id}") == "true",
@@ -159,7 +161,8 @@ def create_form():
             if existing_form:
                 error = f"Form name '{name}' is already in use."
         
-        valid_question_types = ["text", "number", "photo", "date", "datetime", "boolean", "select", "textarea", "file"]
+        valid_question_types = ["text", "number", "photo", "date", "datetime", "boolean", "select", "textarea", "file", "client_select"]
+
         if not error and questions_data:
             for idx, q in enumerate(questions_data):
                 q_type = q.get("question_type")
@@ -186,6 +189,7 @@ def create_form():
                         "id": str(uuid.uuid4()),
                         "form_id": new_form.id,
                         "question_text": q_data.get("question_text", ""),
+                        "question_description": q_data.get("question_description"), # NEW FIELD
                         "question_type": q_data.get("question_type", "text"),
                         "is_required": q_data.get("is_required", True),
                         "order": q_data.get("order", 0),
@@ -275,6 +279,7 @@ def edit_form(form_id):
                 q_data = {
                     "id": q_id, # ID is passed for existing/new questions
                     "question_text": request.form.get(f"question_text_{q_id}"),
+                    "question_description": request.form.get(f"question_description_{q_id}"), # NEW FIELD
                     "question_type": request.form.get(f"question_type_{q_id}"),
                     "order": int(request.form.get(f"question_order_{q_id}", 0)),
                     "is_required": request.form.get(f"question_required_{q_id}") == "true",
@@ -325,6 +330,7 @@ def edit_form(form_id):
                             question = Question.query.get(q_id)
                             if question:
                                 question.question_text = q_data.get("question_text", question.question_text)
+                                question.question_description = q_data.get("question_description", question.question_description) # NEW FIELD
                                 question.question_type = q_data.get("question_type", question.question_type)
                                 question.is_required = q_data.get("is_required", question.is_required)
                                 question.order = q_data.get("order", question.order)
@@ -337,6 +343,7 @@ def edit_form(form_id):
                                 id=str(uuid.uuid4()),
                                 form_id=form.id,
                                 question_text=q_data.get("question_text", ""),
+                                question_description=q_data.get("question_description"), # NEW FIELD
                                 question_type=q_data.get("question_type", "text"),
                                 is_required=q_data.get("is_required", True),
                                 order=q_data.get("order", 0),
@@ -390,6 +397,7 @@ def edit_form(form_id):
                     {
                         "id": q.id,
                         "question_text": q.question_text,
+                        "question_description": q.question_description, # NEW FIELD
                         "question_type": q.question_type,
                         "is_required": q.is_required,
                         "order": q.order,

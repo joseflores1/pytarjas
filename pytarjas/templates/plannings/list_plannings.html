@@ -1,4 +1,4 @@
-{# pytarjas/templates/planner/list_plannings.html #}
+{# pytarjas/templates/plannings/list_plannings.html #}
 {% extends 'base.html' %}
 
 {% block title %}Listado de Planificaciones{% endblock %}
@@ -12,7 +12,8 @@
           Mostrando todas las planificaciones del sistema.
         </p>
       </div>
-      <a href="{{ url_for('planner.create_planning') }}" class="btn btn-primary btn-lg">
+      {# FIX: Link to the create endpoint using the correct blueprint name: plannings.create_planning #}
+      <a href="{{ url_for('plannings.create_planning') }}" class="btn btn-primary btn-lg">
         ➕ Crear Nueva Planificación
       </a>
     </div>

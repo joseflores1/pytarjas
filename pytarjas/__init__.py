@@ -1,6 +1,6 @@
 # pytarjas/__init__.py
 import os
-from flask import Flask, redirect, url_for, session
+from flask import Flask, redirect, url_for, session, send_from_directory # NEW: Import send_from_directory
 from .models.user_models import User
 
 def create_app(test_config=None):
@@ -27,7 +27,8 @@ def create_app(test_config=None):
     
     try:
         upload_path = os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'])
-        os.makedirs(upload_path)
+        os.makedirs(upload_path, exist_ok=True) # Ensure exist_ok=True is set
+        app.config['UPLOAD_PATH'] = upload_path # NEW: Store the full path for serving
     except OSError:
         pass
     
@@ -65,6 +66,19 @@ def create_app(test_config=None):
     from .blueprints.artifacts import plannings # <-- NEW REGISTRATION
     app.register_blueprint(plannings.bp) # <-- NEW REGISTRATION
 
+    # ============================================================================
+    # CRITICAL FIX: SERVE UPLOADED FILES FROM INSTANCE PATH
+    # ============================================================================
+    @app.route('/uploads/<path:filename>')
+    def serve_uploaded_file(filename):
+        # We serve the file directly from the instance/uploads path.
+        # This handles the /uploads/uuid.ext URL structure used in the DB/Template.
+        # Note: This is an insecure default; in production, Azure Blob Storage should handle this.
+        return send_from_directory(
+            app.config['UPLOAD_PATH'], 
+            filename
+        )
+    
     # FIX DE SEGURIDAD: DESHABILITAR CACHÉ DEL NAVEGADOR (BFCACHE)
     @app.after_request
     def set_secure_headers(response):
