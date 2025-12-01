@@ -137,7 +137,6 @@
         font-size: var(--font-size-sm);
         color: var(--color-text-secondary);
         margin-top: var(--space-xs);
-        margin-bottom: var(--space-md);
         padding-left: calc(var(--space-md) + 24px); /* Align with content */
     }
     
@@ -147,13 +146,31 @@
         background: var(--color-bg-secondary);
         border-radius: var(--radius-md);
         display: flex;
-        align-items: center;
-        justify-content: space-between;
+        flex-direction: column; /* Changed to column for image display */
+        gap: var(--space-md);
+        align-items: flex-start;
     }
     .file-display-box a {
         font-weight: var(--font-weight-medium);
         color: var(--color-info);
         word-break: break-all;
+    }
+    
+    /* FIX: Added style for embedded image */
+    .file-display-box .uploaded-image {
+        max-width: 100%;
+        height: auto;
+        max-height: 250px; /* Constrain height */
+        border-radius: var(--radius-sm);
+        object-fit: contain;
+        cursor: pointer;
+    }
+    
+    .file-link-container {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+        align-items: center;
     }
     
     /* FIX: New class for dynamic hiding to solve linter issue */
@@ -214,7 +231,7 @@
       <div class="question-card">
         <div class="question-text">
           <span class="question-number">{{ loop.index }}</span>
-          {{ question.text }} 
+          {{ question.question_text }} 
           
           {# NEW: Display Question Type with Icon #}
           <span class="question-type-badge">
@@ -226,12 +243,11 @@
         </div>
 
         {# NEW: Display Question Description #}
-        {% if question.description %}
-            <p class="question-description-text">{{ question.description }}</p>
+        {% if question.question_description %}
+            <p class="question-description-text">{{ question.question_description }}</p>
         {% endif %}
 
         {# Use q_type for robust comparison (handles None/Undefined/Whitespace safely) #}
-        {# FIX: Use question.question_type #}
         {% set q_type = question.question_type|default('')|string|trim %}
         
         {# TEXT (Short) #}
@@ -331,26 +347,38 @@
             
             {% set accepted_types = 'image/*' if q_type == 'photo' else '.pdf,.doc,.docx,.jpg,.jpeg,.png' %}
             {% set display_placeholder = 'Seleccionar o tomar fotografía' if q_type == 'photo' else 'Seleccionar archivo (PDF, DOC, Imagen)' %}
+            {% set current_answer = task.responses.get(question.id, '') %} {# Re-get current answer to ensure it's fresh #}
             {% set current_filename = current_answer.split('/')[-1] if '/' in current_answer else current_answer %}
 
             {# Show the existing file/path display if an answer is saved #}
             {% if current_answer and current_answer != 'file_uploaded' %}
-                <div class="file-display-box mb-md">
-                    <span>
-                        <span style="font-size: var(--font-size-xl); margin-right: var(--space-sm);">
-                            {{ '📷' if q_type == 'photo' else '📄' }}
-                        </span>
-                        Archivo subido: 
-                        <a href="/{{ current_answer }}" target="_blank" title="Ver archivo">
-                            {{ current_filename }}
+                <div class="file-display-box mb-md" id="file-display-{{ question.id }}">
+                    {# EMBED IMAGE IF PHOTO TYPE #}
+                    {% if q_type == 'photo' %}
+                        {# FIX: Use direct URL access defined in __init__.py #}
+                        <a href="/{{ current_answer }}" target="_blank" title="Ver imagen en tamaño completo">
+                            <img src="/{{ current_answer }}" alt="Foto adjunta" class="uploaded-image">
                         </a>
-                    </span>
-                    
-                    {% if not is_input_disabled %}
-                        <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('file-input-{{ question.id }}').click();">
-                            Reemplazar
-                        </button>
                     {% endif %}
+                    
+                    <div class="file-link-container">
+                        <span>
+                            <span style="font-size: var(--font-size-xl); margin-right: var(--space-sm);">
+                                {{ '📷' if q_type == 'photo' else '📄' }}
+                            </span>
+                            Archivo subido: 
+                            <a href="/{{ current_answer }}" target="_blank" title="Ver archivo">
+                                {{ current_filename }}
+                            </a>
+                        </span>
+                        
+                        {% if not is_input_disabled %}
+                            {# FIX: Use the new handleReplace function #}
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="handleReplace('{{ question.id }}')">
+                                Reemplazar
+                            </button>
+                        {% endif %}
+                    </div>
                 </div>
             {% endif %}
 
@@ -368,6 +396,7 @@
             <small class="form-help file-name-display" data-name="response_{{ question.id }}" 
                    {# Add class attribute and apply conditional class instead of inline style #}
                    class="{% if current_answer and current_answer != 'file_uploaded' %}hidden-by-jinja{% endif %}"
+                   id="file-name-display-{{ question.id }}"
                    >
                 {{ display_placeholder }}
             </small>
@@ -375,7 +404,6 @@
         {% else %}
            <input type="text" 
                   class="form-control" 
-                  {# Now correctly showing the question ID, which helps pinpoint the issue #}
                   value="Tipo no soportado: {{ question.id }} ({{ q_type or 'Vacío/Desconocido' }})" 
                   disabled>
         {% endif %}
@@ -393,7 +421,7 @@
     <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary" id="backBtn">Volver</a>
     
     {% if task.status == 'pending' %}
-        <button type="button" class="btn btn-primary" id="startBtn">▶️ Iniciar Faena</button>
+        <button type="button" class="btn btn-primary" id="startBtn">▶️ Iniciar Tarea</button>
     {% endif %}
 
     {% if task.status == 'in_progress' or can_override_edit %}
@@ -402,7 +430,7 @@
     {% endif %}
     
     {% if task.status == 'in_progress' %}
-        <button type="button" class="btn btn-success" id="completeBtn">✓ Completar Faena</button>
+        <button type="button" class="btn btn-success" id="completeBtn">✓ Completar Tarea</button>
     {% endif %}
 
     {% if is_finalized and can_override_edit and task.status != 'in_progress' %}
@@ -436,7 +464,7 @@
   }
 
   // --- INITIALIZATION ---
-  const taskStatus = '{{ task.status }}';
+  let taskStatus = '{{ task.status }}'; 
   
   // Use top-level variable 'can_override_edit'
   const canOverrideEdit = JSON.parse("{{ can_override_edit | tojson }}"); 
@@ -484,8 +512,23 @@
     document.getElementById('progressText').textContent = `${answered.size} / ${totalQuestions}`;
   }
 
+  // Function to disable the global unload warning 
+  function disableUnloadWarning() {
+      // FIX: Ensure the handler is removed and re-attached correctly
+      window.removeEventListener('beforeunload', beforeUnloadHandler);
+      // Re-attach after a short delay, to catch unsaved changes post-save/redirect
+      setTimeout(() => window.addEventListener('beforeunload', beforeUnloadHandler), 500);
+  }
+
+  function beforeUnloadHandler(e) {
+    if ((hasUnsavedChanges || hasFilesToUpload()) && (taskStatus === 'in_progress' || canOverrideEdit)) { 
+      e.preventDefault();
+      e.returnValue = ''; 
+    }
+  }
+  
+  // Attach general listeners
   document.querySelectorAll('.response-input').forEach(input => {
-    // Skip attaching listeners to disabled fields (pending or finalized without override)
     if(input.disabled || input.readOnly) return;
 
     input.addEventListener('change', () => {
@@ -493,16 +536,13 @@
       updateProgress();
       scheduleAutoSave();
     });
-    // For text/number/textarea, also listen for input event
     if(input.type!=='file') {
        input.addEventListener('input', () => { hasUnsavedChanges = true; });
     }
   });
   
-  // File input change watcher to update the display text
   document.querySelectorAll('input[type="file"].file-input-watcher').forEach(input => {
     input.addEventListener('change', function() {
-        // We no longer rely on the small tag for the file path, but still track change
         hasUnsavedChanges = true;
         updateProgress();
         scheduleAutoSave();
@@ -510,6 +550,60 @@
   });
   
   updateProgress(); // Init
+  window.addEventListener('beforeunload', beforeUnloadHandler); // Re-attach listener globally
+
+
+  // --- IMAGE REPLACEMENT UI HANDLER ---
+  window.handleReplace = function(questionId) {
+      const fileInput = document.getElementById(`file-input-${questionId}`);
+      const fileDisplay = document.getElementById(`file-display-${questionId}`);
+      const nameDisplay = document.getElementById(`file-name-display-${questionId}`);
+      
+      if (fileInput) fileInput.classList.remove('hidden-by-jinja');
+      if (fileDisplay) fileDisplay.classList.add('hidden-by-jinja');
+      if (nameDisplay) nameDisplay.classList.remove('hidden-by-jinja');
+
+      // Clear the value to force a new file selection
+      fileInput.value = '';
+      hasUnsavedChanges = true;
+  }
+  
+  // --- UI DYNAMIC UPDATE FUNCTION ---
+  function updateUiForStatusChange(newStatus) {
+    const statusBadge = document.querySelector('.status-badge');
+    const startBtn = document.getElementById('startBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const completeBtn = document.getElementById('completeBtn');
+    const saveBtnOverride = document.getElementById('saveBtnOverride');
+
+    // 1. Update global state variable
+    taskStatus = newStatus;
+    
+    // 2. Update status badge display
+    if (statusBadge) {
+        statusBadge.className = `status-badge status-${newStatus}`;
+        statusBadge.textContent = newStatus.replace('_', ' ');
+    }
+
+    // 3. Update button visibility and status (This handles the "Iniciar Tarea" change)
+    if (startBtn) startBtn.style.display = 'none';
+    if (saveBtn) saveBtn.style.display = (newStatus === 'in_progress' || canOverrideEdit) ? '' : 'none';
+    if (completeBtn) completeBtn.style.display = (newStatus === 'in_progress') ? '' : 'none';
+    
+    // The override save button remains visible if the user has override rights
+    const isFinalizedAndOverride = newStatus in ['completed', 'reviewed', 'approved'] && canOverrideEdit;
+    if (saveBtnOverride) saveBtnOverride.style.display = isFinalizedAndOverride ? '' : 'none';
+  
+    // 4. Update input lock state
+    const isLocked = (newStatus in ['completed', 'reviewed', 'approved'] && !canOverrideEdit) || newStatus === 'pending';
+    document.querySelectorAll('.response-input').forEach(input => {
+        input.disabled = isLocked;
+    });
+    
+    // 5. Re-check progress in case new fields were enabled/disabled
+    updateProgress();
+  }
+
 
   // --- SAVING LOGIC ---
   function collectResponses() {
@@ -517,10 +611,8 @@
     document.querySelectorAll('.response-input').forEach(input => {
       const qId = input.name.replace('response_', '');
       
-      // We skip file inputs here, as they must be handled by FormData later
       if(input.type==='file') return;
 
-      // Handle other input types
       if(input.type==='radio') { 
           if(input.checked) responses[qId] = input.value; 
       }
@@ -529,7 +621,6 @@
     return responses;
   }
   
-  // Helper to check if any file input has a file selected
   function hasFilesToUpload() {
       return Array.from(document.querySelectorAll('input[type="file"]')).some(
           input => input.files.length > 0
@@ -539,7 +630,6 @@
   async function saveTask(statusChange = null) {
     const filesPresent = hasFilesToUpload();
     
-    // Check if we can skip saving text data/status via JSON
     if (!hasUnsavedChanges && !statusChange && !filesPresent) {
         console.log("No changes to save.");
         return;
@@ -556,27 +646,34 @@
           // --- Submission with Files (Multi-part Form) ---
           const formData = new FormData(document.getElementById('taskForm'));
           
+          if (statusChange) formData.append('status', statusChange);
+
+          // CRITICAL FIX: Add current text/radio answers to the POST payload 
+          // to ensure they are merged in the backend along with the file.
+          Object.entries(collectResponses()).forEach(([qId, value]) => {
+              formData.append(`response_${qId}`, value);
+          });
+          
           const fileRes = await fetch(`/tasks/${taskId}/update`, {
               method: 'POST', 
               body: formData 
           });
-
+          
           if (!fileRes.ok) {
               const errorData = await fileRes.json();
               throw new Error(errorData.error || 'Error uploading files');
           }
           
-          // CRITICAL: File uploaded successfully. Clear file inputs and reload to show saved path.
-          document.querySelectorAll('input[type="file"]').forEach(input => {
-              input.value = ''; 
-          });
-          // Force reload to update the UI with the saved file path/link from the DB
-          window.location.reload(); 
-          return; // Exit saveTask as reload will handle the rest
+          // File upload was successful.
+          // FIX 1: Set hasUnsavedChanges to false to suppress beforeunload warning
+          hasUnsavedChanges = false;
+          
+          // FIX 2: Force a full page navigation/reload to render the saved file path from the database
+          window.location.href = window.location.href; 
+          return; 
       }
 
       // --- Submission of Text/Status (JSON/PATCH) ---
-      // Send text data and status (even if files were just uploaded, to ensure status changes are recorded)
       const payload = { responses: collectResponses() };
       if (statusChange) payload.status = statusChange;
       
@@ -587,20 +684,25 @@
       });
       
       if(res.ok) {
-        // SUCCESS: Show green text and start timeout
         indicator.classList.add('saved'); 
         text.textContent = '✓ Guardado';
-        hasUnsavedChanges = false; // Clear flag on success
+        
+        // CRITICAL FIX: Reset the global flag immediately to clear the browser's "dirty form" state.
+        hasUnsavedChanges = false;
+        
+        // Update UI immediately (no page reload needed for non-file saves)
+        if(statusChange) {
+            updateUiForStatusChange(statusChange);
+        }
         
         setTimeout(() => indicator.classList.remove('show', 'saved'), 2000); 
         
-        if(statusChange) window.location.reload();
       } else {
         const errorData = await res.json();
         throw new Error(errorData.error || 'Error saving data');
       }
     } catch(e) {
-      text.textContent = `⚠️ Error: ${e.message} (Guardando offline)`;
+      text.textContent = `⚠️ Error: ${e.message}`;
       indicator.classList.add('show');
       indicator.classList.remove('saved');
     }
@@ -610,7 +712,11 @@
   function scheduleAutoSave() {
     if (taskStatus === 'in_progress' || hasFilesToUpload()) {
         clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(() => { if(hasUnsavedChanges || hasFilesToUpload()) saveTask(); }, 5000);
+        // FIX: Check hasUnsavedChanges || hasFilesToUpload() inside the timeout function
+        saveTimeout = setTimeout(() => { 
+            // Only trigger save if still dirty after timeout
+            if(hasUnsavedChanges || hasFilesToUpload()) saveTask(); 
+        }, 5000);
     }
   }
 
@@ -625,7 +731,6 @@
     showConfirm(
       '¿Estás seguro que deseas iniciar esta faena? El tiempo de llenado comenzará a contarse.',
       () => {
-        hasUnsavedChanges = true; 
         saveTask('in_progress');
       },
       'Iniciar Faena',
@@ -645,10 +750,9 @@
     showConfirm(
       '¿Confirmas que has completado la tarea? Una vez completada, pasará a revisión y no podrás editarla (a menos que seas Planificador/Administrador).',
       () => {
-        hasUnsavedChanges = true; 
         saveTask('completed');
       },
-      'Completar Faena',
+      'Completar Tarea', // FIX: Corrected typo
       'Sí, completar',
       'success'
     );
@@ -663,7 +767,7 @@
       showConfirm(
         'Hay cambios sin guardar en esta tarea. ¿Seguro que deseas salir? Los cambios no guardados se perderán.',
         () => {
-          hasUnsavedChanges = false; 
+          disableUnloadWarning(); 
           window.location.href = targetUrl;
         },
         'Cambios sin guardar',
@@ -672,14 +776,6 @@
       );
     } else {
       window.location.href = targetUrl;
-    }
-  });
-
-  // --- BROWSER LEAVE WARNING (Native fallback) ---
-  window.addEventListener('beforeunload', (e) => {
-    if ((hasUnsavedChanges || hasFilesToUpload()) && (taskStatus === 'in_progress' || canOverrideEdit)) { 
-      e.preventDefault();
-      e.returnValue = ''; 
     }
   });
 

@@ -453,53 +453,86 @@ def update_task(task_id):
     
     
     # ------------------------------------------------------------------------
-    # FILE UPLOAD HANDLING (POST/MULTIPART-FORM-DATA)
+    # FILE UPLOAD HANDLING (POST/MULTIPART-FORM-DATA) - FIX APPLIED HERE
     # ------------------------------------------------------------------------
-    if request.method == 'POST' and request.files:
+    if request.method == 'POST' and (request.files or request.form):
         
+        # 1. Start with existing responses/status from the database
         responses = document.responses if document.responses is not None else {}
         files_uploaded = False
+        old_status = document.status
+
+        # 2. Process non-file form data (including any text/radio answers submitted along with the file)
+        for key, value in request.form.items():
+            if key.startswith('response_'):
+                question_id = key.replace('response_', '')
+                # Only update with non-empty values (to preserve existing responses/paths if the field was skipped)
+                if value.strip() != '':
+                     responses[question_id] = value.strip()
         
+        # 3. Process uploaded files (overwriting the corresponding entry in responses)
         for key, file in request.files.items():
             if key.startswith('response_') and file.filename != '':
-                # Use imported helper function
+                # Use imported helper function to save the file
                 saved_path = save_file_to_disk(file)
                 if saved_path:
                     question_id = key.replace('response_', '')
-                    # Store the path in the responses dictionary
+                    # Store the new path/URL (this is the desired behavior for upload/replace)
                     responses[question_id] = saved_path
                     files_uploaded = True
-                    
-        # Update JSON field data only if files were successfully uploaded
-        if files_uploaded:
-            # CRITICAL FIX: Assign the updated dictionary back to the SQLAlchemy object
-            # and set the updated_at timestamp before committing.
-            document.responses = responses
+                else:
+                    flash("Error al subir el archivo. Verifique el tamaño/formato.", "error")
+                    # No need to return error immediately, continue processing other fields/files
+
+        # 4. Handle embedded status change
+        status_from_post = request.form.get("status")
+        
+        # 5. Update Document object (if any file/data was processed or status changed)
+        if files_uploaded or status_from_post or any(k.startswith('response_') and v.strip() for k, v in request.form.items()):
+            
+            document.responses = responses 
+            
+            # Status change logic (kept as is)
+            if status_from_post and status_from_post != old_status:
+                document.status = status_from_post
+                if status_from_post == "in_progress" and old_status == "pending":
+                    if not document.worker_id:
+                        document.worker_id = g.user.id
+                    if not document.started_at:
+                        document.started_at = datetime.now(timezone.utc)
+                elif status_from_post == "completed":
+                    if not document.completed_at:
+                        document.completed_at = datetime.now(timezone.utc)
+            
             document.updated_at = datetime.now(timezone.utc)
             
             try:
                 db.session.commit()
                 # SUCCESS: Reload is required on the client side after this POST
-                return jsonify({"success": True, "message": "Files uploaded successfully"}), 200
+                return jsonify({
+                    "success": True, 
+                    "message": "Files uploaded and task updated successfully",
+                    "status_changed": status_from_post is not None
+                }), 200
             except Exception as e:
                 db.session.rollback()
                 return jsonify({"success": False, "error": str(e)}), 500
                 
-        # If no files were uploaded but method was POST, treat as error or ignore
-        return jsonify({"success": False, "error": "No valid files were attached or saved"}), 400
+        # If no files, no status change, and no non-file form data was submitted 
+        return jsonify({"success": False, "message": "No changes to save"}), 200
 
     
     # ------------------------------------------------------------------------
-    # JSON DATA HANDLING (PATCH/PUT)
+    # JSON DATA HANDLING (PATCH/PUT) - For text/status updates without files
     # ------------------------------------------------------------------------
     if not request.is_json:
         return jsonify({"success": False, "error": "JSON required for non-file updates"}), 400
         
     data = request.get_json()
+    old_status = document.status
     
     if "status" in data:
         new_status = data["status"]
-        old_status = document.status
         document.status = new_status
         
         # Logic for setting timestamps based on status transitions
@@ -518,7 +551,8 @@ def update_task(task_id):
             document.responses = {}
         
         # CRITICAL FIX: Filter out empty string values from the JSON update payload.
-        # This prevents the client-side form submission from overwriting saved file paths.
+        # This prevents the client-side form submission from overwriting saved file paths 
+        # (or other empty inputs) with null/empty strings.
         filtered_responses = {
             k: v for k, v in data["responses"].items() if v is not None and v != ""
         }
