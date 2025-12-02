@@ -6,7 +6,8 @@ Updates:
 - Implemented enhanced filtering options for all common fields (timestamps, sync status, form name).
 - Added override edit permission for Admin/Planner roles in get_task and update_task.
 - Included full response data and form structure in list_tasks output for table view.
-- RE-INTRODUCED all synchronization-related fields and filters.
+- RADICAL FIX: Implemented decoupled, multi-file upload via /upload_file endpoint (POST) for preserving file history.
+- The main task update is now strictly JSON (PATCH), accepting file paths as array elements in the 'responses' object.
 """
 
 from flask import Blueprint, request, jsonify, render_template, g, abort, redirect, url_for, flash
@@ -14,15 +15,66 @@ from datetime import datetime, timezone
 from pytarjas.auth import login_required, task_access_required
 from pytarjas.models.user_models import User, db
 from pytarjas.models.docs_models import Document, Form
-from pytarjas.helper import wants_json, save_file_to_disk # Correct helper imports
+# NOTE: The helper.py file has been modified externally to accept (file, document_id, question_id)
+from pytarjas.helper import wants_json, save_file_to_disk 
 import uuid
-from sqlalchemy import cast, Date, or_ # Explicit import for date filtering
-from sqlalchemy.orm import joinedload # Ensure joinedload is imported if needed in get_task
+from sqlalchemy import cast, Date, or_ 
+from sqlalchemy.orm import joinedload 
 
 # Create blueprint with URL prefix /tasks
 bp = Blueprint("tasks", __name__, url_prefix="/tasks")
 
 
+# --- NEW: Multi-File Upload Endpoint ---
+@bp.route("/<task_id>/upload_file", methods=["POST"])
+@login_required
+@task_access_required
+def upload_file_temp(task_id):
+    """
+    Handles immediate file upload (AJAX call) separately from form data.
+    Saves the file using a unique name based on Document ID, Question ID, and UUID 
+    to preserve file history and context.
+    """
+    document = Document.query.get(task_id)
+    if not document:
+        return jsonify({"success": False, "error": "Task not found"}), 404
+
+    # Check for file input named 'file' and required metadata
+    if 'file' not in request.files or request.files['file'].filename == '':
+        return jsonify({"success": False, "error": "No valid file uploaded"}), 400
+
+    file = request.files['file']
+    # Extract question_id from the FormData payload (sent by JS)
+    question_id = request.form.get('question_id') 
+
+    if not question_id:
+        return jsonify({"success": False, "error": "Missing question ID for file naming."}), 400
+
+    is_admin_or_planner = g.user.role in ["admin", "planner"]
+    is_finalized = document.status in ["completed", "reviewed", "approved"]
+    
+    if is_finalized and not is_admin_or_planner:
+        return jsonify({"success": False, "error": "Cannot upload files to finalized task."}), 403
+
+    try:
+        # CRITICAL: Pass document_id (task_id) and question_id to the helper function
+        # The helper now generates a unique filename for history preservation.
+        saved_path = save_file_to_disk(file, task_id, question_id) 
+        
+        if saved_path:
+            return jsonify({
+                "success": True,
+                "message": "File uploaded successfully",
+                "path": saved_path
+            }), 200
+        else:
+            raise Exception("File save failed or helper returned empty path.")
+
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Upload failed: {str(e)}"}), 500
+
+
+# --- Task Creation Endpoint (Unchanged) ---
 @bp.route("/create", methods=["GET", "POST"])
 @login_required
 @task_access_required
@@ -97,7 +149,7 @@ def create_task():
         created_by_id=g.user.id,
         status="pending",
         responses={},
-        photos=[],
+        # PHOTOS and PDF_PATH are now removed, simplifying schema.
         is_synced=True,
         created_at=datetime.now(timezone.utc)
     )
@@ -114,7 +166,6 @@ def create_task():
             }), 201
         else:
             flash("Tarea creada exitosamente", "success")
-            # CHANGE: Redirect to list_tasks instead of get_task for better flow
             return redirect(url_for("tasks.list_tasks"))
     
     except Exception as e:
@@ -122,6 +173,7 @@ def create_task():
         return (jsonify({"success": False, "error": str(e)}), 500) if wants_json() else abort(500)
 
 
+# --- Task Listing Endpoint (Unchanged) ---
 @bp.route("/", methods=["GET"])
 @login_required
 @task_access_required
@@ -369,6 +421,7 @@ def list_tasks():
     )
 
 
+# --- Task Detail Endpoint (Unchanged) ---
 @bp.route("/<task_id>", methods=["GET"])
 @login_required
 @task_access_required
@@ -434,7 +487,8 @@ def get_task(task_id):
         )
 
 
-@bp.route("/<task_id>/update", methods=["PUT", "PATCH", "POST"])
+# --- Task Update Endpoint (Decoupled, JSON/PATCH ONLY) ---
+@bp.route("/<task_id>/update", methods=["PUT", "PATCH"])
 @login_required
 @task_access_required
 def update_task(task_id):
@@ -453,80 +507,11 @@ def update_task(task_id):
     
     
     # ------------------------------------------------------------------------
-    # FILE UPLOAD HANDLING (POST/MULTIPART-FORM-DATA) - FIX APPLIED HERE
-    # ------------------------------------------------------------------------
-    if request.method == 'POST' and (request.files or request.form):
-        
-        # 1. Start with existing responses/status from the database
-        responses = document.responses if document.responses is not None else {}
-        files_uploaded = False
-        old_status = document.status
-
-        # 2. Process non-file form data (including any text/radio answers submitted along with the file)
-        for key, value in request.form.items():
-            if key.startswith('response_'):
-                question_id = key.replace('response_', '')
-                # Only update with non-empty values (to preserve existing responses/paths if the field was skipped)
-                if value.strip() != '':
-                     responses[question_id] = value.strip()
-        
-        # 3. Process uploaded files (overwriting the corresponding entry in responses)
-        for key, file in request.files.items():
-            if key.startswith('response_') and file.filename != '':
-                # Use imported helper function to save the file
-                saved_path = save_file_to_disk(file)
-                if saved_path:
-                    question_id = key.replace('response_', '')
-                    # Store the new path/URL (this is the desired behavior for upload/replace)
-                    responses[question_id] = saved_path
-                    files_uploaded = True
-                else:
-                    flash("Error al subir el archivo. Verifique el tamaño/formato.", "error")
-                    # No need to return error immediately, continue processing other fields/files
-
-        # 4. Handle embedded status change
-        status_from_post = request.form.get("status")
-        
-        # 5. Update Document object (if any file/data was processed or status changed)
-        if files_uploaded or status_from_post or any(k.startswith('response_') and v.strip() for k, v in request.form.items()):
-            
-            document.responses = responses 
-            
-            # Status change logic (kept as is)
-            if status_from_post and status_from_post != old_status:
-                document.status = status_from_post
-                if status_from_post == "in_progress" and old_status == "pending":
-                    if not document.worker_id:
-                        document.worker_id = g.user.id
-                    if not document.started_at:
-                        document.started_at = datetime.now(timezone.utc)
-                elif status_from_post == "completed":
-                    if not document.completed_at:
-                        document.completed_at = datetime.now(timezone.utc)
-            
-            document.updated_at = datetime.now(timezone.utc)
-            
-            try:
-                db.session.commit()
-                # SUCCESS: Reload is required on the client side after this POST
-                return jsonify({
-                    "success": True, 
-                    "message": "Files uploaded and task updated successfully",
-                    "status_changed": status_from_post is not None
-                }), 200
-            except Exception as e:
-                db.session.rollback()
-                return jsonify({"success": False, "error": str(e)}), 500
-                
-        # If no files, no status change, and no non-file form data was submitted 
-        return jsonify({"success": False, "message": "No changes to save"}), 200
-
-    
-    # ------------------------------------------------------------------------
-    # JSON DATA HANDLING (PATCH/PUT) - For text/status updates without files
+    # JSON DATA HANDLING (PATCH/PUT) - Accepting file path array strings
     # ------------------------------------------------------------------------
     if not request.is_json:
-        return jsonify({"success": False, "error": "JSON required for non-file updates"}), 400
+        # File uploads are handled by the dedicated /upload_file endpoint
+        return jsonify({"success": False, "error": "JSON required for task update. File uploads must use the dedicated '/upload_file' endpoint."}), 400
         
     data = request.get_json()
     old_status = document.status
@@ -550,28 +535,14 @@ def update_task(task_id):
         if document.responses is None:
             document.responses = {}
         
-        # CRITICAL FIX: Filter out empty string values from the JSON update payload.
-        # This prevents the client-side form submission from overwriting saved file paths 
-        # (or other empty inputs) with null/empty strings.
-        filtered_responses = {
-            k: v for k, v in data["responses"].items() if v is not None and v != ""
-        }
-        
-        document.responses.update(filtered_responses)
+        # Responses now include text answers and SAVED FILE PATHS (JSON string arrays)
+        document.responses.update(data["responses"])
         
         # Use explicit SQLAlchemy update call to force JSON field modification detection
         db.session.query(Document).filter_by(id=task_id).update(
             {"responses": document.responses}, synchronize_session=False
         )
     
-    if "photos" in data:
-        if document.photos is None:
-            document.photos = []
-        document.photos.extend(data["photos"])
-        db.session.query(Document).filter_by(id=task_id).update(
-            {"photos": document.photos}, synchronize_session=False
-        )
-        
     document.updated_at = datetime.now(timezone.utc)
     document.is_synced = data.get("mark_synced", False)
     

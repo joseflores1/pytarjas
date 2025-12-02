@@ -1,1 +1,0 @@
-DROP TABLE question, form, document, users, planning CASCADE;

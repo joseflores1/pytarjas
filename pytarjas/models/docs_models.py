@@ -315,8 +315,9 @@ class Document(db.Model):
         created_by_id: Foreign key to User (who created this task - for standalone tasks)
         status: Document status (pending, in_progress, completed, reviewed, approved)
         responses: JSON storing all question answers
-        photos: JSON array of photo file paths/URLs
-        pdf_path: Path to generated PDF tarja
+        
+        <PHOTOS AND PDF_PATH FIELDS REMOVED>
+        
         started_at: When worker started filling the document
         completed_at: When worker finished filling the document
         reviewed_at: When planner reviewed the document
@@ -394,15 +395,9 @@ class Document(db.Model):
         nullable=True,
     )
     
-    photos: Mapped[list | None] = mapped_column(
-        JSON,
-        nullable=True,
-    )
+    # REMOVED: photos: Mapped[list | None] = mapped_column(JSON, nullable=True,)
     
-    pdf_path: Mapped[str | None] = mapped_column(
-        String(500),
-        nullable=True,
-    )
+    # REMOVED: pdf_path: Mapped[str | None] = mapped_column(String(500), nullable=True,)
     
     started_at: Mapped[datetime | None] = mapped_column(
         DateTime,
@@ -467,34 +462,12 @@ class Document(db.Model):
     def get_field(self, field_name: str, default=None):
         """
         Get a field from record_data with optional default value.
-        
-        Merged from Record class for convenience.
-        
-        Args:
-            field_name: Name of the field to retrieve
-            default: Default value if field doesn't exist
-            
-        Returns:
-            Field value or default
-            
-        Example:
-            container_number = document.get_field('container_number', 'N/A')
         """
         return self.record_data.get(field_name, default)
     
     def set_field(self, field_name: str, value):
         """
         Set a field in record_data and mark as modified.
-        
-        Merged from Record class. This ensures SQLAlchemy detects
-        the JSON field change and updates the database.
-        
-        Args:
-            field_name: Name of the field to set
-            value: Value to set
-            
-        Example:
-            document.set_field('container_number', 'ABC123')
         """
         self.record_data[field_name] = value
         flag_modified(self, 'record_data')
@@ -503,18 +476,6 @@ class Document(db.Model):
     def update_fields(self, fields_dict: dict):
         """
         Update multiple fields in record_data at once.
-        
-        Merged from Record class. More efficient than calling
-        set_field() multiple times.
-        
-        Args:
-            fields_dict: Dictionary of field_name: value pairs
-            
-        Example:
-            document.update_fields({
-                'container_number': 'ABC123',
-                'client_name': 'ACME Corp'
-            })
         """
         self.record_data.update(fields_dict)
         flag_modified(self, 'record_data')

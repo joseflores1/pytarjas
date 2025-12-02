@@ -100,8 +100,7 @@ class Config:
     UPLOAD_FOLDER = 'uploads'
     
     # Allowed file extensions for uploads
-    ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'}
-    
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx', 'xlsx', 'xls', 'txt'}
     # -------------------------------------------------------------------------
     # PWA Configuration (Progressive Web App)
     # -------------------------------------------------------------------------
