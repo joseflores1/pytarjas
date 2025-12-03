@@ -13,6 +13,3 @@ htmlconv/
 # Virtual environments
 .env
 .venv
-
-# scripts
-scripts/
