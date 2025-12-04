@@ -208,265 +208,268 @@
 {% endblock %}
 
 {% block content %}
-<div class="container" style="max-width: 900px; margin: var(--space-xl) auto;">
-  
-  {# Define type map for icons #}
-  {% set type_map = {
-    'text': '📝', 'textarea': '📄', 'number': '🔢', 'date': '📅', 
-    'datetime': '🕐', 'photo': '📷', 'boolean': '✓', 'select': '📋', 
-    'file': '📁', 'client_select': '🏢'
-  } %}
-  
-  {# Header #}
-  <div class="task-header">
-    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: var(--space-md);">
-      <div>
-        <h1 class="task-header-title">{{ task.form.name }}</h1>
-        <div class="task-meta">
-          <span>📝 {{ task.form.form_type or 'General' }}</span>
-          {% if task.worker %}<span>👤 {{ task.worker.username }}</span>{% endif %}
-        </div>
-      </div>
-      <span class="status-badge status-{{ task.status }}">
-        {{ task.status|replace('_', ' ') }}
-      </span>
-    </div>
-    <div class="progress-bar">
-      <div class="progress-bar-fill" id="progressBar" style="width: 0%;"></div>
-    </div>
-    <div style="text-align: center; font-size: var(--font-size-sm); color: var(--color-text-secondary);">
-      <span id="progressText">0 / {{ task.form.questions|length }}</span>
-    </div>
-  </div>
-
-  {# Form #}
-  <form id="taskForm" 
-        data-task-id="{{ task.id }}" 
-        data-total-questions="{{ task.form.questions|length }}"> 
+  <div class="container" style="max-width: 900px; margin: var(--space-xl) auto;">
     
-    {# Determine effective read-only state #}
-    {% set is_finalized = task.status in ['completed', 'reviewed', 'approved'] %}
-    {% set is_pending = task.status == 'pending' %}
-    {# Use top-level variable 'can_override_edit' #}
-    {% set is_locked = (is_finalized and not can_override_edit) or is_pending %}
-
-    {% for question in task.form.questions %}
-      {# Fetch the saved answer, defaulting to an empty string if not found. #}
-      {% set current_answer = task.responses.get(question.id) %} 
-      
-      {# File paths are handled separately as JSON arrays. #}
-      {% set raw_answer = current_answer or '[]' %}
-      {% set current_paths = raw_answer if raw_answer is string and raw_answer.startswith('[') else '[]' %}
-      
-      {% set is_input_disabled = is_locked %}
-      
-      <div class="question-card">
-        <div class="question-text">
-          <span class="question-number">{{ loop.index }}</span>
-          {{ question.question_text }} 
-          
-          {# NEW: Display Question Type with Icon #}
-          <span class="question-type-badge">
-            {{ type_map.get(question.question_type|default(''), '?') }} {{ question.question_type|default('Tipo Desconocido') | capitalize }}
-          </span>
-          
-          {% if question.is_required %}<span style="color:var(--color-danger)">*</span>{% endif %}
-        </div>
-
-        {# NEW: Display Question Description #}
-        {% if question.question_description %}
-            <p class="question-description-text">{{ question.question_description }}</p>
-        {% endif %}
-
-        {# Use q_type for robust comparison (handles None/Undefined/Whitespace safely) #}
-        {% set q_type = question.question_type|default('')|string|trim %}
-        
-        {# TEXT/NUMBER/DATE/DATETIME - All use current_answer directly in value attribute #}
-        {% if q_type == 'text' %}
-          <input type="text" name="response_{{ question.id }}" id="response_{{ question.id }}"
-                 class="form-control response-input" value="{{ current_answer|default('') }}"
-                 {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
-        
-        {# TEXTAREA (Long) #}
-        {% elif q_type == 'textarea' %}
-          <textarea name="response_{{ question.id }}" id="response_{{ question.id }}"
-                    class="form-control response-input" rows="4"
-                    {% if question.is_required %}required{% endif %} 
-                    {% if is_input_disabled %}disabled{% endif %}>{{ current_answer|default('') }}</textarea>
-
-        {# NUMBER #}
-        {% elif q_type == 'number' %}
-          <input type="number" name="response_{{ question.id }}" id="response_{{ question.id }}"
-                 class="form-control response-input" value="{{ current_answer|default('') }}"
-                 {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
-
-        {# DATE #}
-        {% elif q_type == 'date' %}
-          <input type="date" name="response_{{ question.id }}" id="response_{{ question.id }}"
-                 class="form-control response-input" value="{{ current_answer|default('') }}"
-                 {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
-
-        {# DATETIME #}
-        {% elif q_type == 'datetime' %}
-          <input type="datetime-local" name="response_{{ question.id }}" id="response_{{ question.id }}"
-                 class="form-control response-input" value="{{ current_answer|default('') }}"
-                 {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
-
-        {# SELECT #}
-        {% elif q_type == 'select' %}
-          <select name="response_{{ question.id }}" id="response_{{ question.id }}"
-                  class="form-control response-input"
-                  {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
-            <option value="">-- Seleccionar --</option>
-            {% if question.options and question.options.choices %}
-              {% for choice in question.options.choices %}
-                <option value="{{ choice }}" {% if current_answer == choice %}selected{% endif %}>{{ choice }}</option>
-              {% endfor %}
-            {% endif %}
-          </select>
-
-        {# BOOLEAN (Radio) #}
-        {% elif q_type == 'boolean' %}
-          {% set saved_bool = current_answer|string %}
-          <div class="radio-group">
-            <label class="radio-option">
-              <input type="radio" name="response_{{ question.id }}" value="true" class="response-input"
-                     {% if saved_bool == 'true' %}checked{% endif %}
-                     {% if is_input_disabled %}disabled{% endif %}>
-              <span>Sí</span>
-            </label>
-            <label class="radio-option">
-              <input type="radio" name="response_{{ question.id }}" value="false" class="response-input"
-                     {% if saved_bool == 'false' %}checked{% endif %}
-                     {% if is_input_disabled %}disabled{% endif %}>
-              <span>No</span>
-            </label>
+    {# Define type map for icons #}
+    {% set type_map = {
+      'text': '📝', 'textarea': '📄', 'number': '🔢', 'date': '📅', 
+      'datetime': '🕐', 'photo': '📷', 'boolean': '✓', 'select': '📋', 
+      'file': '📁', 'client_select': '🏢'
+    } %}
+    
+    {# Header #}
+    <div class="task-header">
+      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: var(--space-md);">
+        <div>
+          <h1 class="task-header-title">{{ task.form.name }}</h1>
+          <div class="task-meta">
+            <span>📝 {{ task.form.form_type or 'General' }}</span>
+            {% if task.worker %}<span>👤 {{ task.worker.username }}</span>{% endif %}
           </div>
+        </div>
+        <span class="status-badge status-{{ task.status }}">
+          {{ task.status|replace('_', ' ') }}
+        </span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-bar-fill" id="progressBar" style="width: 0%;"></div>
+      </div>
+      <div style="text-align: center; font-size: var(--font-size-sm); color: var(--color-text-secondary);">
+        <span id="progressText">0 / {{ task.form.questions|length }}</span>
+      </div>
+    </div>
+
+    {# Form #}
+    <form id="taskForm" 
+          data-task-id="{{ task.id }}" 
+          data-total-questions="{{ task.form.questions|length }}"> 
+      
+      {# Determine effective read-only state #}
+      {% set is_finalized = task.status in ['completed', 'reviewed', 'approved'] %}
+      {% set is_pending = task.status == 'pending' %}
+      {# Use top-level variable 'can_override_edit' #}
+      {% set is_locked = (is_finalized and not can_override_edit) or is_pending %}
+
+      {% for question in task.form.questions %}
+        {# Fetch the saved answer, defaulting to an empty string if not found. #}
+        {% set current_answer = task.responses.get(question.id) %} 
+        
+        {# File paths are handled separately as JSON arrays. #}
+        {% set raw_answer = current_answer or '[]' %}
+        {% set current_paths = raw_answer if raw_answer is string and raw_answer.startswith('[') else '[]' %}
+        
+        {% set is_input_disabled = is_locked %}
+        
+        <div class="question-card">
+          <div class="question-text">
+            <span class="question-number">{{ loop.index }}</span>
+            {{ question.question_text }} 
+            
+            {# NEW: Display Question Type with Icon #}
+            <span class="question-type-badge">
+              {{ type_map.get(question.question_type|default(''), '?') }} {{ question.question_type|default('Tipo Desconocido') | capitalize }}
+            </span>
+            
+            {% if question.is_required %}<span style="color:var(--color-danger)">*</span>{% endif %}
+          </div>
+
+          {# NEW: Display Question Description #}
+          {% if question.question_description %}
+              <p class="question-description-text">{{ question.question_description }}</p>
+          {% endif %}
+
+          {# Use q_type for robust comparison (handles None/Undefined/Whitespace safely) #}
+          {% set q_type = question.question_type|default('')|string|trim %}
           
-        {# CLIENT SELECT #}
-        {% elif q_type == 'client_select' %}
-          {% set pre_assigned_client = task.record_data.get('client_name', '') %}
-          {# FIX: Prioritize saved answer over pre-assigned client if saved answer exists #}
-          {% set selected_client = current_answer if current_answer else pre_assigned_client %}
+          {# TEXT/NUMBER/DATE/DATETIME - All use current_answer directly in value attribute #}
+          {% if q_type == 'text' %}
+            <input type="text" name="response_{{ question.id }}" id="response_{{ question.id }}"
+                   class="form-control response-input" value="{{ current_answer if current_answer is not none else '' }}"
+                   {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
+          
+          {# TEXTAREA (Long) #}
+          {% elif q_type == 'textarea' %}
+            <textarea name="response_{{ question.id }}" id="response_{{ question.id }}"
+                      class="form-control response-input" rows="4"
+                      {% if question.is_required %}required{% endif %} 
+                      {% if is_input_disabled %}disabled{% endif %}>{{ current_answer if current_answer is not none else '' }}</textarea>
 
-          <select name="response_{{ question.id }}" id="response_{{ question.id }}"
-                  class="form-control response-input"
-                  {% if question.is_required %}required{% endif %} 
-                  {% if is_input_disabled %}disabled{% endif %}>
-            <option value="">-- Seleccionar Cliente --</option>
-            
-            {% if pre_assigned_client and not current_answer %}
-                <option value="{{ pre_assigned_client }}" selected>🏢 Cliente (Pre-asignado): {{ pre_assigned_client }}</option>
-            {% endif %}
+          {# NUMBER #}
+          {% elif q_type == 'number' %}
+            <input type="number" name="response_{{ question.id }}" id="response_{{ question.id }}"
+                   class="form-control response-input" value="{{ current_answer if current_answer is not none else '' }}"
+                   {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
 
-            {% for client in all_clients %}
-              <option value="{{ client.username }}" 
-                      {% if client.username == selected_client %}selected{% endif %}>
-                🏢 {{ client.username }}
-              </option>
-            {% endfor %}
-            
-            {% if pre_assigned_client and pre_assigned_client != selected_client and not current_answer %}
-                <option value="{{ pre_assigned_client }}" selected>🏢 Cliente (Manual): {{ pre_assigned_client }}</option>
-            {% endif %}
+          {# DATE #}
+          {% elif q_type == 'date' %}
+            <input type="date" name="response_{{ question.id }}" id="response_{{ question.id }}"
+                   class="form-control response-input" value="{{ current_answer if current_answer is not none else '' }}"
+                   {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
 
-          </select>
-          <small class="form-help">
-            Seleccione el cliente final para esta tarea. El valor pre-asignado se usa como sugerencia.
-          </small>
+          {# DATETIME #}
+          {% elif q_type == 'datetime' %}
+            <input type="datetime-local" name="response_{{ question.id }}" id="response_{{ question.id }}"
+                   class="form-control response-input" value="{{ current_answer if current_answer is not none else '' }}"
+                   {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
 
+          {# SELECT #}
+          {% elif q_type == 'select' %}
+            <select name="response_{{ question.id }}" id="response_{{ question.id }}"
+                    class="form-control response-input"
+                    {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
+              <option value="">-- Seleccionar --</option>
+              {% if question.options and question.options.choices %}
+                {% for choice in question.options.choices %}
+                  <option value="{{ choice }}" {% if current_answer == choice %}selected{% endif %}>{{ choice }}</option>
+                {% endfor %}
+              {% endif %}
+            </select>
 
-        {# FILE UPLOAD TYPES: PHOTO and GENERIC FILE #}
-        {% elif q_type == 'photo' or q_type == 'file' %}
-            
-            {% set accepted_types = 'image/*' if q_type == 'photo' else '.pdf,.doc,.docx,.jpg,.jpeg,.png' %}
-            {% set display_placeholder = 'Seleccionar o tomar fotografía(s)' if q_type == 'photo' else 'Seleccionar archivo(s) (PDF, DOC, Imagen)' %}
-
-            {# HIDDEN FIELD: This holds the JSON string array of paths, submitted with JSON payload as the answer #}
-            <input type="hidden" 
-                   name="response_{{ question.id }}" 
-                   id="path-input-{{ question.id }}"
-                   class="response-input file-path-input"
-                   value="{{ current_paths }}"
-                   {% if is_input_disabled %}disabled{% endif %}>
-
-            {# FILE DISPLAY BOX: Dynamically rendered/updated by JS #}
-            {# NOTE: This box now contains all existing file items #}
-            <div class="file-display-box mb-md {% if current_paths == '[]' %} hidden-by-jinja{% endif %}" id="file-display-{{ question.id }}">
-                {# RENDER EXISTING FILES (JS will handle dynamic update) #}
-                <script>
-                    // Pass initial state to JS for rendering
-                    document.addEventListener('DOMContentLoaded', function() {
-                        const pathInput = document.getElementById('path-input-{{ question.id }}');
-                        // Ensure the JSON is parsed safely
-                        try {
-                            const existingPaths = JSON.parse(pathInput.value || '[]');
-                            if (existingPaths.length > 0) {
-                                renderFileItems('{{ question.id }}', existingPaths, '{{ q_type }}');
-                            }
-                        } catch (e) {
-                             console.error("Failed to parse existing paths for rendering:", e);
-                             pathInput.value = '[]'; // Reset invalid path input
-                        }
-                    });
-                </script>
+          {# BOOLEAN (Radio) #}
+          {% elif q_type == 'boolean' %}
+            {% set saved_bool = current_answer|default('')|string %}
+            <div class="radio-group">
+              <label class="radio-option">
+                <input type="radio" name="response_{{ question.id }}" value="true" class="response-input"
+                       {% if saved_bool == 'true' %}checked{% endif %}
+                       {% if is_input_disabled %}disabled{% endif %}>
+                <span>Sí</span>
+              </label>
+              <label class="radio-option">
+                <input type="radio" name="response_{{ question.id }}" value="false" class="response-input"
+                       {% if saved_bool == 'false' %}checked{% endif %}
+                       {% if is_input_disabled %}disabled{% endif %}>
+                <span>No</span>
+              </label>
             </div>
             
-            {# FILE INPUT: Multiple files allowed #}
-            <input type="file" 
-                   name="file-upload-{{ question.id }}" 
-                   id="file-upload-{{ question.id }}" 
-                   class="form-control file-input-uploader"
-                   data-question-id="{{ question.id }}"
-                   data-q-type="{{ q_type }}"
-                   accept="{{ accepted_types }}" 
-                   {% if is_input_disabled %}disabled{% endif %}
-                   multiple> {# CRITICAL: Allows multi-file selection #}
-                   
-            <small class="form-help" id="file-placeholder-{{ question.id }}" style="font-style: italic;">
-                {{ display_placeholder }}
+          {# CLIENT SELECT #}
+          {% elif q_type == 'client_select' %}
+            {% set pre_assigned_client = task.record_data.get('client_name', '') %}
+            
+            <select name="response_{{ question.id }}" id="response_{{ question.id }}"
+                    class="form-control response-input"
+                    {% if question.is_required %}required{% endif %} 
+                    {% if is_input_disabled %}disabled{% endif %}>
+              
+              <option value="" {% if current_answer is none or current_answer == '' %}selected{% endif %}>-- Seleccionar Cliente --</option>
+
+              {% if pre_assigned_client and current_answer is none %}
+                  {# Show pre-assigned client as a suggested but non-selectable option until a real answer is chosen #}
+                  <option value="{{ pre_assigned_client }}" disabled style="color: var(--color-text-tertiary);">
+                      🏢 Cliente (Sugerido de Faena): {{ pre_assigned_client }}
+                  </option>
+              {% endif %}
+
+              {% for client in all_clients %}
+                <option value="{{ client.username }}" 
+                        {% if client.username == current_answer %}selected{% endif %}>
+                  🏢 {{ client.username }}
+                </option>
+              {% endfor %}
+              
+              {# Fallback for historical data #}
+              {% if current_answer and (all_clients|map(attribute='username')|list).count(current_answer) == 0 %}
+                  <option value="{{ current_answer }}" selected>🏢 Cliente (Dato Guardado): {{ current_answer }}</option>
+              {% endif %}
+
+            </select>
+            <small class="form-help">
+              Seleccione el cliente final para esta tarea. El valor pre-asignado se usa como sugerencia.
             </small>
 
 
-        {% else %}
-           <input type="text" 
-                  class="form-control" 
-                  value="Tipo no soportado: {{ question.id }} ({{ q_type or 'Vacío/Desconocido' }})" 
-                  disabled>
-        {% endif %}
-      </div>
-    {% endfor %}
-  </form>
+          {# FILE UPLOAD TYPES: PHOTO and GENERIC FILE #}
+          {% elif q_type == 'photo' or q_type == 'file' %}
+              
+              {% set accepted_types = 'image/*' if q_type == 'photo' else '.pdf,.doc,.docx,.jpg,.jpeg,.png' %}
+              {% set display_placeholder = 'Seleccionar o tomar fotografía(s)' if q_type == 'photo' else 'Seleccionar archivo(s) (PDF, DOC, Imagen)' %}
 
-  {# Action Bar Logic #}
-  {% set can_transition = task.status not in ['completed', 'reviewed', 'approved'] %}
-  {# Use top-level variable 'can_override_edit' #}
-  {% set show_action_bar = can_transition or can_override_edit %}
-  
-  {% if show_action_bar %}
-  <div class="action-bar">
-    <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary" id="backBtn">Volver</a>
-    
-    {# FIX: Render ALL buttons, applying the 'hidden' attribute based on initial state #}
-    
-    <button type="button" class="btn btn-primary" id="startBtn">▶️ Iniciar Tarea</button>
+              {# HIDDEN FIELD: This holds the JSON string array of paths, submitted with JSON payload as the answer #}
+              <input type="hidden" 
+                     name="response_{{ question.id }}" 
+                     id="path-input-{{ question.id }}"
+                     class="response-input file-path-input"
+                     value="{{ current_paths }}"
+                     {% if is_input_disabled %}disabled{% endif %}>
 
-    <button type="button" class="btn btn-secondary" id="saveBtn">💾 Guardar Progreso</button>
-    
-    <button type="button" class="btn btn-success" id="completeBtn">✓ Completar Tarea</button>
+              {# FILE DISPLAY BOX: Dynamically rendered/updated by JS #}
+              {# NOTE: This box now contains all existing file items #}
+              <div class="file-display-box mb-md {% if current_paths == '[]' %} hidden-by-jinja{% endif %}" id="file-display-{{ question.id }}">
+                  {# RENDER EXISTING FILES (JS will handle dynamic update) #}
+                  <script>
+                      // Pass initial state to JS for rendering
+                      document.addEventListener('DOMContentLoaded', function() {
+                          const pathInput = document.getElementById('path-input-{{ question.id }}');
+                          // Ensure the JSON is parsed safely
+                          try {
+                              const existingPaths = JSON.parse(pathInput.value || '[]');
+                              if (existingPaths.length > 0) {
+                                  renderFileItems('{{ question.id }}', existingPaths, '{{ q_type }}');
+                              }
+                          } catch (e) {
+                               console.error("Failed to parse existing paths for rendering:", e);
+                               pathInput.value = '[]'; // Reset invalid path input
+                          }
+                      });
+                  </script>
+              </div>
+              
+              {# FILE INPUT: Multiple files allowed #}
+              <input type="file" 
+                     name="file-upload-{{ question.id }}" 
+                     id="file-upload-{{ question.id }}" 
+                     class="form-control file-input-uploader"
+                     data-question-id="{{ question.id }}"
+                     data-q-type="{{ q_type }}"
+                     accept="{{ accepted_types }}" 
+                     {% if is_input_disabled %}disabled{% endif %}
+                     multiple> {# CRITICAL: Allows multi-file selection #}
+                     
+              <small class="form-help" id="file-placeholder-{{ question.id }}" style="font-style: italic;">
+                  {{ display_placeholder }}
+              </small>
 
-    {# Admin Override button can be rendered conditionally since its existence isn't critical for the main flow #}
-    {% if is_finalized and can_override_edit and task.status != 'in_progress' %}
-      <button type="button" class="btn btn-primary" id="saveBtnOverride" style="margin-left: 20px;">
-        💾 Guardar (Admin Override)
-      </button>
+
+          {% else %}
+             <input type="text" 
+                    class="form-control" 
+                    value="Tipo no soportado: {{ question.id }} ({{ q_type or 'Vacío/Desconocido' }})" 
+                    disabled>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </form>
+
+    {# Action Bar Logic #}
+    {% set can_transition = task.status not in ['completed', 'reviewed', 'approved'] %}
+    {# Use top-level variable 'can_override_edit' #}
+    {% set show_action_bar = can_transition or can_override_edit %}
+    
+    {% if show_action_bar %}
+    <div class="action-bar">
+      <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary" id="backBtn">Volver</a>
+      
+      {# FIX: Render ALL buttons, applying the 'hidden' attribute based on initial state #}
+      
+      <button type="button" class="btn btn-primary" id="startBtn">▶️ Iniciar Tarea</button>
+
+      <button type="button" class="btn btn-secondary" id="saveBtn">💾 Guardar Progreso</button>
+      
+      <button type="button" class="btn btn-success" id="completeBtn">✓ Completar Tarea</button>
+
+      {# Admin Override button can be rendered conditionally since its existence isn't critical for the main flow #}
+      {% if is_finalized and can_override_edit and task.status != 'in_progress' %}
+        <button type="button" class="btn btn-primary" id="saveBtnOverride" style="margin-left: 20px;">
+          💾 Guardar (Admin Override)
+        </button>
+      {% endif %}
+
+    </div>
     {% endif %}
-
+    
+    <div class="save-indicator" id="saveIndicator"><span id="saveIndicatorText">Guardando...</span></div>
   </div>
-  {% endif %}
-  
-  <div class="save-indicator" id="saveIndicator"><span id="saveIndicatorText">Guardando...</span></div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -582,23 +585,46 @@
     inputs.forEach(i => {
        if(i.disabled || i.readOnly) return; 
 
-       // Radio/Checkbox: Check if checked
+       // Radio/Checkbox: Check if checked (if yes, count it and exit this iteration)
        if((i.type==='radio'||i.type==='checkbox') && i.checked) {
            answered.add(i.name);
            return;
        }
        
-       // Hidden path inputs and text/number inputs are counted if they have a non-empty value
+       // FIX 1: If it is a radio/checkbox and is NOT checked, do NOT check its value. Exit.
+       // The 'value' of an unchecked radio button ("true" or "false") is meaningless for progress.
+       if (i.type === 'radio' || i.type === 'checkbox') {
+           return; 
+       }
+       
+       // File Path Inputs
        if (i.classList.contains('file-path-input')) {
            try {
                const paths = JSON.parse(i.value || '[]');
                if (paths.length > 0) {
                    answered.add(i.name);
-                   return;
                }
-           } catch(e) { /* Ignore parsing errors, assume empty */ }
+               // CRITICAL: Always return after processing file inputs. 
+               return; 
+           } catch(e) { 
+               return;
+           }
        }
-       if (i.value.trim()) {
+       
+       // All other inputs (text, number, select, date, datetime): Check if value is non-empty after trimming
+       const trimmedValue = i.value.trim();
+       
+       // FIX 2: Explicitly ignore "0" for number types in the initial state. 
+       if (i.type === 'number' && trimmedValue === '0') {
+           return; 
+       }
+
+       // Also explicitly ignore empty date/datetime strings that browsers may return as a non-empty format like '0000-00-00'
+       if ((i.type === 'date' || i.type === 'datetime-local') && (trimmedValue === '0000-00-00' || !trimmedValue)) {
+           return;
+       }
+       
+       if (trimmedValue) {
            answered.add(i.name);
            return;
        }

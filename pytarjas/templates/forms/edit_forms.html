@@ -608,7 +608,7 @@ Updates:
   }
 
   // Submit Handler: Serialize choices to JSON
-  document.getElementById('createFormForm').addEventListener('submit', function(e) {
+  document.getElementById('editFormForm').addEventListener('submit', function(e) {
     const cards = document.querySelectorAll('.question-card');
     let isValid = true;
 
@@ -657,10 +657,11 @@ Updates:
         const select = card.querySelector('select');
         if (select) toggleChoicesSection(select, qId);
       });
-      document.getElementById('noQuestionsMessage').style.display = 'none';
-      document.getElementById('bottomAddButtonWrapper').style.display = 'block';
+      // The old HTML structure used to embed 'noQuestionsMessage' but now it relies on JS cleanup.
+      // We will skip removing the non-existent message and just call updateQuestionCount
     }
 
     updateQuestionCount(); 
   });
 </script>
+{% endblock extra_js %}
