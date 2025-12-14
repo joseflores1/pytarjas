@@ -9,7 +9,7 @@ from flask import (
 )
 from datetime import datetime, timezone
 from pytarjas.auth import login_required
-from pytarjas.models.docs_models import Document
+from pytarjas.models.docs_models import Task 
 
 # Create blueprint with URL prefix /worker
 bp = Blueprint("worker", __name__, url_prefix="/worker")
@@ -30,28 +30,28 @@ def index():
 
     # Query statistics based on user role
     if g.user.role == "worker":
-        # Workers see only their assigned documents
-        pending_count = Document.query.filter_by(
+        # Workers see only their assigned tasks
+        pending_count = Task.query.filter_by(
             worker_id=g.user.id,
             status="pending"
         ).count()
         
-        in_progress_count = Document.query.filter_by(
+        in_progress_count = Task.query.filter_by(
             worker_id=g.user.id,
             status="in_progress"
         ).count()
         
-        # Completed today (last 24 hours)
+        # Completed today (since the start of the current UTC day)
         today_start = datetime.now(timezone.utc).replace(
             hour=0, minute=0, second=0, microsecond=0
         )
-        completed_today = Document.query.filter(
-            Document.worker_id == g.user.id,
-            Document.status == "completed",
-            Document.completed_at >= today_start
+        completed_today = Task.query.filter(
+            Task.worker_id == g.user.id,
+            Task.status == "completed",
+            Task.completed_at >= today_start
         ).count()
         
-        total_assigned = Document.query.filter_by(
+        total_assigned = Task.query.filter_by(
             worker_id=g.user.id
         ).count()
     

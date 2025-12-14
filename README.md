@@ -34,7 +34,7 @@ All endpoints support **dual response formats** (HTML and JSON) for maximum flex
 |-----------|--------|---------|
 | `auth` | `/auth` | Authentication (login, logout, session) |
 | `admin` | `/admin` | User management (admin-only) |
-| `tasks` | `/tasks` | Task/Document CRUD operations (JSON API) |
+| `tasks` | `/tasks` | Task CRUD operations (JSON API) |
 | `worker` | `/worker` | Worker dashboard UI (HTML) |
 
 ### User Roles

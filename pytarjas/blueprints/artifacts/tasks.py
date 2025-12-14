@@ -1,6 +1,6 @@
 # pytarjas/blueprints/artifacts/tasks.py
 """
-Tasks API blueprint for managing documents/tasks.
+Tasks API blueprint for managing tasks.
 
 Updates:
 - Implemented enhanced filtering options for all common fields (timestamps, sync status, form name).
@@ -8,18 +8,22 @@ Updates:
 - Included full response data and form structure in list_tasks output for table view.
 - RADICAL FIX: Implemented decoupled, multi-file upload via /upload_file endpoint (POST) for preserving file history.
 - The main task update is now strictly JSON (PATCH), accepting file paths as array elements in the 'responses' object.
+- BUG FIX: Fixed variable shadowing in list_tasks that prevented tasks from displaying.
+- BUG FIX: Fixed JSON saving issue in update_task by using flag_modified instead of invalid bulk update.
 """
 
 from flask import Blueprint, request, jsonify, render_template, g, abort, redirect, url_for, flash
 from datetime import datetime, timezone
 from pytarjas.auth import login_required, task_access_required
 from pytarjas.models.user_models import User, db
-from pytarjas.models.docs_models import Document, Form
-# NOTE: The helper.py file has been modified externally to accept (file, document_id, question_id)
+from pytarjas.models.docs_models import Task, Form
+# NOTE: The helper.py file has been modified externally to accept (file, task_id, question_id)
 from pytarjas.helper import wants_json, save_file_to_disk 
 import uuid
 from sqlalchemy import cast, Date, or_ 
-from sqlalchemy.orm import joinedload 
+from sqlalchemy.orm import joinedload
+# NEW IMPORT: Required to properly track changes in JSON columns
+from sqlalchemy.orm.attributes import flag_modified
 
 # Create blueprint with URL prefix /tasks
 bp = Blueprint("tasks", __name__, url_prefix="/tasks")
@@ -32,11 +36,11 @@ bp = Blueprint("tasks", __name__, url_prefix="/tasks")
 def upload_file_temp(task_id):
     """
     Handles immediate file upload (AJAX call) separately from form data.
-    Saves the file using a unique name based on Document ID, Question ID, and UUID 
+    Saves the file using a unique name based on Task ID, Question ID, and UUID 
     to preserve file history and context.
     """
-    document = Document.query.get(task_id)
-    if not document:
+    task = Task.query.get(task_id)
+    if not task:
         return jsonify({"success": False, "error": "Task not found"}), 404
 
     # Check for file input named 'file' and required metadata
@@ -51,13 +55,13 @@ def upload_file_temp(task_id):
         return jsonify({"success": False, "error": "Missing question ID for file naming."}), 400
 
     is_admin_or_planner = g.user.role in ["admin", "planner"]
-    is_finalized = document.status in ["completed", "reviewed", "approved"]
+    is_finalized = task.status in ["completed", "reviewed", "approved"]
     
     if is_finalized and not is_admin_or_planner:
         return jsonify({"success": False, "error": "Cannot upload files to finalized task."}), 403
 
     try:
-        # CRITICAL: Pass document_id (task_id) and question_id to the helper function
+        # CRITICAL: Pass task_id and question_id to the helper function
         # The helper now generates a unique filename for history preservation.
         saved_path = save_file_to_disk(file, task_id, question_id) 
         
@@ -139,8 +143,8 @@ def create_task():
     if client_name_input:
         record_data["client_name"] = client_name_input
         
-    # Create the document
-    document = Document(
+    # Create the task 
+    task = Task(
         id=str(uuid.uuid4()),
         planning_id=None,
         form_id=form_id,
@@ -155,14 +159,14 @@ def create_task():
     )
     
     try:
-        db.session.add(document)
+        db.session.add(task)
         db.session.commit()
         
         if wants_json():
             return jsonify({
                 "success": True,
                 "message": "Task created successfully",
-                "task_id": document.id
+                "task_id": task.id
             }), 201
         else:
             flash("Tarea creada exitosamente", "success")
@@ -218,11 +222,11 @@ def list_tasks():
     dynamic_filters = {k: v.strip() for k, v in request.args.items() if k.startswith('q_') and v.strip()}
 
     # Build base query
-    query = Document.query.options(
-        db.joinedload(Document.form).joinedload(Form.questions),
-        db.joinedload(Document.planning),
-        db.joinedload(Document.worker),
-        db.joinedload(Document.created_by)
+    query = Task.query.options(
+        db.joinedload(Task.form).joinedload(Form.questions),
+        db.joinedload(Task.planning),
+        db.joinedload(Task.worker),
+        db.joinedload(Task.created_by)
     )
     
     # --- Role-based Access Control (Initial Filter) ---
@@ -230,65 +234,59 @@ def list_tasks():
         # Workers ONLY see tasks assigned to them OR created by them
         query = query.filter(
             or_(
-                Document.worker_id == g.user.id,
-                Document.created_by_id == g.user.id
+                Task.worker_id == g.user.id,
+                Task.created_by_id == g.user.id
             )
         )
 
     # --- Specific Filter Application (Applies AFTER Role Control) ---
     if status != 'all':
-        query = query.filter(Document.status == status)
+        query = query.filter(Task.status == status)
 
     # 1. Assigned To Filter (worker_id): Only available to Admin/Planner
     if g.user.role in ["planner", "admin"] and worker_id_filter:
-        query = query.filter(Document.worker_id == worker_id_filter)
+        query = query.filter(Task.worker_id == worker_id_filter)
     
     # 2. Created By Filter (created_by_id): Available to Admin/Planner/Worker
     if created_by_id_filter:
-        query = query.filter(Document.created_by_id == created_by_id_filter)
+        query = query.filter(Task.created_by_id == created_by_id_filter)
     
     # 3. Form Filters (Priority: form_id_filter)
     if form_id_filter:
-        query = query.filter(Document.form_id == form_id_filter)
+        query = query.filter(Task.form_id == form_id_filter)
     elif form_type_filter:
-        query = query.join(Document.form).filter(Form.form_type == form_type_filter)
+        query = query.join(Task.form).filter(Form.form_type == form_type_filter)
 
     # 4. Search Filters (Legacy/Text Search)
     if worker_username_search:
-        query = query.join(Document.worker).filter(
+        query = query.join(Task.worker).filter(
             User.username.ilike(f'%{worker_username_search}%')
         )
         
     if form_name_search:
-        query = query.join(Document.form).filter(Form.name.ilike(f'%{form_name_search}%'))
+        query = query.join(Task.form).filter(Form.name.ilike(f'%{form_name_search}%'))
 
-    # 5. DYNAMIC QUESTION FILTERS (CRITICAL FIX: Filtering logic was simplified and correctly applied)
+    # 5. DYNAMIC QUESTION FILTERS
     for key, value in dynamic_filters.items():
         if not value:
             continue
             
-        # Dynamic filter keys are either 'q_<question_id>' (for responses)
-        # or 'q_record_<field_name>' (for record_data, like client_name or container_number)
-        
-        # NOTE: This dynamic filtering correctly relies on the value being a partial match (%value%)
         if key.startswith('q_record_'):
              record_field = key[9:] 
-             # Fix: Ensure JSON string extraction works before applying LIKE
              query = query.filter(
-                 Document.record_data.op('->>')(record_field).ilike(f'%{value}%')
+                 Task.record_data.op('->>')(record_field).ilike(f'%{value}%')
              )
         else:
              question_id = key[2:] 
-             # Fix: Ensure JSON string extraction works before applying LIKE
              query = query.filter(
-                 Document.responses.op('->>')(question_id).ilike(f'%{value}%')
+                 Task.responses.op('->>')(question_id).ilike(f'%{value}%')
              )
 
 
     # RE-INTRODUCED SYNC FILTER
     if is_synced_filter is not None and is_synced_filter != '':
         is_synced_bool = is_synced_filter.lower() == 'true'
-        query = query.filter(Document.is_synced == is_synced_bool)
+        query = query.filter(Task.is_synced == is_synced_bool)
 
     # --- TIMESTAMP FILTERS ---
     def apply_timestamp_filter(query, field, min_val, max_val):
@@ -306,23 +304,25 @@ def list_tasks():
                 pass
         return query
 
-    query = apply_timestamp_filter(query, Document.created_at, created_at_min, created_at_max)
-    query = apply_timestamp_filter(query, Document.updated_at, updated_at_min, updated_at_max)
-    query = apply_timestamp_filter(query, Document.started_at, started_at_min, started_at_max)
-    query = apply_timestamp_filter(query, Document.completed_at, completed_at_min, completed_at_max)
-    query = apply_timestamp_filter(query, Document.reviewed_at, reviewed_at_min, reviewed_at_max)
-    query = apply_timestamp_filter(query, Document.synced_at, synced_at_min, synced_at_max)
+    query = apply_timestamp_filter(query, Task.created_at, created_at_min, created_at_max)
+    query = apply_timestamp_filter(query, Task.updated_at, updated_at_min, updated_at_max)
+    query = apply_timestamp_filter(query, Task.started_at, started_at_min, started_at_max)
+    query = apply_timestamp_filter(query, Task.completed_at, completed_at_min, completed_at_max)
+    query = apply_timestamp_filter(query, Task.reviewed_at, reviewed_at_min, reviewed_at_max)
+    query = apply_timestamp_filter(query, Task.synced_at, synced_at_min, synced_at_max)
         
     total = query.count()
-    documents = query.order_by(Document.created_at.desc()).offset(offset).limit(limit).all()
+    # FIX: Renamed variable to avoid shadowing 'tasks' list below
+    db_tasks = query.order_by(Task.created_at.desc()).offset(offset).limit(limit).all()
     
     tasks = []
-    for doc in documents:
+    # FIX: Iterating over db_tasks instead of empty tasks list
+    for task in db_tasks:
         # Structure of Questions for the collapsible row
         form_questions = []
-        if doc.form and doc.form.questions:
+        if task.form and task.form.questions:
             # Sort questions by order for correct display
-            for q in sorted(doc.form.questions, key=lambda x: x.order):
+            for q in sorted(task.form.questions, key=lambda x: x.order):
                 form_questions.append({
                     "id": q.id,
                     "text": q.question_text,
@@ -332,33 +332,33 @@ def list_tasks():
 
         # Extract a few key fields from record_data for table view preview
         record_preview = {}
-        if doc.record_data:
-            if 'container_number' in doc.record_data:
-                record_preview['Contenedor'] = doc.record_data['container_number']
-            if 'ship_name' in doc.record_data:
-                record_preview['Nave'] = doc.record_data['ship_name']
-            if 'client_name' in doc.record_data and 'Contenedor' not in record_preview:
-                record_preview['Cliente'] = doc.record_data['client_name']
+        if task.record_data:
+            if 'container_number' in task.record_data:
+                record_preview['Contenedor'] = task.record_data['container_number']
+            if 'ship_name' in task.record_data:
+                record_preview['Nave'] = task.record_data['ship_name']
+            if 'client_name' in task.record_data and 'Contenedor' not in record_preview:
+                record_preview['Cliente'] = task.record_data['client_name']
         
         task_data = {
-            "id": doc.id,
-            "record_data": doc.record_data or {},
+            "id": task.id,
+            "record_data": task.record_data or {},
             "record_preview": record_preview, 
-            "status": doc.status,
-            "worker": {"username": doc.worker.username, "id": doc.worker.id} if doc.worker else None,
-            "created_by": {"username": doc.created_by.username, "id": doc.created_by.id} if doc.created_by else None,
-            "form_type": doc.form.form_type if doc.form else "Unknown",
-            "form_name": doc.form.name if doc.form else "Deleted Form",
-            "responses": doc.responses or {}, 
+            "status": task.status,
+            "worker": {"username": task.worker.username, "id": task.worker.id} if task.worker else None,
+            "created_by": {"username": task.created_by.username, "id": task.created_by.id} if task.created_by else None,
+            "form_type": task.form.form_type if task.form else "Unknown",
+            "form_name": task.form.name if task.form else "Deleted Form",
+            "responses": task.responses or {}, 
             "form_questions": form_questions, 
-            "is_synced": doc.is_synced, 
-            "created_at": doc.created_at.isoformat() if doc.created_at else None,
-            "updated_at": doc.updated_at.isoformat() if doc.updated_at else None,
-            "started_at": doc.started_at.isoformat() if doc.started_at else None,
-            "completed_at": doc.completed_at.isoformat() if doc.completed_at else None,
-            "reviewed_at": doc.reviewed_at.isoformat() if doc.reviewed_at else None,
-            "synced_at": doc.synced_at.isoformat() if doc.synced_at else None, 
-            "_document": doc
+            "is_synced": task.is_synced, 
+            "created_at": task.created_at.isoformat() if task.created_at else None,
+            "updated_at": task.updated_at.isoformat() if task.updated_at else None,
+            "started_at": task.started_at.isoformat() if task.started_at else None,
+            "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+            "reviewed_at": task.reviewed_at.isoformat() if task.reviewed_at else None,
+            "synced_at": task.synced_at.isoformat() if task.synced_at else None, 
+            "_task": task
         }
         tasks.append(task_data)
     
@@ -377,8 +377,8 @@ def list_tasks():
 
     
     if wants_json():
-        # Clean tasks data for JSON output (remove _document which is for internal use)
-        json_tasks = [{k: v for k, v in t.items() if k != '_document'} for t in tasks]
+        # Clean tasks data for JSON output (remove _task which is for internal use)
+        json_tasks = [{k: v for k, v in t.items() if k != '_task'} for t in tasks]
         return jsonify({
             "success": True,
             "tasks": json_tasks,
@@ -430,22 +430,22 @@ def get_task(task_id):
     Display a single task for viewing and editing.
     """
     # Load task with necessary relationships
-    document = Document.query.options(
-        db.joinedload(Document.form).joinedload(Form.questions),
-        db.joinedload(Document.worker),
+    task = Task.query.options(
+        db.joinedload(Task.form).joinedload(Form.questions),
+        db.joinedload(Task.worker),
     ).get(task_id)
 
-    if not document:
+    if not task:
         return (jsonify({"success": False, "error": "Task not found"}), 404) if wants_json() else abort(404)
 
     # --- CRITICAL DATA INTEGRITY CHECK (FIXED ATTRIBUTE NAME) ---
-    if document.form and document.form.questions:
-        for question in document.form.questions:
+    if task.form and task.form.questions:
+        for question in task.form.questions:
             # FIX: Changed 'question.type' to 'question.question_type'
             if not isinstance(question.question_type, str) or len(question.question_type.strip()) == 0:
                 error_msg = (
                     f"Data Integrity Error: Question ID {question.id} ('{question.question_text}') "
-                    f"in Form '{document.form.name}' has invalid or empty type. "
+                    f"in Form '{task.form.name}' has invalid or empty type. "
                     f"Please update the database record for this question."
                 )
                 print(f"!!! DIAGNOSTIC FAILURE: {error_msg}")
@@ -457,8 +457,8 @@ def get_task(task_id):
     can_override_edit = is_admin_or_planner
     
     # Basic view access check: worker is assigned, worker is creator, or user is admin/planner
-    has_view_access = (document.worker_id == g.user.id or 
-                       document.created_by_id == g.user.id or 
+    has_view_access = (task.worker_id == g.user.id or 
+                       task.created_by_id == g.user.id or 
                        is_admin_or_planner)
     
     if not has_view_access:
@@ -468,10 +468,10 @@ def get_task(task_id):
         # Minimal JSON response for viewing, if needed by the client
         return jsonify({
             "success": True,
-            "task_id": document.id,
-            "status": document.status,
-            "form_name": document.form.name if document.form else "Deleted Form",
-            "responses": document.responses,
+            "task_id": task.id,
+            "status": task.status,
+            "form_name": task.form.name if task.form else "Deleted Form",
+            "responses": task.responses,
             "can_override_edit": can_override_edit
         }), 200
     else:
@@ -480,7 +480,7 @@ def get_task(task_id):
 
         return render_template(
             "tasks/task_detail.html",
-            task=document,
+            task=task,
             user=g.user,
             can_override_edit=can_override_edit, # Pass the flag directly
             all_clients=all_clients 
@@ -492,18 +492,18 @@ def get_task(task_id):
 @login_required
 @task_access_required
 def update_task(task_id):
-    document = Document.query.get(task_id)
-    if not document:
+    task = Task.query.get(task_id)
+    if not task:
         return jsonify({"success": False, "error": "Task not found"}), 404
         
     is_admin_or_planner = g.user.role in ["admin", "planner"]
-    is_finalized = document.status in ["completed", "reviewed", "approved"]
+    is_finalized = task.status in ["completed", "reviewed", "approved"]
     
-    if g.user.role == "worker" and document.worker_id != g.user.id and not is_admin_or_planner:
+    if g.user.role == "worker" and task.worker_id != g.user.id and not is_admin_or_planner:
         return jsonify({"success": False, "error": "Access denied"}), 403
     
     if is_finalized and not is_admin_or_planner:
-        return jsonify({"success": False, "error": f"Task is already {document.status}. Only Admins or Planners can modify finalized tasks."}), 403
+        return jsonify({"success": False, "error": f"Task is already {task.status}. Only Admins or Planners can modify finalized tasks."}), 403
     
     
     # ------------------------------------------------------------------------
@@ -514,37 +514,37 @@ def update_task(task_id):
         return jsonify({"success": False, "error": "JSON required for task update. File uploads must use the dedicated '/upload_file' endpoint."}), 400
         
     data = request.get_json()
-    old_status = document.status
+    old_status = task.status
     
     if "status" in data:
         new_status = data["status"]
-        document.status = new_status
+        task.status = new_status
         
         # Logic for setting timestamps based on status transitions
         if new_status == "in_progress" and old_status == "pending":
-            if not document.worker_id:
-                document.worker_id = g.user.id
-            if not document.started_at:
-                document.started_at = datetime.now(timezone.utc)
+            if not task.worker_id:
+                task.worker_id = g.user.id
+            if not task.started_at:
+                task.started_at = datetime.now(timezone.utc)
         elif new_status == "completed":
-            if not document.completed_at:
-                document.completed_at = datetime.now(timezone.utc)
+            if not task.completed_at:
+                task.completed_at = datetime.now(timezone.utc)
         
     
     if "responses" in data:
-        if document.responses is None:
-            document.responses = {}
+        if task.responses is None:
+            task.responses = {}
         
         # Responses now include text answers and SAVED FILE PATHS (JSON string arrays)
-        document.responses.update(data["responses"])
+        task.responses.update(data["responses"])
         
-        # Use explicit SQLAlchemy update call to force JSON field modification detection
-        db.session.query(Document).filter_by(id=task_id).update(
-            {"responses": document.responses}, synchronize_session=False
-        )
+        # FIX: Use flag_modified to notify SQLAlchemy of the JSON change.
+        # The previous bulk update using Task.responses (class attribute) was invalid 
+        # as it updated the column with itself instead of the new value.
+        flag_modified(task, "responses")
     
-    document.updated_at = datetime.now(timezone.utc)
-    document.is_synced = data.get("mark_synced", False)
+    task.updated_at = datetime.now(timezone.utc)
+    task.is_synced = data.get("mark_synced", False)
     
     try:
         db.session.commit()

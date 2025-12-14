@@ -33,17 +33,17 @@ def allowed_file(filename):
     return ext in current_app.config['ALLOWED_EXTENSIONS']
 
 # MODIFIED: Added question_id argument
-def save_file_to_disk(file, document_id, question_id):
+def save_file_to_disk(file, task_id, question_id):
     """Secures filename and saves the file to the UPLOAD_FOLDER, guaranteeing a unique name for history."""
     
-    if file and allowed_file(file.filename) and document_id and question_id:
+    if file and allowed_file(file.filename) and task_id and question_id:
         
         filename = secure_filename(file.filename)
         file_ext = os.path.splitext(filename)[1].lower() # Ensure lowercase extension
         
         # Generate new unique name based on context and UUID
         # Note: The extension saved in the path includes the dot, e.g., '.pdf'
-        base_name = f"{document_id}_{question_id}_{str(uuid.uuid4())}"
+        base_name = f"{task_id}_{question_id}_{str(uuid.uuid4())}"
         unique_filename = base_name + file_ext
         
         upload_path = os.path.join(current_app.instance_path, current_app.config['UPLOAD_FOLDER'])
@@ -64,8 +64,8 @@ def save_file_to_disk(file, document_id, question_id):
         
     else:
         # NEW DEBUGGING LOGIC: Explicitly log why the file was rejected
-        if not (document_id and question_id):
-             current_app.logger.warning("File rejected: Missing document ID or question ID.")
+        if not (task_id and question_id):
+             current_app.logger.warning("File rejected: Missing task ID or question ID.")
         elif file and file.filename and '.' in file.filename:
             ext = file.filename.rsplit('.', 1)[1].lower()
             current_app.logger.warning(

@@ -1,6 +1,6 @@
-# pytarjas/plannings.py
+# pytarjas/blueprints/artifacts/plannings.py
 """
-Plannings API blueprint for managing work plannings and documents.
+Plannings API blueprint for managing work plannings and tasks.
 
 This module defines the resource-centric endpoints /plannings/, /plannings/create, etc.
 """
@@ -12,7 +12,7 @@ import uuid
 
 # Import database and models
 from pytarjas.models.user_models import db, User
-from pytarjas.models.docs_models import Planning, Document, Form   
+from pytarjas.models.docs_models import Planning, Task, Form   
 
 # Import authentication decorators
 from pytarjas.auth import login_required, planning_access_required
@@ -35,7 +35,7 @@ def check_planning_access(planning_id: str) -> Planning:
     planning = Planning.query.options(
         joinedload(Planning.planner),
         joinedload(Planning.form),
-        joinedload(Planning.documents)
+        joinedload(Planning.tasks)
     ).get_or_404(planning_id)
     
     if g.user.role == "admin":
@@ -70,7 +70,7 @@ def list_plannings():
     query = Planning.query.options(
         joinedload(Planning.planner),
         joinedload(Planning.form),
-        joinedload(Planning.documents)
+        joinedload(Planning.tasks)
     )
     
     if status_filter != 'all':
@@ -96,9 +96,9 @@ def list_plannings():
     
     plannings_data = []
     for plan in plannings:
-        completed_docs = sum(
-            1 for doc in plan.documents 
-            if doc.status == 'completed'
+        completed_tasks = sum(
+            1 for task in plan.tasks 
+            if task.status == 'completed'
         )
         
         plan_dict = {
@@ -107,8 +107,8 @@ def list_plannings():
             "form_name": plan.form.name if plan.form else None,
             "form_type": plan.form.form_type if plan.form else None,
             "status": plan.status,
-            "total_documents": plan.total_documents,
-            "completed_documents": completed_docs,
+            "total_tasks": plan.total_tasks,
+            "completed_tasks": completed_tasks,
             "planner": {
                 "id": plan.planner.id,
                 "username": plan.planner.username
@@ -168,7 +168,7 @@ def get_planning(planning_id):
     planning = check_planning_access(planning_id)
     
     progress = {
-        "total": planning.total_documents,
+        "total": planning.total_tasks,
         "pending": 0,
         "in_progress": 0,
         "completed": 0,
@@ -176,30 +176,30 @@ def get_planning(planning_id):
         "approved": 0
     }
     
-    for document in planning.documents:
-        status = document.status
+    for task in planning.tasks:
+        status = task.status
         if status in progress:
             progress[status] += 1
         else:
             progress["pending"] += 1
     
-    documents_data = []
-    for document in planning.documents:
-        doc_dict = {
-            "id": document.id,
-            "record_data": document.record_data,
-            "status": document.status,
+    tasks_data = []
+    for task in planning.tasks:
+        task_dict = {
+            "id": task.id,
+            "record_data": task.record_data,
+            "status": task.status,
             "worker": {
-                "id": document.worker.id,
-                "username": document.worker.username
-            } if document.worker else None,
-            "started_at": document.started_at.isoformat() if document.started_at else None,
-            "completed_at": document.completed_at.isoformat() if document.completed_at else None,
-            "is_synced": document.is_synced,
-            "created_at": document.created_at.isoformat() if document.created_at else None
+                "id": task.worker.id,
+                "username": task.worker.username
+            } if task.worker else None,
+            "started_at": task.started_at.isoformat() if task.started_at else None,
+            "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+            "is_synced": task.is_synced,
+            "created_at": task.created_at.isoformat() if task.created_at else None
         }
         
-        documents_data.append(doc_dict)
+        tasks_data.append(task_dict)
     
     if wants_json():
         return jsonify({
@@ -208,7 +208,7 @@ def get_planning(planning_id):
                 "id": planning.id,
                 "client_name": planning.client_name,
                 "status": planning.status,
-                "total_documents": planning.total_documents,
+                "total_tasks": planning.total_tasks,
                 "file_name": planning.file_name if planning.file_name else None,
                 "form": {
                     "id": planning.form.id,
@@ -227,7 +227,7 @@ def get_planning(planning_id):
                         for q in sorted(planning.form.questions, key=lambda x: x.order)
                     ]
                 } if planning.form else None,
-                "documents": documents_data,
+                "tasks": tasks_data,
                 "planner": {
                     "id": planning.planner.id,
                     "username": planning.planner.username,
@@ -243,7 +243,7 @@ def get_planning(planning_id):
     return render_template(
         "planner/view_planning.html",
         planning=planning,
-        documents=documents_data,
+        tasks=tasks_data,
         progress=progress,
         user=g.user
     )
@@ -343,16 +343,17 @@ def create_planning():
                 form_id=form_id,
                 client_name=client_name,
                 status=status,
-                total_documents=len(records_data),
+                total_tasks=len(records_data),
                 file_path="",
                 file_name="",
                 created_at=datetime.now(timezone.utc)
             )
             db.session.add(planning)
             
-            created_documents = []
+            created_tasks = []
             for record_data in records_data:
-                document = Document(
+                # FIX: Removed 'photos=[]' argument as the field was removed from the Task model
+                task = Task(
                     id=str(uuid.uuid4()),
                     planning_id=planning.id,
                     form_id=form_id,
@@ -361,21 +362,20 @@ def create_planning():
                     worker_id=None,
                     status="pending",
                     responses={},
-                    photos=[],
                     is_synced=True,
                     created_at=datetime.now(timezone.utc)
                 )
-                db.session.add(document)
-                created_documents.append(document)
+                db.session.add(task)
+                created_tasks.append(task)
             
-            planning.total_documents = len(records_data)
+            planning.total_tasks = len(records_data)
             planning.status = "completed"
             planning.updated_at = datetime.now(timezone.utc)
             
             db.session.commit()
             
             success_message = (
-                f"Planning created successfully with {len(records_data)} documents."
+                f"Planning created successfully with {len(records_data)} tasks."
             )
             
             if wants_json():
@@ -385,7 +385,7 @@ def create_planning():
                     "planning": {
                         "id": planning.id,
                         "client_name": planning.client_name,
-                        "total_documents": planning.total_documents,
+                        "total_tasks": planning.total_tasks,
                         "status": planning.status,
                         "created_at": planning.created_at.isoformat()
                     }

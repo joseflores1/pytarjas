@@ -1,16 +1,16 @@
 # docs_models.py
 """
-Document and form management models for the Pytarjas application.
+Task and form management models for the Pytarjas application.
 
-This module defines models for managing forms, plannings, records, and documents
+This module defines models for managing forms, plannings, records, and tasks 
 used in the consolidation/deconsolidation tarja process.
 
 The workflow is:
 1. Planner creates a Planning and associates it with a Form
 2. System creates Records (one per row/entry in the planning)
-3. System auto-generates Documents (one per Record, based on the Form)
-4. Workers fill Documents during faenas
-5. System generates PDF tarjas from completed Documents
+3. System auto-generates Tasks (based on the Form)
+4. Workers fill Tasks during faenas
+5. System generates PDF tarjas from completed Tasks 
 """
 import uuid
 from datetime import datetime, timezone
@@ -190,24 +190,24 @@ class Question(db.Model):
 
 class Planning(db.Model):
     """
-    Work planning document created by Planner.
+    Work planning task created by Planner.
     
-    SIMPLIFIED: Now directly contains Documents without the Record middle layer.
+    SIMPLIFIED: Now directly contains Tasks without the Record middle layer.
     
     Attributes:
         id: Unique identifier (UUID)
         planner_id: Foreign key to User (Planner who created it)
-        form_id: Foreign key to Form (template to use for documents)
+        form_id: Foreign key to Form (template to use for tasks)
         file_path: Location of uploaded file - empty if created via UI
         file_name: Original filename - empty if created via UI
         status: Processing status (uploaded, processing, completed, error)
         client_name: Client who requested this work
-        total_documents: Number of documents in this planning (was total_records)
+        total_tasks: Number of tasks in this planning (was total_records)
         created_at: When the planning was created
         updated_at: Last modification timestamp
         planner: Related User (Planner) object (many-to-one)
         form: Related Form object (many-to-one)
-        documents: Related Document objects (one-to-many) - CHANGED from records
+        tasks: Related Task objects (one-to-many) - CHANGED from records
     """
 
     __tablename__="planning"
@@ -256,8 +256,8 @@ class Planning(db.Model):
         index=True,
     )
     
-    # RENAMED: total_records → total_documents (more accurate now)
-    total_documents: Mapped[int]=mapped_column(
+    # RENAMED: total_records → total_tasks (more accurate now)
+    total_tasks: Mapped[int]=mapped_column(
         Integer,
         nullable=False,
         default=0,
@@ -281,28 +281,28 @@ class Planning(db.Model):
         "Form",
         back_populates="plannings",
     )
-    # CHANGED: records → documents (direct relationship now)
-    documents: Mapped[list["Document"]]=relationship(
-        "Document",
+    # CHANGED: records → tasks (direct relationship now)
+    tasks: Mapped[list["Task"]]=relationship(
+        "Task",
         back_populates="planning",
         cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:
-        return f"<Planning: {self.client_name} - {self.total_documents} documents>"
+        return f"<Planning: {self.client_name} - {self.total_tasks} tasks>"
 
 
-# RECORD CLASS REMOVED - Its functionality has been merged into Document below
+# RECORD CLASS REMOVED - Its functionality has been merged into Task below
 
 
-class Document(db.Model):
+class Task(db.Model):
     """
-    Fillable tarja document for Workers.
+    Fillable tarja task for Workers.
     
     SIMPLIFIED: Now contains task data directly (record_data) and references Planning.
     The Record middle layer has been removed for simplicity.
     
-    Documents can be created in two ways:
+    Tasks can be created in two ways:
     1. Batch creation from Planning (planning_id is set)
     2. Manual creation (planning_id can be NULL)
     
@@ -313,17 +313,17 @@ class Document(db.Model):
         record_data: JSON containing all task-specific data (merged from Record)
         worker_id: Foreign key to User (Worker who fills it)
         created_by_id: Foreign key to User (who created this task - for standalone tasks)
-        status: Document status (pending, in_progress, completed, reviewed, approved)
+        status: Task status (pending, in_progress, completed, reviewed, approved)
         responses: JSON storing all question answers
         
         <PHOTOS AND PDF_PATH FIELDS REMOVED>
         
-        started_at: When worker started filling the document
-        completed_at: When worker finished filling the document
-        reviewed_at: When planner reviewed the document
+        started_at: When worker started filling the task
+        completed_at: When worker finished filling the task
+        reviewed_at: When planner reviewed the task
         synced_at: When offline data was synced to server
         is_synced: Whether offline changes are synced
-        created_at: When the document was created
+        created_at: When the task was created
         updated_at: Last modification timestamp
         planning: Related Planning object (many-to-one) - CHANGED from record
         form: Related Form object (many-to-one) - NEW direct relationship
@@ -335,7 +335,7 @@ class Document(db.Model):
         Pallet form: {"pallet_number": "PLT-001", "warehouse": "A-15", ...}
         Booking form: {"booking_number": "BK2025001", "client": "ACME", ...}
     """
-    __tablename__ = "document"
+    __tablename__ = "task"
     
     id: Mapped[str] = mapped_column(
         String(36),
@@ -375,7 +375,7 @@ class Document(db.Model):
         index=True,
     )
     
-    # NEW: Track who created the document (for standalone tasks)
+    # NEW: Track who created the task (for standalone tasks)
     created_by_id: Mapped[str | None] = mapped_column(
         String(36),
         ForeignKey("users.id", ondelete="SET NULL"),
@@ -435,7 +435,7 @@ class Document(db.Model):
     # CHANGED: record → planning (direct relationship now)
     planning: Mapped["Planning"] = relationship(
         "Planning",
-        back_populates="documents",
+        back_populates="tasks",
     )
     
     # NEW: Direct relationship to Form
@@ -449,7 +449,7 @@ class Document(db.Model):
         foreign_keys=[worker_id],
     )
     
-    # NEW: User who created this document (for standalone tasks)
+    # NEW: User who created this task (for standalone tasks)
     created_by: Mapped["User"] = relationship(
         "User",
         foreign_keys=[created_by_id],
@@ -486,29 +486,29 @@ class Document(db.Model):
     # ========================================================================
     
     def start_filling(self, worker_id: str) -> None:
-        """Mark document as started by a worker."""
+        """Mark task as started by a worker."""
         self.worker_id = worker_id
         self.status = "in_progress"
         self.started_at = datetime.now(timezone.utc)
         self.updated_at = datetime.now(timezone.utc)
     
     def complete_filling(self) -> None:
-        """Mark document as completed by the worker."""
+        """Mark task as completed by the worker."""
         self.status = "completed"
         self.completed_at = datetime.now(timezone.utc)
         self.updated_at = datetime.now(timezone.utc)
     
     def mark_reviewed(self) -> None:
-        """Mark document as reviewed by a planner."""
+        """Mark task as reviewed by a planner."""
         self.status = "reviewed"
         self.reviewed_at = datetime.now(timezone.utc)
         self.updated_at = datetime.now(timezone.utc)
     
     def mark_synced(self) -> None:
-        """Mark document as synced after offline changes."""
+        """Mark task as synced after offline changes."""
         self.is_synced = True
         self.synced_at = datetime.now(timezone.utc)
         self.updated_at = datetime.now(timezone.utc)
     
     def __repr__(self) -> str:
-        return f"<Document: {self.id} ({self.status})>"
+        return f"<Task: {self.id} ({self.status})>"

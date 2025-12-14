@@ -3,7 +3,7 @@
 Forms blueprint for managing Form templates and Questions.
 
 This blueprint allows Admins, Planners, and Workers to create and manage
-form templates that will be used for tarja documents during field work.
+form templates that will be used for tarja tasks during field work.
 """
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for, jsonify, g
