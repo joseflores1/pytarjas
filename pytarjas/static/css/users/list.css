@@ -1,0 +1,167 @@
+/* pytarjas/static/css/users/list.css */
+
+/* --- HEADER & FILTERS --- */
+.page-header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+    margin-top: var(--space-lg);
+    margin-bottom: var(--space-lg);
+}
+
+.filters-container {
+    margin-bottom: var(--space-xl);
+}
+
+.filters-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+/* --- TABLE STYLES --- */
+.users-table-card {
+    overflow-x: auto;
+}
+
+.users-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.users-table thead tr {
+    background-color: var(--color-bg-secondary);
+    border-bottom: 2px solid var(--color-border);
+}
+
+.users-table th {
+    padding: var(--space-md);
+    text-align: left;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
+    white-space: nowrap;
+}
+
+.users-table th.actions-col {
+    text-align: center;
+}
+
+.users-table tbody tr {
+    border-bottom: 1px solid var(--color-border);
+    transition: background-color var(--transition-fast);
+}
+
+.users-table tbody tr:hover {
+    background-color: var(--color-bg-secondary);
+}
+
+.users-table td {
+    padding: var(--space-md);
+    color: var(--color-text-secondary);
+}
+
+/* Specific Column Styles */
+.user-name-cell {
+    color: var(--color-text-primary);
+    font-weight: var(--font-weight-medium);
+}
+
+.user-email-cell {
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.date-cell {
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+}
+
+.actions-cell {
+    text-align: center;
+}
+
+.actions-wrapper {
+    display: flex;
+    gap: var(--space-sm);
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* --- BADGES & STATUS --- */
+.role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.role-planner {
+    background-color: #8b5cf6;
+    color: white;
+}
+
+.empty-state {
+    text-align: center;
+    padding: var(--space-2xl);
+}
+
+.empty-icon {
+    font-size: 4rem;
+    margin-bottom: var(--space-lg);
+    opacity: 0.3;
+}
+
+/* Highlight for current user row */
+tr.current-user-row {
+    background-color: var(--color-primary-light);
+    border: 2px solid var(--color-primary);
+}
+
+/* --- MOBILE RESPONSIVENESS (Merged from users_list.css) --- */
+@media (max-width: 767px) {
+  .users-table { display: block; }
+  .users-table thead { display: none; }
+  .users-table tbody { display: block; }
+  
+  .users-table tr {
+    display: block;
+    margin-bottom: var(--space-lg);
+    border: 1px solid var(--color-border) !important;
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    background-color: var(--color-bg-primary) !important;
+    box-shadow: var(--shadow-sm);
+  }
+  
+  .users-table td {
+    display: flex; /* Use flex to align label and value */
+    justify-content: space-between;
+    align-items: center;
+    text-align: right !important;
+    padding: var(--space-sm) 0 !important;
+    border-bottom: 1px solid var(--color-border);
+    font-size: var(--font-size-sm);
+  }
+  
+  .users-table td:last-child { 
+      border-bottom: none; 
+      display: block; /* Actions block stacks */
+      text-align: center !important;
+      margin-top: var(--space-sm);
+  }
+  
+  /* Add labels via CSS */
+  .users-table td:nth-child(1)::before { content: "Usuario"; font-weight: bold; margin-right: auto; }
+  .users-table td:nth-child(2)::before { content: "Email"; font-weight: bold; margin-right: auto; }
+  .users-table td:nth-child(3)::before { content: "Rol"; font-weight: bold; margin-right: auto; }
+  .users-table td:nth-child(4)::before { content: "Creado"; font-weight: bold; margin-right: auto; }
+  .users-table td:nth-child(5)::before { content: "Último Login"; font-weight: bold; margin-right: auto; }
+  .users-table td:nth-child(6)::before { content: "Actualizado"; font-weight: bold; margin-right: auto; }
+  .users-table td:nth-child(7)::before { content: "Acciones"; font-weight: bold; display: block; margin-bottom: var(--space-xs); text-align: left;}
+  
+  /* Action buttons full width on mobile */
+  .actions-wrapper { flex-direction: column; width: 100%; }
+  .actions-wrapper .btn { width: 100%; }
+}

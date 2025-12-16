@@ -1,0 +1,35 @@
+/* pytarjas/static/css/planner/index.css */
+
+/* --- LAYOUT --- */
+.planner-container {
+    max-width: 900px;
+    margin: var(--space-xl) auto;
+    text-align: center;
+}
+
+.planner-card {
+    padding: var(--space-3xl);
+}
+
+.planner-title {
+    font-size: var(--font-size-3xl);
+}
+
+.planner-welcome {
+    font-size: var(--font-size-lg);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-xl);
+}
+
+.planner-menu-grid {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-lg);
+    flex-wrap: wrap;
+}
+
+/* --- ERROR STATE --- */
+.access-denied-text {
+    font-size: var(--font-size-lg);
+    color: var(--color-danger);
+}

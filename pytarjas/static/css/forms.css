@@ -1,20 +1,17 @@
 /**
- * forms.css - Form Controls & Validation States
- * Purpose: Input fields, textareas, selects, checkboxes, radios, validation styling
- * Dependencies: base.css, components.css (uses CSS variables)
- * Optimized for: Touch-friendly data entry on Android tablets
+ * forms.css - Form Controls & Layouts
+ * Purpose: Inputs, selects, checkboxes, radios, and form layouts
+ * Dependencies: base.css (variables)
  */
 
 /* ============================================
-   FORM ELEMENT DEFAULTS
+   FORM CONTAINERS & LAYOUTS
    ============================================ */
 
-/* Form container - Prevents horizontal overflow */
 form {
   width: 100%;
 }
 
-/* Fieldset - Groups related form controls */
 fieldset {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -28,22 +25,41 @@ legend {
   padding: 0 var(--space-sm);
 }
 
-
-/* ============================================
-   FORM GROUPS - Label + Input Pairing
-   ============================================ */
-
-/* Form group - Standard field wrapper */
+/* Form Group - Standard wrapper for Label + Input */
 .form-group {
   margin-bottom: var(--space-lg);
 }
 
-/* Last form group shouldn't have bottom margin */
 .form-group:last-child {
   margin-bottom: 0;
 }
 
-/* Label styling */
+/* Form Row - Side-by-side inputs (Responsive) */
+.form-row {
+  display: flex;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.form-row > .form-group {
+  flex: 1;
+  margin-bottom: 0; /* Let row handle spacing */
+}
+
+/* Actions wrapper (Buttons at bottom) */
+.form-actions {
+  display: flex;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+  justify-content: flex-end;
+}
+
+/* ============================================
+   LABELS & HELP TEXT
+   ============================================ */
+
 .form-label {
   display: block;
   font-weight: var(--font-weight-medium);
@@ -52,22 +68,12 @@ legend {
   font-size: var(--font-size-base);
 }
 
-/* Required field indicator */
 .form-label-required::after {
   content: " *";
   color: var(--color-danger);
   font-weight: var(--font-weight-bold);
 }
 
-/* Optional field indicator */
-.form-label-optional::after {
-  content: " (optional)";
-  color: var(--color-text-tertiary);
-  font-weight: var(--font-weight-normal);
-  font-size: var(--font-size-sm);
-}
-
-/* Help text - Descriptive text below inputs */
 .form-help {
   display: block;
   margin-top: var(--space-xs);
@@ -76,97 +82,57 @@ legend {
   line-height: var(--line-height-normal);
 }
 
-
 /* ============================================
-   TEXT INPUTS & TEXTAREAS
+   INPUTS & TEXTAREAS
    ============================================ */
 
-/* Base input styles - Applied to all text-based inputs */
 .form-control {
-  /* Appearance */
   width: 100%;
   display: block;
-  
-  /* Typography */
   font-family: var(--font-family-base);
   font-size: var(--font-size-base);
   line-height: var(--line-height-normal);
   color: var(--color-text-primary);
-  
-  /* Spacing - Touch-friendly minimum 44px height */
   padding: var(--space-md);
   min-height: var(--touch-target-min);
-  
-  /* Visual */
   background-color: var(--color-bg-primary);
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
-  
-  /* Transitions */
-  transition: border-color var(--transition-fast),
-              box-shadow var(--transition-fast),
-              background-color var(--transition-fast);
-  
-  /* Remove default appearance on iOS */
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
   -webkit-appearance: none;
-  -moz-appearance: none;
   appearance: none;
 }
 
-/* Hover state */
 .form-control:hover:not(:disabled) {
   border-color: var(--color-border-dark);
 }
 
-/* Focus state - Important for keyboard navigation */
 .form-control:focus {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-light);
-  background-color: var(--color-bg-primary);
 }
 
-/* Disabled state */
 .form-control:disabled {
   background-color: var(--color-bg-secondary);
   color: var(--color-text-tertiary);
   border-color: var(--color-border);
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.7;
 }
 
-/* Readonly state - Can't edit but can select text */
-.form-control:read-only {
-  background-color: var(--color-bg-secondary);
-  border-color: var(--color-border);
-  cursor: default;
-}
-
-/* Placeholder text */
 .form-control::placeholder {
   color: var(--color-text-tertiary);
-  opacity: 1; /* Firefox shows placeholders at reduced opacity by default */
+  opacity: 1;
 }
 
-/* Textarea specific styles */
 textarea.form-control {
-  resize: vertical; /* Allow vertical resize only */
-  min-height: 120px; /* Minimum 5 lines of text */
+  resize: vertical;
+  min-height: 120px;
   line-height: var(--line-height-relaxed);
 }
 
-/* Prevent resize on mobile to avoid layout issues */
-@media (max-width: 767px) {
-  textarea.form-control {
-    resize: none;
-  }
-}
-
-
-/* ============================================
-   INPUT SIZES
-   ============================================ */
-
+/* Sizes */
 .form-control-sm {
   padding: var(--space-sm) var(--space-md);
   font-size: var(--font-size-sm);
@@ -176,47 +142,33 @@ textarea.form-control {
 .form-control-lg {
   padding: var(--space-lg);
   font-size: var(--font-size-lg);
-  min-height: 56px;
 }
 
-
 /* ============================================
-   SELECT DROPDOWNS
+   SELECTS
    ============================================ */
 
-/* Select element with custom arrow */
 .form-select {
-  /* Inherit all base input styles */
   width: 100%;
   display: block;
-  font-family: var(--font-family-base);
+  font-family: inherit;
   font-size: var(--font-size-base);
-  line-height: var(--line-height-normal);
   color: var(--color-text-primary);
   padding: var(--space-md);
-  padding-right: var(--space-2xl); /* Extra space for arrow */
+  padding-right: var(--space-2xl);
   min-height: var(--touch-target-min);
   background-color: var(--color-bg-primary);
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: border-color var(--transition-fast),
-              box-shadow var(--transition-fast);
   
-  /* Custom arrow icon */
+  /* Custom Arrow */
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right var(--space-md) center;
   background-size: 12px;
-  
-  /* Remove default arrow */
   -webkit-appearance: none;
-  -moz-appearance: none;
   appearance: none;
-}
-
-.form-select:hover:not(:disabled) {
-  border-color: var(--color-border-dark);
 }
 
 .form-select:focus {
@@ -225,27 +177,10 @@ textarea.form-control {
   box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 
-.form-select:disabled {
-  background-color: var(--color-bg-secondary);
-  color: var(--color-text-tertiary);
-  border-color: var(--color-border);
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-/* Multiple select - Allows selecting multiple options */
-.form-select[multiple] {
-  padding-right: var(--space-md); /* No arrow for multiple select */
-  background-image: none;
-  min-height: 120px;
-}
-
-
 /* ============================================
-   CHECKBOXES & RADIO BUTTONS
+   CHECKBOXES & RADIOS
    ============================================ */
 
-/* Wrapper for checkbox/radio groups */
 .form-check {
   display: flex;
   align-items: flex-start;
@@ -254,600 +189,87 @@ textarea.form-control {
   min-height: var(--touch-target-min);
 }
 
-/* Checkbox and radio input */
 .form-check-input {
-  /* Size - Large enough for easy tapping */
   width: 24px;
   height: 24px;
-  flex-shrink: 0; /* Prevents shrinking */
-  margin-top: 2px; /* Align with first line of text */
-  
-  /* Visual */
+  flex-shrink: 0;
+  margin-top: 2px;
   border: 2px solid var(--color-border-dark);
   background-color: var(--color-bg-primary);
   cursor: pointer;
-  
-  /* Transition */
-  transition: all var(--transition-fast);
-  
-  /* Remove default appearance */
   -webkit-appearance: none;
-  -moz-appearance: none;
   appearance: none;
+  transition: all var(--transition-fast);
 }
 
-/* Checkbox specific */
-.form-check-input[type="checkbox"] {
-  border-radius: var(--radius-sm);
-}
+.form-check-input[type="checkbox"] { border-radius: var(--radius-sm); }
+.form-check-input[type="radio"] { border-radius: 50%; }
 
-/* Radio specific */
-.form-check-input[type="radio"] {
-  border-radius: 50%;
-}
-
-/* Hover state */
-.form-check-input:hover:not(:disabled) {
-  border-color: var(--color-primary);
-}
-
-/* Focus state */
-.form-check-input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-light);
-}
-
-/* Checked state - Checkbox */
-.form-check-input[type="checkbox"]:checked {
+.form-check-input:checked {
   background-color: var(--color-primary);
   border-color: var(--color-primary);
+}
+
+/* Checkbox Icon */
+.form-check-input[type="checkbox"]:checked {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='white' d='M13.5 3L6 10.5 2.5 7l-1 1L6 12.5 14.5 4z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: center;
-  background-size: 16px;
 }
 
-/* Checked state - Radio */
+/* Radio Icon */
 .form-check-input[type="radio"]:checked {
-  background-color: var(--color-primary);
-  border-color: var(--color-primary);
-  box-shadow: inset 0 0 0 3px var(--color-bg-primary); /* Creates inner circle effect */
+  box-shadow: inset 0 0 0 4px var(--color-bg-primary);
 }
 
-/* Disabled state */
-.form-check-input:disabled {
-  background-color: var(--color-bg-secondary);
-  border-color: var(--color-border);
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-/* Label for checkbox/radio */
 .form-check-label {
   cursor: pointer;
-  user-select: none; /* Prevents text selection on double-tap */
   color: var(--color-text-primary);
-  line-height: var(--line-height-normal);
-  padding-top: 2px; /* Align with input */
+  padding-top: 2px;
 }
-
-.form-check-input:disabled ~ .form-check-label {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-/* Inline checkboxes/radios - Horizontal layout */
-.form-check-inline {
-  display: inline-flex;
-  margin-right: var(--space-lg);
-}
-
-
-/* ============================================
-   FILE INPUT
-   ============================================ */
-
-/* File input wrapper */
-.form-file {
-  position: relative;
-  display: block;
-}
-
-/* Hide default file input */
-.form-file-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  overflow: hidden;
-}
-
-/* Custom file input label/button */
-.form-file-label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  width: 100%;
-  padding: var(--space-md);
-  min-height: var(--touch-target-min);
-  background-color: var(--color-bg-primary);
-  border: 2px dashed var(--color-border-dark);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  color: var(--color-text-secondary);
-}
-
-.form-file-label:hover {
-  border-color: var(--color-primary);
-  background-color: var(--color-primary-light);
-  color: var(--color-primary);
-}
-
-.form-file-input:focus ~ .form-file-label {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-light);
-}
-
-/* File name display */
-.form-file-text {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* File upload icon/button */
-.form-file-button {
-  padding: var(--space-sm) var(--space-md);
-  background-color: var(--color-bg-secondary);
-  border-radius: var(--radius-sm);
-  font-weight: var(--font-weight-medium);
-  flex-shrink: 0;
-}
-
-
-/* ============================================
-   RANGE SLIDER
-   ============================================ */
-
-.form-range {
-  width: 100%;
-  height: 44px; /* Touch-friendly height */
-  padding: 0;
-  background: transparent;
-  cursor: pointer;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-}
-
-/* Track - The line the thumb slides along */
-.form-range::-webkit-slider-runnable-track {
-  width: 100%;
-  height: 6px;
-  background: var(--color-bg-tertiary);
-  border-radius: var(--radius-full);
-}
-
-.form-range::-moz-range-track {
-  width: 100%;
-  height: 6px;
-  background: var(--color-bg-tertiary);
-  border-radius: var(--radius-full);
-}
-
-/* Thumb - The draggable part */
-.form-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 24px;
-  height: 24px;
-  background: var(--color-primary);
-  border: 3px solid var(--color-bg-primary);
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: var(--shadow-md);
-  margin-top: -9px; /* Center thumb on track */
-  transition: all var(--transition-fast);
-}
-
-.form-range::-moz-range-thumb {
-  width: 24px;
-  height: 24px;
-  background: var(--color-primary);
-  border: 3px solid var(--color-bg-primary);
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: var(--shadow-md);
-  transition: all var(--transition-fast);
-}
-
-/* Hover state */
-.form-range:hover::-webkit-slider-thumb {
-  background: var(--color-primary-dark);
-  transform: scale(1.1);
-}
-
-.form-range:hover::-moz-range-thumb {
-  background: var(--color-primary-dark);
-  transform: scale(1.1);
-}
-
-/* Focus state */
-.form-range:focus {
-  outline: none;
-}
-
-.form-range:focus::-webkit-slider-thumb {
-  box-shadow: 0 0 0 3px var(--color-primary-light);
-}
-
-.form-range:focus::-moz-range-thumb {
-  box-shadow: 0 0 0 3px var(--color-primary-light);
-}
-
 
 /* ============================================
    VALIDATION STATES
    ============================================ */
 
-/* Valid state - Green border and checkmark */
-.form-control.is-valid,
-.form-select.is-valid {
-  border-color: var(--color-secondary);
-  padding-right: calc(var(--space-md) + 24px); /* Space for icon */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%2310b981' d='M13.5 3L6 10.5 2.5 7l-1 1L6 12.5 14.5 4z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right var(--space-md) center;
-  background-size: 16px;
-}
-
-.form-control.is-valid:focus,
-.form-select.is-valid:focus {
-  border-color: var(--color-secondary);
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
-}
-
-/* Invalid state - Red border and X mark */
-.form-control.is-invalid,
-.form-select.is-invalid {
+.form-control.is-invalid, .form-select.is-invalid {
   border-color: var(--color-danger);
-  padding-right: calc(var(--space-md) + 24px); /* Space for icon */
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%23ef4444' d='M3 3l10 10m0-10L3 13'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right var(--space-md) center;
   background-size: 16px;
+  padding-right: 40px;
 }
 
-.form-control.is-invalid:focus,
-.form-select.is-invalid:focus {
-  border-color: var(--color-danger);
-  box-shadow: 0 0 0 3px var(--color-danger-light);
-}
-
-/* Checkbox/radio validation states */
-.form-check-input.is-valid {
-  border-color: var(--color-secondary);
-}
-
-.form-check-input.is-valid:checked {
-  background-color: var(--color-secondary);
-  border-color: var(--color-secondary);
-}
-
-.form-check-input.is-invalid {
-  border-color: var(--color-danger);
-}
-
-.form-check-input.is-invalid:checked {
-  background-color: var(--color-danger);
-  border-color: var(--color-danger);
-}
-
-/* Valid feedback text */
-.valid-feedback {
-  display: none;
-  margin-top: var(--space-xs);
-  font-size: var(--font-size-sm);
-  color: var(--color-secondary);
-}
-
-.is-valid ~ .valid-feedback {
-  display: block;
-}
-
-/* Invalid feedback text */
 .invalid-feedback {
   display: none;
   margin-top: var(--space-xs);
   font-size: var(--font-size-sm);
   color: var(--color-danger);
-  font-weight: var(--font-weight-medium);
 }
 
-.is-invalid ~ .invalid-feedback {
-  display: block;
-}
-
+.is-invalid ~ .invalid-feedback { display: block; }
 
 /* ============================================
-   INPUT GROUPS - Buttons/Icons with Inputs
+   RESPONSIVE
    ============================================ */
 
-/* Input group wrapper */
-.input-group {
-  position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: stretch;
-  width: 100%;
-}
-
-.input-group > .form-control,
-.input-group > .form-select {
-  position: relative;
-  flex: 1 1 auto;
-  width: 1%;
-  min-width: 0;
-}
-
-/* Input group text/icon/button */
-.input-group-text {
-  display: flex;
-  align-items: center;
-  padding: var(--space-md);
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-normal);
-  line-height: var(--line-height-normal);
-  color: var(--color-text-secondary);
-  text-align: center;
-  white-space: nowrap;
-  background-color: var(--color-bg-secondary);
-  border: 2px solid var(--color-border);
-}
-
-/* Prepend - Before input */
-.input-group-prepend {
-  margin-right: -2px; /* Overlap borders */
-}
-
-.input-group-prepend .input-group-text {
-  border-radius: var(--radius-md) 0 0 var(--radius-md);
-}
-
-.input-group-prepend ~ .form-control {
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
-}
-
-/* Append - After input */
-.input-group-append {
-  margin-left: -2px; /* Overlap borders */
-}
-
-.input-group-append .input-group-text {
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
-}
-
-.input-group > .form-control:not(:last-child) {
-  border-radius: var(--radius-md) 0 0 var(--radius-md);
-}
-
-/* Button in input group */
-.input-group .btn {
-  position: relative;
-  z-index: 2;
-}
-
-.input-group .btn:not(:last-child) {
-  border-radius: var(--radius-md) 0 0 var(--radius-md);
-}
-
-.input-group .btn:not(:first-child) {
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
-}
-
-
-/* ============================================
-   SEARCH INPUT
-   ============================================ */
-
-.form-search {
-  position: relative;
-}
-
-.form-search .form-control {
-  padding-left: calc(var(--space-md) + 24px); /* Space for search icon */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%236b7280' d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: left var(--space-md) center;
-  background-size: 16px;
-}
-
-/* Clear button for search */
-.form-search-clear {
-  position: absolute;
-  right: var(--space-md);
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: var(--color-text-tertiary);
-  cursor: pointer;
-  padding: var(--space-xs);
-  border-radius: var(--radius-sm);
-  transition: all var(--transition-fast);
-}
-
-.form-search-clear:hover {
-  color: var(--color-text-primary);
-  background-color: var(--color-bg-secondary);
-}
-
-
-/* ============================================
-   SWITCH TOGGLE
-   ============================================ */
-
-.form-switch {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  min-height: var(--touch-target-min);
-}
-
-.form-switch-input {
-  position: relative;
-  width: 52px;
-  height: 28px;
-  flex-shrink: 0;
-  cursor: pointer;
-  background-color: var(--color-bg-tertiary);
-  border: 2px solid var(--color-border-dark);
-  border-radius: var(--radius-full);
-  transition: all var(--transition-fast);
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-}
-
-/* Switch thumb */
-.form-switch-input::before {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 20px;
-  height: 20px;
-  background-color: white;
-  border-radius: 50%;
-  box-shadow: var(--shadow-sm);
-  transition: all var(--transition-fast);
-}
-
-/* Checked state */
-.form-switch-input:checked {
-  background-color: var(--color-primary);
-  border-color: var(--color-primary);
-}
-
-.form-switch-input:checked::before {
-  transform: translateX(24px);
-}
-
-/* Focus state */
-.form-switch-input:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--color-primary-light);
-}
-
-/* Disabled state */
-.form-switch-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.form-switch-label {
-  cursor: pointer;
-  user-select: none;
-}
-
-.form-switch-input:disabled ~ .form-switch-label {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-
-/* ============================================
-   FORM VALIDATION SUMMARY
-   ============================================ */
-
-/* Error summary box at top of form */
-.form-errors {
-  padding: var(--space-md) var(--space-lg);
-  margin-bottom: var(--space-lg);
-  background-color: var(--color-danger-light);
-  border: 1px solid var(--color-danger);
-  border-left: 4px solid var(--color-danger);
-  border-radius: var(--radius-md);
-}
-
-.form-errors-title {
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-danger);
-  margin-bottom: var(--space-sm);
-}
-
-.form-errors-list {
-  list-style: disc;
-  padding-left: var(--space-lg);
-  margin: 0;
-  color: var(--color-danger);
-}
-
-.form-errors-list li {
-  margin-bottom: var(--space-xs);
-}
-
-
-/* ============================================
-   RESPONSIVE ADJUSTMENTS
-   ============================================ */
-
-/* Tablet adjustments */
-@media (min-width: 768px) {
-  /* Slightly larger inputs on tablets */
-  .form-control,
-  .form-select {
-    font-size: var(--font-size-lg);
-  }
-  
-  /* Larger touch targets */
-  .form-check-input {
-    width: 28px;
-    height: 28px;
-  }
-}
-
-/* Mobile-specific adjustments */
 @media (max-width: 767px) {
-  /* Prevent zoom on input focus (iOS) */
-  .form-control,
-  .form-select {
-    font-size: 16px; /* Minimum to prevent zoom */
+  /* Stack rows vertically on mobile */
+  .form-row {
+    flex-direction: column;
+    gap: 0;
   }
   
-  /* Full-width buttons on mobile */
+  .form-row > .form-group {
+    margin-bottom: var(--space-lg);
+  }
+  
+  /* Make buttons full width */
+  .form-actions {
+    flex-direction: column;
+  }
   .form-actions .btn {
     width: 100%;
-  }
-}
-
-
-/* ============================================
-   PRINT STYLES
-   ============================================ */
-
-@media print {
-  /* Hide interactive elements */
-  .form-file-label,
-  .form-switch,
-  .btn {
-    display: none !important;
-  }
-  
-  /* Show filled values */
-  .form-control,
-  .form-select {
-    border: none;
-    border-bottom: 1px solid #000;
-    padding: var(--space-xs) 0;
-    background: none;
-  }
-  
-  /* Don't print empty fields */
-  .form-control:placeholder-shown {
-    border: none;
   }
 }

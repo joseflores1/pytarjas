@@ -1,60 +1,12 @@
 {# pytarjas/templates/tasks/create_task.html #}
-{#
-Create Task Page
-
-Updates:
-- Implemented global 'showConfirm' modal for Cancel action
-- Added form change tracking to prevent accidental data loss
-#}
-
 {% extends 'base.html' %}
 
 {% block title %}Crear Nueva Tarea{% endblock %}
 
 {% block extra_css %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
-  <style>
-    .form-preview {
-      background-color: var(--color-bg-secondary);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      padding: var(--space-md);
-      margin-top: var(--space-md);
-      display: none;
-    }
-
-    .form-preview.visible {
-      display: block;
-      animation: fadeIn 0.3s ease;
-    }
-    
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .form-preview-title {
-      font-size: var(--font-size-lg);
-      font-weight: var(--font-weight-semibold);
-      color: var(--color-primary);
-      margin-bottom: var(--space-sm);
-    }
-
-    .form-preview-meta {
-      display: flex;
-      gap: var(--space-md);
-      flex-wrap: wrap;
-      margin-top: var(--space-sm);
-    }
-    
-    .form-actions {
-      display: flex;
-      gap: var(--space-md);
-      margin-top: var(--space-xl);
-      padding-top: var(--space-lg);
-      border-top: 1px solid var(--color-border);
-    }
-  </style>
+  {# NEW: Module-specific CSS #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tasks/create.css') }}">
 {% endblock %}
 
 {% block header %}
@@ -117,12 +69,12 @@ Updates:
             <label for="form_id" class="form-label">
               Formulario <span style="color: var(--color-danger);">*</span>
             </label>
+            {# REMOVED onchange attribute, handled by JS #}
             <select 
               id="form_id" 
               name="form_id" 
               class="form-control"
               required
-              onchange="showFormPreview()"
             >
               <option value="">-- Seleccione un formulario --</option>
               {% for form in forms %}
@@ -207,84 +159,6 @@ Updates:
 {% endblock %}
 
 {% block extra_js %}
-  <script>
-    let formChanged = false;
-
-    // Track changes
-    document.getElementById('createTaskForm')?.addEventListener('change', function() {
-      formChanged = true;
-    });
-
-    // Preview Logic
-    function showFormPreview() {
-      const select = document.getElementById('form_id');
-      const preview = document.getElementById('formPreview');
-      const selectedOption = select.options[select.selectedIndex];
-      
-      if (selectedOption.value) {
-        const name = selectedOption.dataset.name;
-        const description = selectedOption.dataset.description;
-        const type = selectedOption.dataset.type;
-        
-        document.getElementById('previewName').textContent = name;
-        document.getElementById('previewDescription').textContent = description || 'Sin descripción';
-        document.getElementById('previewType').textContent = type || 'Sin tipo';
-        
-        preview.classList.add('visible');
-      } else {
-        preview.classList.remove('visible');
-      }
-    }
-
-    // Validation & Submission
-    document.getElementById('createTaskForm')?.addEventListener('submit', function(e) {
-      const formId = document.getElementById('form_id').value;
-      
-      if (!formId) {
-        e.preventDefault();
-        alert('Por favor seleccione un formulario');
-        document.getElementById('form_id').focus();
-        return false;
-      }
-      
-      const submitBtn = this.querySelector('button[type="submit"]');
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '⏳ Creando...';
-      
-      // Allow submission without warning
-      formChanged = false;
-    });
-
-    // --- HANDLE CANCEL WITH MODAL ---
-    function handleCancel(e) {
-      e.preventDefault();
-      const targetUrl = this.href;
-      
-      if (formChanged) {
-        showConfirm(
-          'Has seleccionado opciones pero no has creado la tarea. ¿Deseas salir y descartar la selección?',
-          () => {
-            formChanged = false; // Bypass check
-            window.location.href = targetUrl;
-          },
-          'Descartar Tarea',
-          'Sí, salir',
-          'danger'
-        );
-      } else {
-        window.location.href = targetUrl;
-      }
-    }
-
-    document.getElementById('cancelBtn')?.addEventListener('click', handleCancel);
-    document.getElementById('headerBackBtn')?.addEventListener('click', handleCancel);
-
-    // Browser native fallback
-    window.addEventListener('beforeunload', function(e) {
-      if (formChanged) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    });
-  </script>
+  {# NEW: Module-specific JS #}
+  <script src="{{ url_for('static', filename='js/tasks/create.js') }}"></script>
 {% endblock %}

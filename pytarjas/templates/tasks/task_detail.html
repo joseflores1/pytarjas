@@ -5,212 +5,13 @@
 
 {% block extra_css %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
-  <style>
-    .task-header {
-      background: var(--color-bg-primary);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      padding: var(--space-lg);
-      margin-bottom: var(--space-lg);
-    }
-
-    .task-header-title {
-      font-size: var(--font-size-xl);
-      font-weight: var(--font-weight-bold);
-      color: var(--color-text-primary);
-      margin-bottom: var(--space-sm);
-    }
-
-    .task-meta {
-      display: flex;
-      gap: var(--space-lg);
-      flex-wrap: wrap;
-      font-size: var(--font-size-sm);
-      color: var(--color-text-secondary);
-    }
-
-    .status-badge {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: var(--radius-full);
-      font-size: var(--font-size-sm);
-      font-weight: var(--font-weight-semibold);
-      text-transform: uppercase;
-    }
-
-    .status-pending { background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
-    .status-in_progress { background: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe; }
-    .status-completed { background: #f0fdf4; color: #15803d; border: 1px solid #dcfce7; }
-    .status-reviewed { background: #f5f3ff; color: #6d28d9; border: 1px solid #ede9fe; }
-
-    .progress-bar {
-      background: var(--color-bg-tertiary);
-      border-radius: var(--radius-full);
-      height: 8px;
-      margin: var(--space-md) 0;
-      overflow: hidden;
-    }
-
-    .progress-bar-fill {
-      background: var(--color-primary);
-      height: 100%;
-      transition: width 0.3s ease;
-    }
-
-    .question-card {
-      background: var(--color-bg-primary);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      padding: var(--space-lg);
-      margin-bottom: var(--space-md);
-    }
-
-    .question-number {
-      display: inline-block;
-      background: var(--color-primary);
-      color: white;
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      text-align: center;
-      line-height: 24px;
-      font-weight: bold;
-      font-size: 12px;
-      margin-right: 8px;
-    }
-
-    .question-text {
-      font-size: var(--font-size-lg);
-      font-weight: 500;
-      color: var(--color-text-primary);
-      margin-bottom: var(--space-md);
-      display: flex;
-      align-items: center;
-    }
-
-    .radio-group { display: flex; gap: var(--space-lg); }
-    .radio-option {
-      display: flex; align-items: center; gap: 8px; cursor: pointer;
-      padding: 8px 16px; border: 1px solid var(--color-border);
-      border-radius: var(--radius-md); transition: all 0.2s;
-    }
-    .radio-option:hover { background-color: var(--color-bg-secondary); }
-    .radio-option input:checked + span { color: var(--color-primary); font-weight: bold; }
-
-    .save-indicator {
-      position: fixed; bottom: 20px; right: 20px;
-      background: var(--color-bg-primary);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      padding: 8px 16px;
-      box-shadow: var(--shadow-lg);
-      display: none; z-index: 1000;
-    }
-    .save-indicator.show { display: block; }
-    .save-indicator.saved { color: var(--color-secondary); }
-
-    .action-bar {
-      position: sticky; bottom: 0;
-      background: var(--color-bg-primary);
-      border-top: 1px solid var(--color-border);
-      padding: var(--space-md);
-      display: flex; gap: var(--space-md);
-      justify-content: flex-end;
-      z-index: 100; box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
-    }
-    
-    /* NEW: Badge style for question type */
-    .question-type-badge {
-      font-size: var(--font-size-xs);
-      font-weight: var(--font-weight-normal);
-      margin-left: var(--space-md);
-      background-color: var(--color-info);
-      color: white;
-      padding: 2px 8px;
-      border-radius: var(--radius-full);
-      vertical-align: middle;
-      flex-shrink: 0;
-    }
-
-    /* NEW: Style for question description */
-    .question-description-text {
-        font-size: var(--font-size-sm);
-        color: var(--color-text-secondary);
-        margin-top: var(--space-xs);
-        padding-left: calc(var(--space-md) + 24px); /* Align with content */
-    }
-    
-    .file-display-box {
-        margin-top: var(--space-sm);
-        padding: var(--space-md);
-        background: var(--color-bg-secondary);
-        border-radius: var(--radius-md);
-        display: flex;
-        flex-direction: column; 
-        gap: var(--space-md);
-        align-items: flex-start; 
-    }
-    .file-display-box a {
-        font-weight: var(--font-weight-medium);
-        color: var(--color-info);
-        word-break: break-all;
-    }
-    
-    /* NEW STYLE: Wrapper to horizontally center the image element */
-    .image-wrapper {
-        width: 100%; 
-        display: flex;
-        justify-content: center; 
-        margin-bottom: var(--space-sm);
-    }
-
-    /* MODIFIED: Image sizing based on its wrapper */
-    .file-display-box .uploaded-image {
-        max-width: 100%; 
-        height: auto;
-        max-height: 400px; 
-        min-height: 150px; 
-        object-fit: contain;
-        border-radius: var(--radius-sm);
-        cursor: pointer;
-    }
-    
-    /* Container for each file item inside the display box */
-    .file-item-container {
-        display: flex;
-        flex-direction: column; /* Stack image and name/button vertically */
-        width: 100%;
-        padding-bottom: var(--space-md);
-        border-bottom: 1px solid var(--color-border);
-    }
-    .file-item-container:last-child {
-        border-bottom: none;
-        padding-bottom: 0;
-    }
-
-    .file-link-container {
-        display: flex;
-        justify-content: space-between;
-        width: 100%; 
-        align-items: center;
-    }
-    
-    .file-link-text {
-        display: flex;
-        align-items: center;
-        flex-shrink: 1; 
-    }
-    
-    .hidden-by-jinja {
-        display: none !important;
-    }
-  </style>
+  {# NEW: Module-specific CSS #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tasks/detail.css') }}">
 {% endblock %}
 
 {% block content %}
   <div class="container" style="max-width: 900px; margin: var(--space-xl) auto;">
     
-    {# Define type map for icons #}
     {% set type_map = {
       'text': '📝', 'textarea': '📄', 'number': '🔢', 'date': '📅', 
       'datetime': '🕐', 'photo': '📷', 'boolean': '✓', 'select': '📋', 
@@ -240,32 +41,30 @@
     </div>
 
     {# Form #}
+    {# NEW: Added data attributes for status and permission to replace JS global variables #}
     <form id="taskForm" 
           data-task-id="{{ task.id }}" 
-          data-total-questions="{{ task.form.questions|length }}"> 
+          data-total-questions="{{ task.form.questions|length }}"
+          data-task-status="{{ task.status }}"
+          data-can-override-edit="{{ can_override_edit | tojson }}"> 
       
-      {# Determine effective read-only state #}
       {% set is_finalized = task.status in ['completed', 'reviewed', 'approved'] %}
       {% set is_pending = task.status == 'pending' %}
-      {# Use top-level variable 'can_override_edit' #}
       {% set is_locked = (is_finalized and not can_override_edit) or is_pending %}
 
       {% for question in task.form.questions %}
-        {# Fetch the saved answer, defaulting to an empty string if not found. #}
         {% set current_answer = task.responses.get(question.id) %} 
         
-        {# File paths are handled separately as JSON arrays. #}
         {% set raw_answer = current_answer or '[]' %}
         {% set current_paths = raw_answer if raw_answer is string and raw_answer.startswith('[') else '[]' %}
         
         {% set is_input_disabled = is_locked %}
         
-        <div class="question-card">
+        <div class="question-card" id="card-{{ question.id }}">
           <div class="question-text">
             <span class="question-number">{{ loop.index }}</span>
-            {{ question.question_text }} 
+            <span class="q-text-content">{{ question.question_text }}</span>
             
-            {# NEW: Display Question Type with Icon #}
             <span class="question-type-badge">
               {{ type_map.get(question.question_type|default(''), '?') }} {{ question.question_type|default('Tipo Desconocido') | capitalize }}
             </span>
@@ -273,40 +72,34 @@
             {% if question.is_required %}<span style="color:var(--color-danger)">*</span>{% endif %}
           </div>
 
-          {# NEW: Display Question Description #}
           {% if question.question_description %}
               <p class="question-description-text">{{ question.question_description }}</p>
           {% endif %}
 
-          {# Use q_type for robust comparison (handles None/Undefined/Whitespace safely) #}
           {% set q_type = question.question_type|default('')|string|trim %}
           
-          {# TEXT/NUMBER/DATE/DATETIME - All use current_answer directly in value attribute #}
+          {# TEXT/NUMBER/DATE INPUTS #}
           {% if q_type == 'text' %}
             <input type="text" name="response_{{ question.id }}" id="response_{{ question.id }}"
                    class="form-control response-input" value="{{ current_answer if current_answer is not none else '' }}"
                    {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
           
-          {# TEXTAREA (Long) #}
           {% elif q_type == 'textarea' %}
             <textarea name="response_{{ question.id }}" id="response_{{ question.id }}"
                       class="form-control response-input" rows="4"
                       {% if question.is_required %}required{% endif %} 
                       {% if is_input_disabled %}disabled{% endif %}>{{ current_answer if current_answer is not none else '' }}</textarea>
 
-          {# NUMBER #}
           {% elif q_type == 'number' %}
             <input type="number" name="response_{{ question.id }}" id="response_{{ question.id }}"
                    class="form-control response-input" value="{{ current_answer if current_answer is not none else '' }}"
                    {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
 
-          {# DATE #}
           {% elif q_type == 'date' %}
             <input type="date" name="response_{{ question.id }}" id="response_{{ question.id }}"
                    class="form-control response-input" value="{{ current_answer if current_answer is not none else '' }}"
                    {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
 
-          {# DATETIME #}
           {% elif q_type == 'datetime' %}
             <input type="datetime-local" name="response_{{ question.id }}" id="response_{{ question.id }}"
                    class="form-control response-input" value="{{ current_answer if current_answer is not none else '' }}"
@@ -325,20 +118,22 @@
               {% endif %}
             </select>
 
-          {# BOOLEAN (Radio) #}
+          {# BOOLEAN #}
           {% elif q_type == 'boolean' %}
             {% set saved_bool = current_answer|default('')|string %}
             <div class="radio-group">
               <label class="radio-option">
                 <input type="radio" name="response_{{ question.id }}" value="true" class="response-input"
                        {% if saved_bool == 'true' %}checked{% endif %}
-                       {% if is_input_disabled %}disabled{% endif %}>
+                       {% if is_input_disabled %}disabled{% endif %}
+                       {% if question.is_required %}required{% endif %}>
                 <span>Sí</span>
               </label>
               <label class="radio-option">
                 <input type="radio" name="response_{{ question.id }}" value="false" class="response-input"
                        {% if saved_bool == 'false' %}checked{% endif %}
-                       {% if is_input_disabled %}disabled{% endif %}>
+                       {% if is_input_disabled %}disabled{% endif %}
+                       {% if question.is_required %}required{% endif %}>
                 <span>No</span>
               </label>
             </div>
@@ -355,7 +150,6 @@
               <option value="" {% if current_answer is none or current_answer == '' %}selected{% endif %}>-- Seleccionar Cliente --</option>
 
               {% if pre_assigned_client and current_answer is none %}
-                  {# Show pre-assigned client as a suggested but non-selectable option until a real answer is chosen #}
                   <option value="{{ pre_assigned_client }}" disabled style="color: var(--color-text-tertiary);">
                       🏢 Cliente (Sugerido de Faena): {{ pre_assigned_client }}
                   </option>
@@ -368,7 +162,6 @@
                 </option>
               {% endfor %}
               
-              {# Fallback for historical data #}
               {% if current_answer and (all_clients|map(attribute='username')|list).count(current_answer) == 0 %}
                   <option value="{{ current_answer }}" selected>🏢 Cliente (Dato Guardado): {{ current_answer }}</option>
               {% endif %}
@@ -378,44 +171,25 @@
               Seleccione el cliente final para esta tarea. El valor pre-asignado se usa como sugerencia.
             </small>
 
-
-          {# FILE UPLOAD TYPES: PHOTO and GENERIC FILE #}
+          {# FILE UPLOAD TYPES #}
           {% elif q_type == 'photo' or q_type == 'file' %}
               
               {% set accepted_types = 'image/*' if q_type == 'photo' else '.pdf,.doc,.docx,.jpg,.jpeg,.png' %}
               {% set display_placeholder = 'Seleccionar o tomar fotografía(s)' if q_type == 'photo' else 'Seleccionar archivo(s) (PDF, DOC, Imagen)' %}
 
-              {# HIDDEN FIELD: This holds the JSON string array of paths, submitted with JSON payload as the answer #}
+              {# NEW: data-question-id added to help JS initialization #}
               <input type="hidden" 
                      name="response_{{ question.id }}" 
                      id="path-input-{{ question.id }}"
                      class="response-input file-path-input"
                      value="{{ current_paths }}"
-                     {% if is_input_disabled %}disabled{% endif %}>
+                     data-question-id="{{ question.id }}"
+                     {% if is_input_disabled %}disabled{% endif %}
+                     {% if question.is_required %}data-required="true"{% endif %}>
 
-              {# FILE DISPLAY BOX: Dynamically rendered/updated by JS #}
-              {# NOTE: This box now contains all existing file items #}
-              <div class="file-display-box mb-md {% if current_paths == '[]' %} hidden-by-jinja{% endif %}" id="file-display-{{ question.id }}">
-                  {# RENDER EXISTING FILES (JS will handle dynamic update) #}
-                  <script>
-                      // Pass initial state to JS for rendering
-                      document.addEventListener('DOMContentLoaded', function() {
-                          const pathInput = document.getElementById('path-input-{{ question.id }}');
-                          // Ensure the JSON is parsed safely
-                          try {
-                              const existingPaths = JSON.parse(pathInput.value || '[]');
-                              if (existingPaths.length > 0) {
-                                  renderFileItems('{{ question.id }}', existingPaths, '{{ q_type }}');
-                              }
-                          } catch (e) {
-                               console.error("Failed to parse existing paths for rendering:", e);
-                               pathInput.value = '[]'; // Reset invalid path input
-                          }
-                      });
-                  </script>
-              </div>
+              {# NEW: Clean div without inline script loop #}
+              <div class="file-display-box mb-md {% if current_paths == '[]' %} hidden-by-jinja{% endif %}" id="file-display-{{ question.id }}"></div>
               
-              {# FILE INPUT: Multiple files allowed #}
               <input type="file" 
                      name="file-upload-{{ question.id }}" 
                      id="file-upload-{{ question.id }}" 
@@ -424,12 +198,11 @@
                      data-q-type="{{ q_type }}"
                      accept="{{ accepted_types }}" 
                      {% if is_input_disabled %}disabled{% endif %}
-                     multiple> {# CRITICAL: Allows multi-file selection #}
+                     multiple>
                      
               <small class="form-help" id="file-placeholder-{{ question.id }}" style="font-style: italic;">
                   {{ display_placeholder }}
               </small>
-
 
           {% else %}
              <input type="text" 
@@ -441,24 +214,25 @@
       {% endfor %}
     </form>
 
-    {# Action Bar Logic #}
+    {# Action Bar #}
     {% set can_transition = task.status not in ['completed', 'reviewed', 'approved'] %}
-    {# Use top-level variable 'can_override_edit' #}
     {% set show_action_bar = can_transition or can_override_edit %}
     
     {% if show_action_bar %}
     <div class="action-bar">
       <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary" id="backBtn">Volver</a>
       
-      {# FIX: Render ALL buttons, applying the 'hidden' attribute based on initial state #}
-      
       <button type="button" class="btn btn-primary" id="startBtn">▶️ Iniciar Tarea</button>
 
       <button type="button" class="btn btn-secondary" id="saveBtn">💾 Guardar Progreso</button>
       
-      <button type="button" class="btn btn-success" id="completeBtn">✓ Completar Tarea</button>
+      <button type="button" 
+              class="btn btn-success" 
+              id="completeBtn"
+              {% if task.status != 'in_progress' %}style="display:none;" disabled{% endif %}>
+          ✓ Completar Tarea
+      </button>
 
-      {# Admin Override button can be rendered conditionally since its existence isn't critical for the main flow #}
       {% if is_finalized and can_override_edit and task.status != 'in_progress' %}
         <button type="button" class="btn btn-primary" id="saveBtnOverride" style="margin-left: 20px;">
           💾 Guardar (Admin Override)
@@ -469,487 +243,27 @@
     {% endif %}
     
     <div class="save-indicator" id="saveIndicator"><span id="saveIndicatorText">Guardando...</span></div>
+    
+    <div id="validationModal" class="modal-overlay" style="display:none;">
+      <div class="modal-content">
+        <div class="modal-header">
+            <span>⚠️</span>
+            <h3>Faltan Respuestas</h3>
+        </div>
+        <div class="modal-body">
+            <p>Por favor, complete los siguientes campos obligatorios antes de finalizar:</p>
+            <ul id="missingQuestionsList" class="missing-list"></ul>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-primary" id="closeValidationModalBtn">Entendido</button>
+        </div>
+      </div>
+    </div>
+    
   </div>
 {% endblock %}
 
 {% block extra_js %}
-<script>
-  // --- UTILITIES FOR DATE/TIME DEFAULTS ---
-  function getFormattedDate(date) {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-  }
-
-  function getFormattedDateTime(date) {
-      const datePart = getFormattedDate(date);
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      return `${datePart}T${hours}:${minutes}`;
-  }
-  // --- END UTILITIES ---
-
-  // --- INITIALIZATION ---
-  let taskStatus = '{{ task.status }}'; 
-  
-  const canOverrideEdit = JSON.parse("{{ can_override_edit | tojson }}"); 
-  const isTaskReadonly = taskStatus in ['completed', 'reviewed', 'approved'] && !canOverrideEdit;
-  
-  let hasUnsavedChanges = false;
-  let taskId = document.getElementById('taskForm').dataset.taskId;
-  let totalQuestions = parseInt(document.getElementById('taskForm').dataset.totalQuestions);
-
-  // Set date/datetime defaults (omitted for brevity, assume previous code section works)
-  
-  // --- CORE FILE RENDERING AND MANIPULATION ---
-  
-  function renderFileItemHtml(path, questionId, qType) {
-      const filename = path.split('/').pop();
-      const icon = qType === 'photo' ? '📷' : '📄';
-      const isImage = qType === 'photo' || path.match(/\.(jpg|jpeg|png|gif|webp)$/i);
-      
-      let html = '<div class="file-item-container" data-path="' + path + '">';
-      
-      // Image Preview (Centering is achieved by CSS class 'image-wrapper')
-      if (isImage) {
-          html += `
-            <div class="image-wrapper">
-                <a href="/${path}" target="_blank" title="Ver imagen en tamaño completo">
-                    <img src="/${path}" alt="Foto adjunta" class="uploaded-image">
-                </a>
-            </div>
-          `;
-      }
-      
-      // File Link and Delete Button
-      html += `
-        <div class="file-link-container">
-            <span class="file-link-text">
-                <span style="font-size: var(--font-size-xl); margin-right: var(--space-sm);">${icon}</span>
-                Archivo subido: 
-                <a href="/${path}" target="_blank" title="Ver archivo">${filename}</a>
-            </span>
-            <button type="button" class="btn btn-sm btn-danger" onclick="removeFile('${questionId}', '${path}')">
-                🗑️ Eliminar
-            </button>
-        </div>
-      `;
-      html += '</div>';
-      return html;
-  }
-
-  function renderFileItems(questionId, paths, qType) {
-      const displayBox = document.getElementById(`file-display-${questionId}`);
-      displayBox.innerHTML = ''; // Clear previous content
-
-      if (paths.length > 0) {
-          paths.forEach(path => {
-              displayBox.innerHTML += renderFileItemHtml(path, questionId, qType);
-          });
-          displayBox.classList.remove('hidden-by-jinja');
-      } else {
-          displayBox.classList.add('hidden-by-jinja');
-      }
-  }
-  
-  // New function to remove a file from the array (handleReplace is now obsolete)
-  window.removeFile = function(questionId, pathToRemove) {
-      const pathInput = document.getElementById(`path-input-${questionId}`);
-      
-      try {
-          let existingPaths = JSON.parse(pathInput.value || '[]');
-          
-          // Filter out the path to be removed
-          const newPaths = existingPaths.filter(p => p !== pathToRemove);
-          
-          // Update hidden input with the new JSON array string
-          pathInput.value = JSON.stringify(newPaths);
-          
-          // Re-render the UI for the specific question
-          const qType = document.getElementById(`file-upload-${questionId}`).dataset.qType;
-          renderFileItems(questionId, newPaths, qType);
-          
-          // Manually trigger change to mark form dirty
-          pathInput.dispatchEvent(new Event('change'));
-
-      } catch (e) {
-          console.error("Error removing file:", e);
-      }
-  }
-
-  // --- PROGRESS & CHANGE TRACKING --- 
-  function updateProgress() {
-    const inputs = document.querySelectorAll('.response-input');
-    const answered = new Set();
-    inputs.forEach(i => {
-       if(i.disabled || i.readOnly) return; 
-
-       // Radio/Checkbox: Check if checked (if yes, count it and exit this iteration)
-       if((i.type==='radio'||i.type==='checkbox') && i.checked) {
-           answered.add(i.name);
-           return;
-       }
-       
-       // FIX 1: If it is a radio/checkbox and is NOT checked, do NOT check its value. Exit.
-       // The 'value' of an unchecked radio button ("true" or "false") is meaningless for progress.
-       if (i.type === 'radio' || i.type === 'checkbox') {
-           return; 
-       }
-       
-       // File Path Inputs
-       if (i.classList.contains('file-path-input')) {
-           try {
-               const paths = JSON.parse(i.value || '[]');
-               if (paths.length > 0) {
-                   answered.add(i.name);
-               }
-               // CRITICAL: Always return after processing file inputs. 
-               return; 
-           } catch(e) { 
-               return;
-           }
-       }
-       
-       // All other inputs (text, number, select, date, datetime): Check if value is non-empty after trimming
-       const trimmedValue = i.value.trim();
-       
-       // FIX 2: Explicitly ignore "0" for number types in the initial state. 
-       if (i.type === 'number' && trimmedValue === '0') {
-           return; 
-       }
-
-       // Also explicitly ignore empty date/datetime strings that browsers may return as a non-empty format like '0000-00-00'
-       if ((i.type === 'date' || i.type === 'datetime-local') && (trimmedValue === '0000-00-00' || !trimmedValue)) {
-           return;
-       }
-       
-       if (trimmedValue) {
-           answered.add(i.name);
-           return;
-       }
-    });
-    const pct = (answered.size / totalQuestions) * 100;
-    document.getElementById('progressBar').style.width = pct + '%';
-    document.getElementById('progressText').textContent = `${answered.size} / ${totalQuestions}`;
-  }
-
-  // Function to disable the global unload warning 
-  function disableUnloadWarning() {
-      window.removeEventListener('beforeunload', beforeUnloadHandler);
-      setTimeout(() => window.addEventListener('beforeunload', beforeUnloadHandler), 500);
-  }
-
-  function beforeUnloadHandler(e) {
-    if (hasUnsavedChanges && (taskStatus === 'in_progress' || canOverrideEdit)) { 
-      e.preventDefault();
-      e.returnValue = ''; 
-    }
-  }
-  
-  // Attach general listeners for non-file inputs 
-  document.querySelectorAll('.response-input').forEach(input => {
-    if(input.disabled || input.readOnly) return;
-
-    if(input.type === 'file') return;
-
-    input.addEventListener('change', () => {
-      hasUnsavedChanges = true;
-      updateProgress();
-      scheduleAutoSave();
-    });
-    if(input.type!=='radio' && input.type!=='hidden') {
-       input.addEventListener('input', () => { hasUnsavedChanges = true; });
-    }
-  });
-  
-  
-  // --- MULTI-FILE UPLOAD LOGIC ---
-
-  async function handleFileUpload(event) {
-    const fileInput = event.target;
-    const files = Array.from(fileInput.files);
-    const questionId = fileInput.dataset.questionId;
-    const qType = fileInput.dataset.qType;
-    const pathInput = document.getElementById(`path-input-${questionId}`);
-    
-    if (files.length === 0) return;
-
-    const indicator = document.getElementById('saveIndicator');
-    const text = document.getElementById('saveIndicatorText');
-    indicator.classList.add('show'); 
-    indicator.classList.remove('saved'); 
-    text.textContent = `Subiendo ${files.length} archivo(s)...`;
-    
-    let existingPaths = JSON.parse(pathInput.value || '[]');
-    let allUploadsSuccessful = true;
-
-    for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const formData = new FormData();
-        formData.append('file', file);
-        // CRITICAL: Pass the questionId in the payload for backend naming
-        formData.append('question_id', questionId); 
-
-        try {
-            const res = await fetch(`/tasks/${taskId}/upload_file`, {
-                method: 'POST',
-                body: formData 
-            });
-
-            const data = await res.json();
-
-            if (res.ok && data.success) {
-                existingPaths.push(data.path);
-                text.textContent = `✓ Archivo ${i + 1}/${files.length} subido...`;
-            } else {
-                allUploadsSuccessful = false;
-                throw new Error(data.error || `Fallo en el servidor al subir el archivo ${file.name}.`);
-            }
-
-        } catch (e) {
-            allUploadsSuccessful = false;
-            console.error("File upload error:", e);
-            break; 
-        }
-    }
-    
-    // 1. Update the hidden input with the combined paths array (JSON string)
-    pathInput.value = JSON.stringify(existingPaths);
-
-    // 2. Re-render the UI with all paths
-    renderFileItems(questionId, existingPaths, qType);
-    
-    // 3. Mark form as dirty for JSON PATCH
-    // Dispatching change on pathInput already marks the form as dirty via the general listener
-    
-    // 4. Clear the file input
-    fileInput.value = '';
-
-    if (allUploadsSuccessful) {
-        indicator.classList.add('saved'); 
-        text.textContent = `✓ Todos los ${files.length} archivos subidos.`;
-    } else {
-        text.textContent = `⚠️ Subida(s) fallida(s). Revise consola.`;
-    }
-
-    setTimeout(() => indicator.classList.remove('show', 'saved'), 4000); 
-  }
-
-  // Attach listener to all file inputs (uploader role)
-  document.querySelectorAll('input[type="file"].file-input-uploader').forEach(input => {
-    if(!input.disabled) {
-        input.addEventListener('change', handleFileUpload);
-    }
-  });
-
-
-  // --- MAIN SAVE LOGIC (JSON/PATCH ONLY) ---
-
-  function collectResponses() {
-    const responses = {};
-    document.querySelectorAll('.response-input').forEach(input => {
-      const qId = input.name.replace('response_', '');
-      
-      if(input.type==='radio') { 
-          if(input.checked) responses[qId] = input.value; 
-      }
-      else if(input.type !== 'file') {
-          // Collect text, number, date, select, and the HIDDEN file path string (which is a JSON array string)
-          responses[qId] = input.value;
-      }
-    });
-    return responses;
-  }
-  
-  async function saveTask(statusChange = null) {
-    
-    // FIX: Removed the defensive check here to ensure the save button always sends the payload.
-    // However, since statusChange reload is working, we only need to fix the case where
-    // hasUnsavedChanges is false when Guardar Progreso is clicked.
-    // The simplified logic below is based on the robust reload solution.
-
-    const indicator = document.getElementById('saveIndicator');
-    const text = document.getElementById('saveIndicatorText');
-    indicator.classList.add('show'); 
-    indicator.classList.remove('saved'); 
-    text.textContent = 'Guardando datos...';
-    
-    try {
-      const payload = { responses: collectResponses() };
-      if (statusChange) payload.status = statusChange;
-      
-      const res = await fetch(`/tasks/${taskId}/update`, {
-        method: 'PATCH', 
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload)
-      });
-      
-      if(res.ok) {
-        indicator.classList.add('saved'); 
-        text.textContent = '✓ Guardado';
-        
-        hasUnsavedChanges = false;
-        
-        // CRITICAL FIX: If status is changing (e.g., pending -> in_progress),
-        // force a full page reload to reset the browser state entirely.
-        if(statusChange) {
-            // This fix guarantees the buttons and fields are rendered in the correct, enabled state.
-            disableUnloadWarning(); // Clear warning just before navigation
-            window.location.reload(); 
-        } else {
-             // For standard save, just update the UI locally with a micro-delay for robustness
-             setTimeout(() => updateUiForStatusChange(taskStatus), 50);
-        }
-        
-        setTimeout(() => indicator.classList.remove('show', 'saved'), 2000); 
-        
-      } else {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Error saving data');
-      }
-    } catch(e) {
-      text.textContent = `⚠️ Error: ${e.message}`;
-      indicator.classList.add('show');
-      indicator.classList.remove('saved');
-    }
-  }
-
-
-  let saveTimeout;
-  function scheduleAutoSave() {
-    if (taskStatus === 'in_progress' || canOverrideEdit) {
-        clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(() => { 
-            if(hasUnsavedChanges) saveTask(); 
-        }, 5000);
-    }
-  }
-
-  // --- BUTTON/ELEMENT REFERENCES ---
-  const startBtn = document.getElementById('startBtn');
-  const saveBtn = document.getElementById('saveBtn');
-  const completeBtn = document.getElementById('completeBtn');
-  const saveBtnOverride = document.getElementById('saveBtnOverride');
-  
-  // --- BUTTON HANDLERS ---
-
-  if (saveBtn) saveBtn.addEventListener('click', () => saveTask());
-  if (saveBtnOverride) saveBtnOverride.addEventListener('click', () => saveTask());
-
-
-  // Start Task - Custom Confirmation
-  if (startBtn) startBtn.addEventListener('click', () => {
-    showConfirm(
-      '¿Estás seguro que deseas iniciar esta faena? El tiempo de llenado comenzará a contarse.',
-      () => {
-        // This initiates saveTask('in_progress'), which now forces a reload on success.
-        saveTask('in_progress'); 
-      },
-      'Iniciar Faena',
-      'Sí, iniciar',
-      'primary'
-    );
-  });
-
-  // Complete Task - Custom Confirmation
-  if (completeBtn) completeBtn.addEventListener('click', () => {
-    const form = document.getElementById('taskForm');
-    if(!canOverrideEdit && !form.checkValidity()) { 
-        form.reportValidity(); 
-        return; 
-    }
-    // This initiates saveTask('completed'), which also forces a reload on success.
-    showConfirm('¿Confirmas que has completado la tarea? Una vez completada, pasará a revisión y no podrás editarla (a menos que seas Planificador/Administrador).', () => { saveTask('completed'); }, 'Completar Tarea', 'Sí, completar', 'success');
-  });
-  
-  // Back Button - Custom Confirmation for Unsaved Changes
-  document.getElementById('backBtn').addEventListener('click', function(e) {
-    e.preventDefault();
-    const targetUrl = this.href;
-    if (hasUnsavedChanges) {
-      showConfirm('Hay cambios sin guardar en esta tarea. ¿Seguro que deseas salir? Los cambios no guardados se perderán.', () => { disableUnloadWarning(); window.location.href = targetUrl; }, 'Cambios sin guardar', 'Salir sin guardar', 'danger');
-    } else {
-      window.location.href = targetUrl;
-    }
-  });
-
-  // --- UI UPDATE FUNCTION (MODIFIED) ---
-  function updateUiForStatusChange(newStatus) {
-    const statusBadge = document.querySelector('.status-badge');
-    
-    // 1. Update global state variable
-    taskStatus = newStatus;
-    
-    // 2. Update status badge display
-    if (statusBadge) {
-        statusBadge.className = `status-badge status-${newStatus}`;
-        statusBadge.textContent = newStatus.replace('_', ' ');
-    }
-
-    // 3. Update button visibility and status 
-    const isFinalizedAndOverride = newStatus in ['completed', 'reviewed', 'approved'] && canOverrideEdit;
-    const isInProgress = newStatus === 'in_progress';
-    const isPending = newStatus === 'pending';
-
-    // Helper to toggle the HTML 'hidden' attribute
-    const toggleHidden = (element, shouldHide) => {
-        if (!element) return;
-        if (shouldHide) {
-            element.setAttribute('hidden', 'true');
-        } else {
-            element.removeAttribute('hidden');
-        }
-    };
-    
-    // Helper to toggle the 'disabled' attribute
-    const toggleDisabled = (element, shouldDisable) => {
-        if (!element) return;
-        if (shouldDisable) {
-            element.setAttribute('disabled', 'true');
-        } else {
-            element.removeAttribute('disabled');
-        }
-    };
-
-    // CRITICAL BUTTON LOGIC FIX:
-
-    // Iniciar Tarea: Visible when Pending. Clickable ONLY when Pending.
-    toggleHidden(startBtn, !(isPending && !canOverrideEdit));
-    toggleDisabled(startBtn, !isPending); // Disabled if NOT pending
-
-    // Save button: Visible when In-Progress or Admin overriding. Clickable when In-Progress or Admin overriding.
-    const showSave = isInProgress || isFinalizedAndOverride;
-    toggleHidden(saveBtn, !showSave);
-    toggleDisabled(saveBtn, isPending && !canOverrideEdit); // Disabled if Pending (and not Admin)
-
-    // Complete button: Visible when In-Progress. Clickable when In-Progress.
-    toggleHidden(completeBtn, !isInProgress);
-    toggleDisabled(completeBtn, isPending || isFinalizedAndOverride); // Disabled if Pending OR Admin overriding final state
-
-    // Admin Override Save button: Visible/Clickable based on its own state
-    if (saveBtnOverride) toggleDisabled(saveBtnOverride, isPending); 
-
-    // 4. Update input lock state (using disabled attribute)
-    // Form is locked if PENDING, OR if finalized without override rights
-    const isLocked = isPending || (newStatus in ['completed', 'reviewed', 'approved'] && !canOverrideEdit);
-    
-    document.querySelectorAll('.response-input').forEach(input => {
-        if (isLocked) {
-            input.setAttribute('disabled', 'true');
-        } else {
-            input.removeAttribute('disabled');
-        }
-    });
-    
-    // 5. Re-check progress in case new fields were enabled/disabled
-    updateProgress();
-  }
-  
-  // CRITICAL STEP: Call the update function immediately on DOM ready to set the correct state
-  document.addEventListener('DOMContentLoaded', function() {
-      // Running immediately ensures the initial render state is corrected.
-      updateUiForStatusChange(taskStatus);
-  });
-</script>
+{# NEW: Module-specific JS #}
+<script src="{{ url_for('static', filename='js/tasks/detail.js') }}"></script>
 {% endblock %}

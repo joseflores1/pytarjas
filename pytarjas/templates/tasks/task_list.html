@@ -1,284 +1,12 @@
 {# pytarjas/templates/tasks/task_list.html #}
-{#
-Task List Template
-
-UPDATES:
-- Implemented Dynamic Filtering using JavaScript Debouncing (auto-submits form).
-- Replaced text search for Form and Worker with selectable dropdowns.
-- Introduced Dynamic Question Filters based on selected Form.
-- Removed the 'container_number' filter.
-- JavaScript now cleans the URL of empty query parameters before submission.
-- FIXED: Custom Cascading Searchable User Filter (sub-dropdown menus) for Created By and Assigned To.
-#}
-
 {% extends 'base.html' %}
 
 {% block title %}Lista de Tareas{% endblock %}
 
 {% block extra_css %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
-  <style>
-    /* Table Styling for better display */
-    .table-responsive {
-      /* Permite el scroll horizontal SÓLO si la tabla es más ancha que el contenedor */
-      overflow-x: auto;
-      margin-bottom: var(--space-xl);
-    }
-    
-    .tasks-table {
-      width: 100%;
-      border-collapse: separate;
-      border-spacing: 0;
-      /* min-width: 1400px; - REMOVED: La tabla se auto-ajusta al 100% ahora */
-    }
-
-    .tasks-table th, .tasks-table td {
-      padding: var(--space-md) var(--space-sm);
-      text-align: left;
-      vertical-align: top;
-      border-bottom: 1px solid var(--color-border);
-      font-size: var(--font-size-sm);
-      white-space: nowrap; /* Mantener nowrap como default para timestmps, sobreescribir para texto */
-    }
-
-    /* Column Widths and Wrapping FIX */
-    .col-fixed-date {
-        width: 70px; /* Reducido para fechas (YYYY-MM-DD) */
-    }
-    .col-fixed-status {
-        width: 60px; /* Reducido para badges de estado */
-    }
-    .col-fixed-sync {
-        width: 50px;
-        text-align: center;
-    }
-    .col-fixed-action {
-        width: 100px; /* Fija el ancho del botón */
-        text-align: center;
-    }
-    .col-key-data {
-        width: 180px; /* Ancho suficiente para 2 líneas */
-        white-space: normal; /* PERMITE EL AJUSTE DE TEXTO */
-    }
-    .col-wrapping-text {
-        width: 120px;
-        white-space: normal; /* PERMITE EL AJUSTE DE TEXTO */
-    }
-
-    .tasks-table thead tr {
-      background-color: var(--color-bg-secondary);
-    }
-    
-    .tasks-table tbody tr:hover {
-      background-color: var(--color-bg-tertiary);
-    }
-    
-    .tasks-table tbody tr.collapsible-row:hover {
-      background-color: transparent !important;
-    }
-
-    /* Collapsible Row Styling (FORZADO A VERTICAL) */
-    .detail-row {
-      background-color: var(--color-bg-secondary);
-      border-top: 1px dashed var(--color-border);
-      padding: 0 !important;
-    }
-    
-    .detail-content {
-      padding: var(--space-lg);
-      display: grid;
-      grid-template-columns: 1fr; /* Una sola columna para evitar scroll horizontal */
-      gap: var(--space-md);
-      border: 1px solid var(--color-border);
-      border-top: none;
-      border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-      margin-bottom: var(--space-md);
-    }
-
-    .qa-group {
-      background-color: var(--color-bg-primary);
-      padding: var(--space-md);
-      border-radius: var(--radius-md);
-      box-shadow: var(--shadow-sm);
-    }
-
-    .qa-question {
-      font-weight: var(--font-weight-semibold);
-      color: var(--color-text-primary);
-      margin-bottom: var(--space-xs);
-      font-size: var(--font-size-sm);
-    }
-
-    .qa-answer {
-      color: var(--color-text-secondary);
-      word-break: break-word;
-      font-size: var(--font-size-base);
-      line-height: 1.4;
-    }
-
-    .toggle-icon {
-      cursor: pointer;
-      font-size: 1.2rem;
-      transition: transform 0.2s;
-      margin-right: var(--space-sm);
-    }
-
-    .toggle-icon.open {
-      transform: rotate(90deg);
-    }
-    
-    /* Filter Bar */
-    .filter-group-container {
-        display: flex;
-        gap: var(--space-md);
-        flex-wrap: wrap;
-        padding: var(--space-md);
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-lg);
-        background-color: var(--color-bg-secondary);
-        margin-bottom: var(--space-xl);
-    }
-    
-    .filter-group {
-        display: flex;
-        flex-direction: column;
-        min-width: 150px;
-    }
-    
-    .filter-group label {
-        font-size: var(--font-size-sm);
-        margin-bottom: var(--space-xs);
-        font-weight: var(--font-weight-medium);
-        color: var(--color-text-primary);
-    }
-    
-    .filter-group input, .filter-group select {
-        font-size: var(--font-size-base);
-        padding: var(--space-xs);
-    }
-    
-    .date-filter-pair {
-        display: flex;
-        gap: var(--space-sm);
-    }
-    
-    .date-filter-pair input {
-        width: 50%;
-    }
-
-    /* Status Badges */
-    .status-badge {
-      padding: 4px 10px;
-      border-radius: 50px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      white-space: nowrap;
-    }
-    .status-pending { background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
-    .status-in_progress { background: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe; }
-    .status-completed { background: #f0fdf4; color: #15803d; border: 1px solid #dcfce7; }
-    .status-reviewed { background: #f5f3ff; color: #6d28d9; border: 1px solid #ede9fe; }
-    .status-approved { background: #ecfdf5; color: #047857; border: 1px solid #d1fae5; }
-    
-    .is-synced-badge { background-color: var(--color-secondary); color: white; }
-    .not-synced-badge { background-color: var(--color-danger); color: white; }
-    
-    /* --- Custom Filter Styles for Grouped Toggles FIX --- */
-    .custom-filter-container {
-        position: relative;
-        min-width: 180px;
-    }
-    
-    .custom-filter-display {
-        padding: var(--space-xs) var(--space-md);
-        min-height: 36px;
-        background-color: var(--color-bg-primary);
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-md);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        cursor: pointer;
-        font-size: var(--font-size-base);
-    }
-    
-    .custom-filter-menu {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        z-index: 1050; 
-        margin-top: 4px;
-        background-color: var(--color-bg-primary);
-        border: 1px solid var(--color-border-dark);
-        border-radius: var(--radius-md);
-        box-shadow: var(--shadow-lg);
-        max-height: 300px;
-        overflow-y: auto;
-        display: none;
-        padding: var(--space-sm);
-    }
-    
-    .custom-filter-menu.active { display: block; }
-    
-    .filter-search-input {
-        width: 100%;
-        margin-bottom: var(--space-sm);
-        padding: var(--space-sm);
-    }
-    
-    .filter-role-group {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-    }
-    
-    .filter-role-category {
-        font-weight: var(--font-weight-semibold);
-        padding: var(--space-sm) var(--space-xs);
-        cursor: pointer;
-        user-select: none;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        transition: background-color var(--transition-fast);
-        border-radius: var(--radius-sm);
-    }
-    
-    .filter-role-category:hover { background-color: var(--color-bg-secondary); }
-    
-    .filter-role-category .arrow {
-        transition: transform var(--transition-fast);
-        margin-left: auto;
-    }
-    
-    .filter-role-category.expanded .arrow {
-        transform: rotate(90deg);
-    }
-
-    .filter-user-list {
-        list-style: none;
-        padding: 0 0 0 var(--space-lg);
-        display: none; /* Controlled by JS toggle */
-    }
-
-    .filter-user-list li {
-        padding: var(--space-xs) var(--space-sm);
-        cursor: pointer;
-        font-weight: var(--font-weight-normal);
-        color: var(--color-text-secondary);
-        border-radius: var(--radius-sm);
-        font-size: var(--font-size-sm);
-    }
-    
-    .filter-user-list li:hover {
-        background-color: var(--color-primary-light);
-        color: var(--color-primary);
-    }
-
-  </style>
+  {# NEW: Module-specific CSS #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tasks/list.css') }}">
 {% endblock %}
 
 {% block header %}
@@ -300,16 +28,14 @@ UPDATES:
 {% block content %}
   <div class="container">
     
-    {# HIDDEN JSON DATA BLOCK (For JavaScript dynamic filtering) #}
+    {# HIDDEN JSON DATA BLOCK #}
     <textarea id="allFormsData" style="display:none;">
         {% set form_data = {} %}
         {% for form in all_forms %}
             {% set questions_list = [] %}
             {% for q in form.questions|sort(attribute='order') %}
-                {# Determine key for filtering. Use a fixed key for record_data fields (like client_name) or q_UUID for responses #}
                 {% set filter_key = 'q_record_client_name' if q.question_type|default('')|string|trim == 'client_select' %}
                 {% set filter_key = filter_key if filter_key else 'q_' + q.id %}
-                
                 {% set questions_list = questions_list.append({
                     'id': q.id, 
                     'text': q.question_text, 
@@ -317,31 +43,19 @@ UPDATES:
                     'name_key': filter_key
                 }) or questions_list %}
             {% endfor %}
-            
             {% set form_data = form_data.update({
-                form.id: {
-                    'name': form.name,
-                    'questions': questions_list
-                }
+                form.id: { 'name': form.name, 'questions': questions_list }
             }) or form_data %}
         {% endfor %}
         {{ form_data | tojson | safe }}
     </textarea>
     
-    {# Utility to group users by role for the custom dropdowns #}
+    {# Group users by role #}
     {% set all_users_for_filters = all_assignable_users %}
-    {% set grouped_users = {
-        'admin': [], 
-        'planner': [], 
-        'worker': [] 
-    } %}
+    {% set grouped_users = {'admin': [], 'planner': [], 'worker': []} %}
     {% for user_obj in all_users_for_filters %}
-        {% if user_obj.role == 'admin' %}
-            {% set _ = grouped_users['admin'].append(user_obj) %}
-        {% elif user_obj.role == 'planner' %}
-            {% set _ = grouped_users['planner'].append(user_obj) %}
-        {% elif user_obj.role == 'worker' %}
-            {% set _ = grouped_users['worker'].append(user_obj) %}
+        {% if user_obj.role in grouped_users %}
+            {% set _ = grouped_users[user_obj.role].append(user_obj) %}
         {% endif %}
     {% endfor %}
     
@@ -349,7 +63,7 @@ UPDATES:
     <form method="GET" action="{{ url_for('tasks.list_tasks') }}" id="filterForm">
       <div class="filter-group-container">
         
-        {# ROW 1: STATUS, FORM, ASSIGNED USER #}
+        {# Status Filter #}
         <div class="filter-group" style="min-width: 180px;">
           <label for="status">Estado</label>
           <select name="status" id="status" class="form-control filter-input">
@@ -362,7 +76,7 @@ UPDATES:
           </select>
         </div>
         
-        {# Form Dropdown (Filter by ID) #}
+        {# Form Filter #}
         <div class="filter-group">
           <label for="form_id_filter">Formulario</label>
           <select name="form_id_filter" id="form_id_filter" class="form-control filter-input">
@@ -375,13 +89,15 @@ UPDATES:
           </select>
         </div>
 
-        {# NEW: Created By Filter (Custom Cascading Component) #}
+        {# Created By Filter #}
         {% if user.role != 'client' %}
         <div class="filter-group">
           <label>Creado por</label>
           <div class="custom-filter-container" id="created-by-filter-container">
             <input type="hidden" name="created_by_id" id="created_by_id_input" class="filter-input" value="{{ created_by_id_filter or '' }}">
-            <div class="custom-filter-display" id="created-by-display" onclick="toggleMenu('created-by')">
+            
+            {# REMOVED onclick, now handled by JS class #}
+            <div class="custom-filter-display" id="created-by-display">
                 {% set selected_creator = all_creators | selectattr('id', '==', created_by_id_filter) | first %}
                 {{ selected_creator.username if selected_creator else '-- Todos --' }}
                 <span>▼</span>
@@ -390,16 +106,17 @@ UPDATES:
             <div class="custom-filter-menu" id="created-by-menu">
                 <input type="text" class="form-control filter-search-input" placeholder="Buscar creador..." id="created-by-search">
                 <ul class="filter-role-group" id="created-by-list">
-                    <li class="filter-role-item filter-user-list-item all-option" data-id="" data-username="-- Todos --" onclick="selectUser(this, 'created-by')">-- Todos --</li>
+                    {# REMOVED onclick #}
+                    <li class="filter-role-item filter-user-list-item all-option" data-id="" data-username="-- Todos --">-- Todos --</li>
                     
                     {% for role, users in grouped_users.items() %}
                         {% if users %}
-                        <li class="filter-role-item filter-role-category" data-role="{{ role }}" onclick="toggleGroupList(this)">
+                        <li class="filter-role-item filter-role-category" data-role="{{ role }}">
                             {% if role == 'admin' %}👑 Administradores{% elif role == 'planner' %}📋 Planificadores{% elif role == 'worker' %}🔧 Trabajadores{% endif %} <span class="arrow">▶</span>
                         </li>
                         <ul class="filter-user-list" data-role="{{ role }}">
                             {% for user_obj in users %}
-                                <li data-id="{{ user_obj.id }}" data-username="{{ user_obj.username }}" data-role="{{ user_obj.role }}" onclick="selectUser(this, 'created-by')">
+                                <li data-id="{{ user_obj.id }}" data-username="{{ user_obj.username }}" data-role="{{ user_obj.role }}">
                                     {{ user_obj.username }}
                                 </li>
                             {% endfor %}
@@ -412,13 +129,13 @@ UPDATES:
         </div>
         {% endif %}
 
-        {# RESTRICTED: Assigned To Filter (Custom Cascading Component - Only Admin/Planner) #}
+        {# Assigned To Filter #}
         {% if user.role in ['admin', 'planner'] %}
         <div class="filter-group">
           <label>Asignado a</label>
           <div class="custom-filter-container" id="assigned-to-filter-container">
             <input type="hidden" name="worker_id" id="worker_id_input" class="filter-input" value="{{ worker_id_filter or '' }}">
-            <div class="custom-filter-display" id="assigned-to-display" onclick="toggleMenu('assigned-to')">
+            <div class="custom-filter-display" id="assigned-to-display">
                 {% set selected_worker = all_assignable_users | selectattr('id', '==', worker_id_filter) | first %}
                 {{ selected_worker.username if selected_worker else '-- Todos --' }}
                 <span>▼</span>
@@ -427,16 +144,16 @@ UPDATES:
             <div class="custom-filter-menu" id="assigned-to-menu">
                 <input type="text" class="form-control filter-search-input" placeholder="Buscar asignado..." id="assigned-to-search">
                 <ul class="filter-role-group" id="assigned-to-list">
-                    <li class="filter-role-item filter-user-list-item all-option" data-id="" data-username="-- Todos --" onclick="selectUser(this, 'assigned-to')">-- Todos --</li>
+                    <li class="filter-role-item filter-user-list-item all-option" data-id="" data-username="-- Todos --">-- Todos --</li>
                     
                     {% for role, users in grouped_users.items() %}
                         {% if users %}
-                        <li class="filter-role-item filter-role-category" data-role="{{ role }}" onclick="toggleGroupList(this)">
+                        <li class="filter-role-item filter-role-category" data-role="{{ role }}">
                             {% if role == 'admin' %}👑 Administradores{% elif role == 'planner' %}📋 Planificadores{% elif role == 'worker' %}🔧 Trabajadores{% endif %} <span class="arrow">▶</span>
                         </li>
                         <ul class="filter-user-list" data-role="{{ role }}">
                             {% for user_obj in users %}
-                                <li data-id="{{ user_obj.id }}" data-username="{{ user_obj.username }}" data-role="{{ user_obj.role }}" onclick="selectUser(this, 'assigned-to')">
+                                <li data-id="{{ user_obj.id }}" data-username="{{ user_obj.username }}" data-role="{{ user_obj.role }}">
                                     {{ user_obj.username }}
                                 </li>
                             {% endfor %}
@@ -449,7 +166,7 @@ UPDATES:
         </div>
         {% endif %}
 
-        {# RE-INTRODUCED: is_synced filter #}
+        {# Is Synced Filter #}
         <div class="filter-group" style="min-width: 180px;">
           <label for="is_synced">Sincronizado</label>
           <select name="is_synced" id="is_synced" class="form-control filter-input">
@@ -459,73 +176,33 @@ UPDATES:
           </select>
         </div>
 
-        
         {# DYNAMIC QUESTION FILTERS CONTAINER #}
         <div id="dynamic-question-filters" style="display: flex; gap: var(--space-md); flex-wrap: wrap;">
-            {# Dynamic fields will be injected here by JS #}
+            {# Filled by JS #}
             {% for key, value in dynamic_filters.items() %}
                 {% if key.startswith('q_') %}
-                    {# Attempt to derive a user-friendly name, otherwise use the key #}
-                    {% set display_name = key | replace('q_record_client_name', 'Cliente Asignado') %}
-                    {% set display_name = display_name if 'q_' not in display_name else 'Campo Dinámico' %}
-                    
                     <div class="filter-group dynamic-filter-group" data-filter-key="{{ key }}">
-                        <label for="{{ key }}">{{ display_name | capitalize }}</label>
-                        <input type="text" name="{{ key }}" id="{{ key }}" value="{{ value }}" class="form-control filter-input" placeholder="Buscar texto...">
+                         {# Placeholder to prevent layout shift before JS runs #}
+                        <label>{{ key }}</label>
+                        <input type="text" value="{{ value }}" class="form-control filter-input">
                     </div>
                 {% endif %}
             {% endfor %}
         </div>
-        {# END DYNAMIC QUESTION FILTERS CONTAINER #}
-
 
         {# TIMESTAMP FILTERS #}
-        <div class="filter-group">
-            <label>Creada</label>
-            <div class="date-filter-pair">
-                <input type="date" name="created_at_min" value="{{ created_at_min or '' }}" class="form-control filter-input" title="Desde">
-                <input type="date" name="created_at_max" value="{{ created_at_max or '' }}" class="form-control filter-input" title="Hasta">
-            </div>
-        </div>
+        <div class="filter-group"><label>Creada</label><div class="date-filter-pair"><input type="date" name="created_at_min" value="{{ created_at_min or '' }}" class="form-control filter-input"><input type="date" name="created_at_max" value="{{ created_at_max or '' }}" class="form-control filter-input"></div></div>
         
-        <div class="filter-group">
-            <label>Iniciada</label>
-            <div class="date-filter-pair">
-                <input type="date" name="started_at_min" value="{{ started_at_min or '' }}" class="form-control filter-input" title="Desde">
-                <input type="date" name="started_at_max" value="{{ started_at_max or '' }}" class="form-control filter-input" title="Hasta">
-            </div>
-        </div>
+        <div class="filter-group"><label>Iniciada</label><div class="date-filter-pair"><input type="date" name="started_at_min" value="{{ started_at_min or '' }}" class="form-control filter-input"><input type="date" name="started_at_max" value="{{ started_at_max or '' }}" class="form-control filter-input"></div></div>
 
-        <div class="filter-group">
-            <label>Completada</label>
-            <div class="date-filter-pair">
-                <input type="date" name="completed_at_min" value="{{ completed_at_min or '' }}" class="form-control filter-input" title="Desde">
-                <input type="date" name="completed_at_max" value="{{ completed_at_max or '' }}" class="form-control filter-input" title="Hasta">
-            </div>
-        </div>
+        <div class="filter-group"><label>Completada</label><div class="date-filter-pair"><input type="date" name="completed_at_min" value="{{ completed_at_min or '' }}" class="form-control filter-input"><input type="date" name="completed_at_max" value="{{ completed_at_max or '' }}" class="form-control filter-input"></div></div>
 
-        <div class="filter-group">
-            <label>Actualizada</label>
-            <div class="date-filter-pair">
-                <input type="date" name="updated_at_min" value="{{ updated_at_min or '' }}" class="form-control filter-input" title="Desde">
-                <input type="date" name="updated_at_max" value="{{ updated_at_max or '' }}" class="form-control filter-input" title="Hasta">
-            </div>
-        </div>
+        <div class="filter-group"><label>Actualizada</label><div class="date-filter-pair"><input type="date" name="updated_at_min" value="{{ updated_at_min or '' }}" class="form-control filter-input"><input type="date" name="updated_at_max" value="{{ updated_at_max or '' }}" class="form-control filter-input"></div></div>
         
-        {# RE-INTRODUCED: Sincronizada filter date range #}
-        <div class="filter-group">
-            <label>Sincronizada</label>
-            <div class="date-filter-pair">
-                <input type="date" name="synced_at_min" value="{{ synced_at_min or '' }}" class="form-control filter-input" title="Desde">
-                <input type="date" name="synced_at_max" value="{{ synced_at_max or '' }}" class="form-control filter-input" title="Hasta">
-            </div>
-        </div>
+        <div class="filter-group"><label>Sincronizada</label><div class="date-filter-pair"><input type="date" name="synced_at_min" value="{{ synced_at_min or '' }}" class="form-control filter-input"><input type="date" name="synced_at_max" value="{{ synced_at_max or '' }}" class="form-control filter-input"></div></div>
         
         <div style="display: flex; align-items: flex-end; gap: var(--space-sm);">
-            {# Removed redundant "Filtrar" button #}
-            <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary">
-              Limpiar
-            </a>
+            <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary">Limpiar</a>
         </div>
       </div>
     </form>
@@ -536,75 +213,41 @@ UPDATES:
       <div class="table-responsive card">
         <table class="tasks-table">
           <thead>
-            <tr>
-              <th style="width: 20px;"></th> <th class="col-fixed-action">Acciones</th> <th style="width: 180px;">Formulario</th>
-              <th class="col-wrapping-text">Asignado a</th>
-              <th class="col-wrapping-text">Creado por</th>
-              <th class="col-fixed-status">Estado</th>
-              <th class="col-key-data">Datos Clave</th>
-              <th class="col-fixed-date">Creada</th>
-              <th class="col-fixed-date">Iniciada</th>
-              <th class="col-fixed-date">Completada</th>
-              <th class="col-fixed-date">Revisada</th>
-              <th class="col-fixed-date">Sincronizada</th> <th class="col-fixed-sync">Sync</th> </tr>
+            <tr><th style="width: 20px;"></th> <th class="col-fixed-action">Acciones</th> <th style="width: 180px;">Formulario</th><th class="col-wrapping-text">Asignado a</th><th class="col-wrapping-text">Creado por</th><th class="col-fixed-status">Estado</th><th class="col-key-data">Datos Clave</th><th class="col-fixed-date">Creada</th><th class="col-fixed-date">Iniciada</th><th class="col-fixed-date">Completada</th><th class="col-fixed-date">Revisada</th><th class="col-fixed-date">Sincronizada</th> <th class="col-fixed-sync">Sync</th> </tr>
           </thead>
           <tbody>
             {% for task in tasks %}
             <tr data-task-id="{{ task.id }}" class="task-row">
               <td>
-                {# FIX: Reference the correct key 'form_questions' #}
                 {% if task.form_questions %}
-                  <span class="toggle-icon" onclick="toggleDetail('{{ task.id }}')">▶</span>
+                  {# REMOVED onclick, Added data attribute #}
+                  <span class="toggle-icon" data-task-id="{{ task.id }}">▶</span>
                 {% endif %}
               </td>
-              <td class="col-fixed-action"> <a href="{{ url_for('tasks.get_task', task_id=task.id) }}" class="btn btn-sm btn-secondary">
-                  Ver / Editar
-                </a>
-              </td>
-              <td style="font-weight: 600; white-space: normal;">
-                <a href="{{ url_for('tasks.get_task', task_id=task.id) }}" class="text-primary">{{ task.form_name }}</a>
-              </td>
-              <td class="col-wrapping-text">
-                {{ task.worker.username if task.worker else 'N/A' }}
-              </td>
-              <td class="col-wrapping-text">
-                {{ task.created_by.username if task.created_by else 'N/A' }}
-              </td>
-              <td>
-                <span class="status-badge status-{{ task.status }}">
-                  {{ task.status|replace('_', ' ')|capitalize }}
-                </span>
-              </td>
+              <td class="col-fixed-action"> <a href="{{ url_for('tasks.get_task', task_id=task.id) }}" class="btn btn-sm btn-secondary">Ver / Editar</a></td>
+              <td style="font-weight: 600; white-space: normal;"><a href="{{ url_for('tasks.get_task', task_id=task.id) }}" class="text-primary">{{ task.form_name }}</a></td>
+              <td class="col-wrapping-text">{{ task.worker.username if task.worker else 'N/A' }}</td>
+              <td class="col-wrapping-text">{{ task.created_by.username if task.created_by else 'N/A' }}</td>
+              <td><span class="status-badge status-{{ task.status }}">{{ task.status|replace('_', ' ')|capitalize }}</span></td>
               <td class="col-key-data">
                 {% for key, value in (task.record_preview|default({})).items() %}
                     <div style="font-size: 0.8rem;"><strong>{{ key }}:</strong> {{ value }}</div>
                 {% endfor %}
               </td>
-              <td class="col-fixed-date" title="{{ task.created_at }}">
-                {{ task.created_at[:10] if task.created_at else 'N/A' }}
-              </td>
-              <td class="col-fixed-date" title="{{ task.started_at }}">
-                {{ task.started_at[:10] if task.started_at else 'N/A' }}
-              </td>
-              <td class="col-fixed-date" title="{{ task.completed_at }}">
-                {{ task.completed_at[:10] if task.completed_at else 'N/A' }}
-              </td>
-              <td class="col-fixed-date" title="{{ task.reviewed_at }}">
-                {{ task.reviewed_at[:10] if task.reviewed_at else 'N/A' }}
-              </td>
-              <td class="col-fixed-date" title="{{ task.synced_at }}"> {{ task.synced_at[:10] if task.synced_at else 'N/A' }}
-              </td>
-              <td class="col-fixed-sync"> {% if task.is_synced %}
-                  <span class="badge is-synced-badge">✅</span>
-                {% else %}
-                  <span class="badge not-synced-badge">❌</span>
-                {% endif %}
+              <td class="col-fixed-date" title="{{ task.created_at }}">{{ task.created_at[:10] if task.created_at else 'N/A' }}</td>
+              <td class="col-fixed-date" title="{{ task.started_at }}">{{ task.started_at[:10] if task.started_at else 'N/A' }}</td>
+              <td class="col-fixed-date" title="{{ task.completed_at }}">{{ task.completed_at[:10] if task.completed_at else 'N/A' }}</td>
+              <td class="col-fixed-date" title="{{ task.reviewed_at }}">{{ task.reviewed_at[:10] if task.reviewed_at else 'N/A' }}</td>
+              <td class="col-fixed-date" title="{{ task.synced_at }}"> {{ task.synced_at[:10] if task.synced_at else 'N/A' }}</td>
+              <td class="col-fixed-sync"> 
+                  {% if task.is_synced %}<span class="badge is-synced-badge">✅</span>
+                  {% else %}<span class="badge not-synced-badge">❌</span>{% endif %}
               </td>
             </tr>
             {# Collapsible Detail Row #}
             <tr id="detail-{{ task.id }}" class="collapsible-row" style="display: none;">
-                <td colspan="13" class="detail-row"> <div class="detail-content">
-                        {# FIX: Reference the correct key 'form_questions' #}
+                <td colspan="13" class="detail-row"> 
+                    <div class="detail-content">
                         {% if task.responses and task.form_questions %}
                             {% set response_map = task.responses %}
                             {% for question in task.form_questions %}
@@ -614,15 +257,10 @@ UPDATES:
                                     <div class="qa-question">{{ question.text }}</div>
                                     <div class="qa-answer">
                                       {% set q_type = question.type|default('')|string|trim %}
-                                      {% if q_type == 'photo' or q_type == 'file' %}
-                                        Archivo/Foto Adjunta (Ver detalle)
-                                      {% elif answer == 'true' %}
-                                        Sí
-                                      {% elif answer == 'false' %}
-                                        No
-                                      {% else %}
-                                        {{ answer }}
-                                      {% endif %}
+                                      {% if q_type == 'photo' or q_type == 'file' %}Archivo/Foto Adjunta (Ver detalle)
+                                      {% elif answer == 'true' %}Sí
+                                      {% elif answer == 'false' %}No
+                                      {% else %}{{ answer }}{% endif %}
                                     </div>
                                 </div>
                                 {% endif %}
@@ -636,9 +274,7 @@ UPDATES:
                               </div>
                             {% endif %}
                         {% else %}
-                            <p style="grid-column: 1 / -1; text-align: center; color: var(--color-text-tertiary);">
-                                Aún no hay respuestas registradas para esta tarea.
-                            </p>
+                            <p style="grid-column: 1 / -1; text-align: center; color: var(--color-text-tertiary);">Aún no hay respuestas registradas.</p>
                         {% endif %}
                     </div>
                 </td>
@@ -648,67 +284,29 @@ UPDATES:
         </table>
       </div>
 
-      {# Pagination (Unchanged) #}
+      {# Pagination Block (Standard) #}
       {% if total > limit %}
         <div style="display: flex; justify-content: center; gap: var(--space-md); margin-top: var(--space-2xl);">
-          {% set filter_params = {
-              'status': status,
-              'form_id_filter': form_id_filter,
-              'worker_id': worker_id_filter,
-              'created_by_id': created_by_id_filter,
-              'created_at_min': created_at_min,
-              'created_at_max': created_at_max,
-              'updated_at_min': updated_at_min,
-              'updated_at_max': updated_at_max,
-              'started_at_min': started_at_min,
-              'started_at_max': started_at_max,
-              'completed_at_min': completed_at_min,
-              'completed_at_max': completed_at_max,
-              'reviewed_at_min': reviewed_at_min,
-              'reviewed_at_max': reviewed_at_max,
-              'synced_at_min': synced_at_min,
-              'synced_at_max': synced_at_max,
-              'is_synced': is_synced_filter,
-              'limit': limit
-          } %}
-          {# Add dynamic filters to pagination links if they exist #}
-          {% for key, value in dynamic_filters.items() %}
-              {% set filter_params = filter_params.update({key: value}) or filter_params %}
-          {% endfor %}
-
+          {% set filter_params = request.args.to_dict() %}
+          {% set _ = filter_params.pop('offset', None) %}
           {% set current_url = url_for('tasks.list_tasks', **filter_params) %}
           
           {% if offset > 0 %}
-            <a href="{{ current_url }}&offset={{ offset - limit }}" 
-               class="btn btn-secondary">
-              ← Anterior
-            </a>
+            <a href="{{ current_url }}&offset={{ offset - limit }}" class="btn btn-secondary">← Anterior</a>
           {% endif %}
-          
-          <div style="display: flex; align-items: center; font-weight: 600; color: var(--color-text-secondary);">
-            Página {{ (offset // limit) + 1 }}
-          </div>
-          
+          <div style="display: flex; align-items: center; font-weight: 600; color: var(--color-text-secondary);">Página {{ (offset // limit) + 1 }}</div>
           {% if offset + limit < total %}
-            <a href="{{ current_url }}&offset={{ offset + limit }}" 
-               class="btn btn-secondary">
-              Siguiente →
-            </a>
+            <a href="{{ current_url }}&offset={{ offset + limit }}" class="btn btn-secondary">Siguiente →</a>
           {% endif %}
         </div>
       {% endif %}
 
     {% else %}
-      {# Empty State (Unchanged) #}
       <div class="empty-state card-body" style="background-color: var(--color-bg-secondary); border: 2px dashed var(--color-border); border-radius: var(--radius-xl); padding: var(--space-3xl) var(--space-xl); text-align: center;">
         <div style="font-size: 4rem; margin-bottom: var(--space-lg); opacity: 0.3;">📭</div>
         <h2 style="font-size: 1.5rem; font-weight: 700;">No se encontraron tareas</h2>
-        <p style="color: var(--color-text-secondary); margin-bottom: var(--space-xl);">
-          Ajuste sus filtros o cree una nueva tarea.
-        </p>
-        <a href="{{ url_for('tasks.create_task') }}" class="btn btn-primary btn-lg">
-          Crear Nueva Tarea
-        </a>
+        <p style="color: var(--color-text-secondary); margin-bottom: var(--space-xl);">Ajuste sus filtros o cree una nueva tarea.</p>
+        <a href="{{ url_for('tasks.create_task') }}" class="btn btn-primary btn-lg">Crear Nueva Tarea</a>
       </div>
     {% endif %}
 
@@ -716,345 +314,6 @@ UPDATES:
 {% endblock %}
 
 {% block extra_js %}
-  <script>
-    /**
-     * Toggles the visibility of the task detail row (Q&A).
-     */
-    function toggleDetail(taskId) {
-      const detailRow = document.getElementById(`detail-${taskId}`);
-      const toggleIcon = document.querySelector(`tr[data-task-id="${taskId}"] .toggle-icon`);
-
-      if (detailRow.style.display === 'none' || detailRow.style.display === '') {
-        // Find and hide any other open detail rows first (optional, but good UX)
-        document.querySelectorAll('.collapsible-row').forEach(row => {
-          if (row.id !== `detail-${taskId}`) {
-            row.style.display = 'none';
-          }
-        });
-        document.querySelectorAll('.toggle-icon.open').forEach(icon => {
-          if (icon !== toggleIcon) {
-            icon.classList.remove('open');
-          }
-        });
-        
-        // Open the selected row
-        detailRow.style.display = 'table-row';
-        toggleIcon.classList.add('open');
-      } else {
-        // Close the row
-        detailRow.style.display = 'none';
-        toggleIcon.classList.remove('open');
-      }
-    }
-
-    // --- DYNAMIC FILTERING LOGIC (Debounce & Scroll Management) ---
-    const filterForm = document.getElementById('filterForm');
-    const formIdSelect = document.getElementById('form_id_filter');
-    const dynamicFilterContainer = document.getElementById('dynamic-question-filters');
-    const allFormsDataTextarea = document.getElementById('allFormsData');
-    let allFormsData = {};
-
-    try {
-        const dataStr = allFormsDataTextarea.value.trim();
-        // The inner content of the textarea is a JSON string of a dictionary 
-        // that wraps the actual form_data dictionary (due to how Jinja 'set' works inside template blocks).
-        const jsonObject = JSON.parse(dataStr);
-        // We attempt to extract the inner dictionary safely.
-        // If the structure is complex due to Jinja set, we try to access the first key or use the object itself.
-        // Note: We use jsonObject directly here since the Jinja code above stores the full dict/dict as the string.
-        allFormsData = jsonObject; 
-    } catch (e) {
-        console.error("Error parsing allFormsData:", e);
-    }
-    
-    // --- STEP 1: Implement Dynamic Filter Injection ---
-    function updateDynamicFilters() {
-        const selectedFormId = formIdSelect.value;
-        const currentFilters = new URLSearchParams(window.location.search);
-        
-        // Remove old dynamic filters based on the class 'dynamic-filter-group'
-        document.querySelectorAll('.dynamic-filter-group').forEach(el => el.remove());
-        
-        if (!selectedFormId || !allFormsData[selectedFormId]) return;
-
-        const form = allFormsData[selectedFormId];
-        
-        form.questions.forEach(q => {
-            const type = q.type ? q.type.trim().toLowerCase() : '';
-            const isTextType = type === 'text' || type === 'textarea';
-            const isNumberType = type === 'number';
-            const isSelectType = type === 'select';
-            const isClientSelectType = type === 'client_select';
-            
-            // Only filter on basic text, numeric, and specific types.
-            if (isTextType || isNumberType || isSelectType || isClientSelectType) {
-                
-                const nameKey = q.name_key; // e.g., 'q_UUID' or 'q_record_client_name'
-                const currentValue = currentFilters.get(nameKey) || '';
-                
-                const filterGroup = document.createElement('div');
-                filterGroup.className = 'filter-group dynamic-filter-group';
-                filterGroup.setAttribute('data-filter-key', nameKey);
-                filterGroup.setAttribute('style', 'min-width: 180px;');
-
-                let inputHtml = '';
-                
-                // Determine user-friendly label
-                let labelText = q.text.replace(/[\*\?]/g, '').trim(); 
-                if (isClientSelectType) labelText = 'Cliente Asignado';
-                if (q.text.toLowerCase().includes('contenedor')) labelText = 'N° Contenedor';
-
-
-                if (isNumberType) {
-                    inputHtml = `
-                        <label for="${nameKey}">${labelText}</label>
-                        <input type="number" name="${nameKey}" id="${nameKey}" 
-                               value="${currentValue}" class="form-control filter-input" 
-                               placeholder="Buscar número">
-                    `;
-                } else {
-                    // Standard text search (used for text, select, and client select)
-                    inputHtml = `
-                        <label for="${nameKey}">${labelText}</label>
-                        <input type="text" name="${nameKey}" id="${nameKey}" 
-                               value="${currentValue}" class="form-control filter-input" 
-                               placeholder="Buscar texto...">
-                    `;
-                }
-
-                filterGroup.innerHTML = inputHtml;
-                dynamicFilterContainer.appendChild(filterGroup);
-            }
-        });
-        
-        // Re-attach event listeners to the newly created inputs
-        document.querySelectorAll('.dynamic-filter-group .filter-input').forEach(input => {
-            input.addEventListener('input', triggerFilter);
-            input.addEventListener('change', triggerFilter);
-        });
-    }
-
-    // Call once on load to populate if a form is already selected
-    document.addEventListener('DOMContentLoaded', updateDynamicFilters);
-    formIdSelect.addEventListener('change', () => {
-        // Clear all dynamic filters when changing the form
-        document.querySelectorAll('.dynamic-filter-group').forEach(el => el.remove());
-        updateDynamicFilters();
-        triggerFilter();
-    });
-
-    // --- STEP 2: Custom Dropdown/Search Logic FIX ---
-
-    // Function to handle the simple vertical toggle (show/hide the user list below the header)
-    window.toggleGroupList = function(item) {
-        const userList = item.nextElementSibling;
-        
-        if (userList && userList.classList.contains('filter-user-list')) {
-            // Toggle visibility of the user list below the header
-            userList.style.display = userList.style.display === 'block' ? 'none' : 'block';
-            item.classList.toggle('expanded');
-        }
-    }
-
-    // Function to handle the main menu visibility (clicking the display box)
-    window.toggleMenu = function(type) {
-        const menuElement = document.getElementById(`${type}-menu`);
-        const searchInput = document.getElementById(`${type}-search`);
-
-        // Close the other menu if it's open
-        const otherType = type === 'created-by' ? 'assigned-to' : 'created-by';
-        const otherMenu = document.getElementById(`${otherType}-menu`);
-        if (otherMenu) otherMenu.classList.remove('active');
-
-        // Toggle visibility of the current menu
-        menuElement.classList.toggle('active');
-        if (menuElement.classList.contains('active')) {
-             searchInput.focus();
-             // Reset search on open
-             searchInput.value = '';
-             filterUsers(searchInput.id, `${type}-list`);
-        }
-        
-        // Collapse all sub-lists when the main menu opens/closes
-        menuElement.querySelectorAll('.filter-user-list').forEach(list => list.style.display = 'none');
-        menuElement.querySelectorAll('.filter-role-category').forEach(header => header.classList.remove('expanded'));
-    }
-
-    // Function to handle selection of a user
-    window.selectUser = function(selectedItem, type) {
-        const id = selectedItem.dataset.id;
-        const username = selectedItem.dataset.username;
-        const displayElement = document.getElementById(`${type}-display`);
-        // The input element name depends on the type (worker_id or created_by_id)
-        const inputElementId = type === 'assigned-to' ? 'worker_id_input' : 'created_by_id_input';
-        const inputElement = document.getElementById(inputElementId);
-        const menuElement = document.getElementById(`${type}-menu`);
-
-        displayElement.textContent = username;
-        inputElement.value = id;
-        menuElement.classList.remove('active');
-        
-        // Trigger the filter immediately after selection
-        triggerFilter(); 
-    }
-
-    // Function to handle search filtering
-    function filterUsers(searchInputId, listId) {
-        const input = document.getElementById(searchInputId);
-        const filter = input.value.toUpperCase();
-        const list = document.getElementById(listId);
-        
-        // Process categories and users
-        list.querySelectorAll('.filter-role-category').forEach(categoryHeader => {
-            const userList = categoryHeader.nextElementSibling; // The UL sibling
-            const categoryText = categoryHeader.textContent.toUpperCase();
-            
-            let categoryHasVisibleUsers = false;
-            
-            if (userList) {
-                // Filter individual users in the list
-                userList.querySelectorAll('li').forEach(userItem => {
-                    // Check user list against the search filter
-                    const userMatches = userItem.dataset.username.toUpperCase().indexOf(filter) > -1;
-                    if (userMatches) {
-                        userItem.style.display = "";
-                        categoryHasVisibleUsers = true;
-                    } else {
-                        userItem.style.display = "none";
-                    }
-                });
-            }
-            
-            const categoryMatchesFilter = categoryText.indexOf(filter) > -1;
-
-            if (categoryMatchesFilter || categoryHasVisibleUsers) {
-                categoryHeader.style.display = "";
-                
-                // If the user searches by role name, expand the list automatically
-                if (filter.length > 0) {
-                     if (userList) userList.style.display = 'block';
-                     categoryHeader.classList.add('expanded');
-                } else {
-                    // When search is cleared, revert to default collapsed view
-                    if (userList) userList.style.display = 'none';
-                    categoryHeader.classList.remove('expanded');
-                }
-            } else {
-                categoryHeader.style.display = "none";
-                if (userList) userList.style.display = 'none';
-                categoryHeader.classList.remove('expanded');
-            }
-        });
-
-        // Handle the '-- Todos --' option visibility
-        list.querySelectorAll('.all-option').forEach(item => {
-             const matchesFilter = item.textContent.toUpperCase().indexOf(filter) > -1;
-             item.style.display = matchesFilter ? "" : "none";
-        });
-    }
-
-    // Attach search input handlers
-    document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('created-by-search')?.addEventListener('input', (e) => filterUsers(e.target.id, 'created-by-list'));
-        document.getElementById('assigned-to-search')?.addEventListener('input', (e) => filterUsers(e.target.id, 'assigned-to-list'));
-    });
-
-
-    // --- STEP 4: URL Cleanup Logic (Unchanged from previous fix) ---
-
-    let debounceTimer;
-
-    /**
-     * Executes the filter action after a delay.
-     */
-    function triggerFilter() {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            
-            const data = new FormData(filterForm);
-            const newParams = new URLSearchParams();
-            
-            // 1. Process form data and only keep non-empty/non-default values
-            for (const [key, value] of data.entries()) {
-                const trimmedValue = value.trim();
-                
-                // Determine if this key should be kept
-                const isDefault = (key === 'status' && trimmedValue === 'all') || 
-                                  (key === 'form_id_filter' && trimmedValue === '') || 
-                                  (key === 'worker_id' && trimmedValue === '') || 
-                                  (key === 'created_by_id' && trimmedValue === '') || 
-                                  (key === 'is_synced' && trimmedValue === '') || 
-                                  (key.includes('_min') && trimmedValue === '') || 
-                                  (key.includes('_max') && trimmedValue === '') ||
-                                  (key.startsWith('q_') && trimmedValue === '');
-                
-                // Exclude empty values AND default values for cleanliness
-                if (!isDefault && trimmedValue !== '') {
-                    newParams.set(key, trimmedValue);
-                }
-                // Explicitly keep status if it's 'all'
-                else if (key === 'status' && trimmedValue === 'all') {
-                     newParams.set(key, trimmedValue);
-                }
-            }
-            
-            // 2. Submit the form to reload with clean parameters
-            const url = `${window.location.pathname}?${newParams.toString()}`;
-            window.location.href = url;
-
-        }, 400); // 400ms delay for smooth typing
-    }
-
-    // Attach listener to all relevant fields
-    document.querySelectorAll('.filter-input').forEach(input => {
-        // Use change for select/date fields to trigger filter immediately after selection
-        if (input.tagName === 'SELECT' || input.type === 'date' || input.type === 'hidden') {
-             input.addEventListener('change', triggerFilter);
-        } else {
-             // Use input event for text fields for debounce searching
-             input.addEventListener('input', triggerFilter); 
-        }
-        
-    });
-
-    // --- SCROLL RESTORATION ON PAGE LOAD (Unchanged) ---
-    document.addEventListener('DOMContentLoaded', () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const savedScrollY = urlParams.get('scroll_pos');
-
-        if (savedScrollY) {
-            // Restore scroll position immediately (without setTimeout)
-            window.scrollTo(0, parseInt(savedScrollY));
-            
-            // OPTIONAL: Clean the URL history to remove the scroll_pos parameter
-            if (window.history.replaceState) {
-                const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + window.location.search.replace(/&?scroll_pos=[^&]*/, "");
-                window.history.replaceState(null, document.title, cleanUrl);
-            }
-        }
-    });
-
-
-    // --- Auto-refresh logic (Unchanged) ---
-    const AUTO_REFRESH_INTERVAL = 30000;
-    let autoRefreshTimer = null;
-    
-    function startAutoRefresh() {
-      if (navigator.onLine) {
-        autoRefreshTimer = setTimeout(() => window.location.reload(), AUTO_REFRESH_INTERVAL);
-      }
-    }
-    
-    function stopAutoRefresh() {
-      if (autoRefreshTimer) {
-        clearTimeout(autoRefreshTimer);
-        autoRefreshTimer = null;
-      }
-    }
-    
-    startAutoRefresh();
-    window.addEventListener('offline', stopAutoRefresh);
-    window.addEventListener('online', startAutoRefresh);
-    window.addEventListener('beforeunload', stopAutoRefresh);
-  </script>
+  {# NEW: Module-specific JS #}
+  <script src="{{ url_for('static', filename='js/tasks/list.js') }}"></script>
 {% endblock %}

@@ -11,5 +11,4 @@ instance/
 htmlconv/
 
 # Virtual environments
-.env
 .venv

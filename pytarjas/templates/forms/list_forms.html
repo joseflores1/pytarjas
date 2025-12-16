@@ -1,19 +1,12 @@
 {# pytarjas/templates/forms/list_forms.html #}
-{#
-List Forms Page
-
-Updates:
-- Implemented global 'showConfirm' modal for Form Deactivation
-- Replaced native browser alerts
-- REMOVED 'seal_verification' filter button and display logic.
-#}
-
 {% extends 'base.html' %}
 
 {% block title %}Plantillas de Formularios{% endblock %}
 
 {% block extra_css %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+  {# NEW: Module-specific CSS #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/forms/list.css') }}">
 {% endblock %}
 
 {% block header %}
@@ -68,7 +61,6 @@ Updates:
              style="min-width: 140px;">
             📤 Desconsolidado
           </a>
-          {# REMOVED: Sello Filter Button #}
         </div>
       </div>
       
@@ -101,69 +93,56 @@ Updates:
     {# FORMS GRID #}
     {% if forms %}
       
-      <div class="grid grid-cols-1 gap-lg" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
+      <div class="forms-grid">
         
         {% for form in forms %}
-        <div class="card" style="display: flex; flex-direction: column; height: 100%;">
+        <div class="card form-card">
           
-          <div class="card-header" style="display: flex; justify-content: space-between; align-items: start; gap: var(--space-md); padding: var(--space-lg); border-bottom: 1px solid var(--color-border);">
+          <div class="form-card-header">
             <div style="flex: 1; min-width: 0;">
-              <h3 style="font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); margin-bottom: var(--space-xs); word-break: break-word;">
-                {{ form.name }}
-              </h3>
+              <h3 class="form-card-title">{{ form.name }}</h3>
               
               {% if form.form_type == 'consolidado' %}
                 <span class="badge" style="background-color: #3b82f6; color: white;">📦 Consolidado</span>
               {% elif form.form_type == 'desconsolidado' %}
                 <span class="badge" style="background-color: #10b981; color: white;">📤 Desconsolidado</span>
-              {# REMOVED: elif form.form_type == 'seal_verification' #}
               {% else %}
                 <span class="badge badge-secondary">{{ form.form_type or 'Sin tipo' }}</span>
               {% endif %}
             </div>
             
             {% if form.is_active %}
-              <span class="badge badge-success" style="flex-shrink: 0;">✅ Activo</span>
+              <span class="badge badge-success badge-fixed">✅ Activo</span>
             {% else %}
-              <span class="badge" style="background-color: #6b7280; color: white; flex-shrink: 0;">⛔ Inactivo</span>
+              <span class="badge badge-fixed" style="background-color: #6b7280; color: white;">⛔ Inactivo</span>
             {% endif %}
           </div>
           
-          <div class="card-body" style="flex: 1; padding: var(--space-lg);">
+          <div class="form-card-body">
             {% if form.description %}
-              <p style="color: var(--color-text-secondary); margin-bottom: var(--space-md); line-height: 1.6;">
+              <p class="form-card-description">
                 {{ form.description[:150] }}{% if form.description|length > 150 %}...{% endif %}
               </p>
             {% else %}
-              <p style="color: var(--color-text-tertiary); font-style: italic; margin-bottom: var(--space-md);">
-                Sin descripción
-              </p>
+              <p class="form-card-description" style="font-style: italic;">Sin descripción</p>
             {% endif %}
             
-            <div style="display: flex; flex-direction: column; gap: var(--space-sm); padding: var(--space-md); background-color: var(--color-bg-secondary); border-radius: var(--radius-md);">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
-                  📝 Preguntas:
-                </span>
-                <span style="color: var(--color-text-primary); font-weight: var(--font-weight-semibold);">
-                  {{ form.questions|length }}
-                </span>
+            <div class="form-card-meta">
+              <div class="form-card-meta-row">
+                <span style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">📝 Preguntas:</span>
+                <span style="color: var(--color-text-primary); font-weight: var(--font-weight-semibold);">{{ form.questions|length }}</span>
               </div>
               
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
-                  📅 Creado:
-                </span>
+              <div class="form-card-meta-row">
+                <span style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">📅 Creado:</span>
                 <span style="color: var(--color-text-primary); font-size: var(--font-size-sm);">
                   {{ form.created_at.strftime('%d/%m/%Y') if form.created_at else 'N/A' }}
                 </span>
               </div>
               
               {% if form.updated_at %}
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
-                  🔄 Actualizado:
-                </span>
+              <div class="form-card-meta-row">
+                <span style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">🔄 Actualizado:</span>
                 <span style="color: var(--color-text-primary); font-size: var(--font-size-sm);">
                   {{ form.updated_at.strftime('%d/%m/%Y') }}
                 </span>
@@ -172,7 +151,7 @@ Updates:
             </div>
           </div>
           
-          <div class="card-footer" style="padding: var(--space-lg); border-top: 1px solid var(--color-border); background-color: var(--color-bg-secondary);">
+          <div class="form-card-footer">
             <div style="display: flex; flex-wrap: wrap; gap: var(--space-sm);">
               
               <a href="{{ url_for('forms.edit_form', form_id=form.id) }}" 
@@ -182,25 +161,19 @@ Updates:
               </a>
               
               {% if form.is_active %}
-                {# Deactivate form button with Custom Confirm #}
                 <form method="POST" 
                       action="{{ url_for('forms.delete_form', form_id=form.id) }}" 
                       style="flex: 1; min-width: 100px;"
                       onsubmit="return confirmDeactivate(event, '{{ form.name }}');">
-                  <button type="submit" 
-                          class="btn btn-danger btn-sm" 
-                          style="width: 100%;">
+                  <button type="submit" class="btn btn-danger btn-sm" style="width: 100%;">
                     ⛔ Desactivar
                   </button>
                 </form>
               {% else %}
-                {# Activate form button (No confirm needed usually, but safe action) #}
                 <form method="POST" 
                       action="{{ url_for('forms.activate_form', form_id=form.id) }}" 
                       style="flex: 1; min-width: 100px;">
-                  <button type="submit" 
-                          class="btn btn-success btn-sm" 
-                          style="width: 100%;">
+                  <button type="submit" class="btn btn-success btn-sm" style="width: 100%;">
                     ✅ Activar
                   </button>
                 </form>
@@ -224,10 +197,8 @@ Updates:
       
       {# EMPTY STATE #}
       <div class="card">
-        <div class="card-body" style="text-align: center; padding: var(--space-2xl);">
-          <div style="font-size: 5rem; margin-bottom: var(--space-lg); opacity: 0.3;">
-            📋
-          </div>
+        <div class="card-body empty-state-card">
+          <div class="empty-state-icon">📋</div>
           <h3 style="color: var(--color-text-primary); margin-bottom: var(--space-sm);">
             No se encontraron formularios
           </h3>
@@ -261,54 +232,6 @@ Updates:
 {% endblock %}
 
 {% block extra_js %}
-<script>
-  /**
-   * Custom Confirmation for Form Deactivation
-   */
-  function confirmDeactivate(e, formName) {
-    e.preventDefault(); // Stop immediate submission
-    const form = e.target;
-    
-    showConfirm(
-      `¿Está seguro que desea desactivar el formulario "${formName}"?\n\nEl formulario dejará de estar disponible para nuevas tareas, pero no se eliminarán los datos históricos.`,
-      () => {
-        form.submit(); // Resume submission on confirm
-      },
-      'Desactivar Formulario',
-      'Sí, desactivar',
-      'danger'
-    );
-    
-    return false;
-  }
-  
-  /**
-   * Keyboard shortcuts
-   */
-  document.addEventListener('keydown', function(e) {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
-      e.preventDefault();
-      window.location.href = "{{ url_for('forms.create_form') }}";
-    }
-  });
-  
-  /**
-   * Visual feedback on card hover
-   */
-  document.addEventListener('DOMContentLoaded', function() {
-    const cards = document.querySelectorAll('.card');
-    cards.forEach(function(card) {
-      card.addEventListener('mouseenter', function() {
-        this.style.transform = 'translateY(-2px)';
-        this.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-        this.style.transition = 'all 0.2s ease';
-      });
-      
-      card.addEventListener('mouseleave', function() {
-        this.style.transform = 'translateY(0)';
-        this.style.boxShadow = '';
-      });
-    });
-  });
-</script>
+  {# NEW: Module-specific JS #}
+  <script src="{{ url_for('static', filename='js/forms/list.js') }}"></script>
 {% endblock %}

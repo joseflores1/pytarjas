@@ -1,20 +1,17 @@
 {# pytarjas/templates/admin/index.html #}
-{#
-Admin Dashboard - Main landing page for administrators
-
-Updates:
-- FIXED: All User Management links point to the agnostic 'users' blueprint.
-- FIXED: All Planning Management links point to the 'plannings' blueprint.
-#}
-
 {% extends 'base.html' %}
 
 {% block title %}Panel de Administración{% endblock %}
 
+{% block extra_css %}
+  {# NEW: Module-specific CSS #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/index.css') }}">
+{% endblock %}
+
 {% block header %}
   <div class="container">
-    <h1 style="margin-top: var(--space-lg);">Panel de Administración</h1>
-    <p style="color: var(--color-text-secondary); margin-bottom: var(--space-lg);">
+    <h1 class="page-header">Panel de Administración</h1>
+    <p class="page-subtitle">
       Bienvenido, <strong>{{ g.user.username }}</strong>. Resumen del sistema.
     </p>
   </div>
@@ -23,142 +20,100 @@ Updates:
 {% block content %}
   <div class="container">
     
-    {# ============================================
-         STATISTICS CARDS SECTION
-         ============================================ #}
-    <section style="margin-bottom: var(--space-2xl);">
-      <h2 style="margin-bottom: var(--space-lg); color: var(--color-text-primary);">
-        Resumen del Sistema
-      </h2>
+    {# STATS SECTION #}
+    <section class="admin-section">
+      <h2 class="section-title">Resumen del Sistema</h2>
       
-      <div style="
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: var(--space-lg);
-        margin-bottom: var(--space-2xl);
-      ">
+      <div class="stats-grid">
         
-        {# Total Users Card #}
-        <a href="{{ url_for('users.list_users') }}" class="card card-clickable" style="text-decoration: none; color: inherit;">
-          <div class="card-body" style="text-align: center;">
-            <div style="font-size: 2rem; margin-bottom: var(--space-md); color: var(--color-primary);">
-              👥
-            </div>
-            <h3 class="card-title" style="font-size: var(--font-size-base); margin-bottom: var(--space-sm);">
-              Usuarios Totales
-            </h3>
-            <div style="font-size: 3rem; font-weight: var(--font-weight-bold); color: var(--color-primary); margin: var(--space-md) 0; line-height: 1;">
-              {{ user_count }}
-            </div>
+        {# Total Users #}
+        <a href="{{ url_for('users.list_users') }}" class="card stat-card">
+          <div class="stat-card-body">
+            <div class="stat-icon color-primary">👥</div>
+            <h3 class="stat-title">Usuarios Totales</h3>
+            <div class="stat-value color-primary">{{ user_count }}</div>
           </div>
         </a>
         
-        {# Admins Card #}
-        <a href="{{ url_for('users.list_users', role='admin') }}" class="card card-clickable" style="text-decoration: none; color: inherit;">
-          <div class="card-body" style="text-align: center;">
-            <div style="font-size: 2rem; margin-bottom: var(--space-md); color: var(--color-danger);">
-              👑
-            </div>
-            <h3 class="card-title" style="font-size: var(--font-size-base); margin-bottom: var(--space-sm);">
-              Administradores
-            </h3>
-            <div style="font-size: 3rem; font-weight: var(--font-weight-bold); color: var(--color-danger); margin: var(--space-md) 0; line-height: 1;">
-              {{ admin_count }}
-            </div>
+        {# Admins #}
+        <a href="{{ url_for('users.list_users', role='admin') }}" class="card stat-card">
+          <div class="stat-card-body">
+            <div class="stat-icon color-danger">👑</div>
+            <h3 class="stat-title">Administradores</h3>
+            <div class="stat-value color-danger">{{ admin_count }}</div>
           </div>
         </a>
         
-        {# Workers Card #}
-        <a href="{{ url_for('users.list_users', role='worker') }}" class="card card-clickable" style="text-decoration: none; color: inherit;">
-          <div class="card-body" style="text-align: center;">
-            <div style="font-size: 2rem; margin-bottom: var(--space-md); color: var(--color-secondary);">
-              🔧
-            </div>
-            <h3 class="card-title" style="font-size: var(--font-size-base); margin-bottom: var(--space-sm);">
-              Trabajadores
-            </h3>
-            <div style="font-size: 3rem; font-weight: var(--font-weight-bold); color: var(--color-secondary); margin: var(--space-md) 0; line-height: 1;">
-              {{ worker_count }}
-            </div>
+        {# Workers #}
+        <a href="{{ url_for('users.list_users', role='worker') }}" class="card stat-card">
+          <div class="stat-card-body">
+            <div class="stat-icon color-secondary">🔧</div>
+            <h3 class="stat-title">Trabajadores</h3>
+            <div class="stat-value color-secondary">{{ worker_count }}</div>
           </div>
         </a>
 
-        {# Planners Card #}
-        <a href="{{ url_for('users.list_users', role='planner') }}" class="card card-clickable" style="text-decoration: none; color: inherit;">
-          <div class="card-body" style="text-align: center;">
-            <div style="font-size: 2rem; margin-bottom: var(--space-md); color: #8b5cf6;">
-              📋
-            </div>
-            <h3 class="card-title" style="font-size: var(--font-size-base); margin-bottom: var(--space-sm);">
-              Planificadores
-            </h3>
-            <div style="font-size: 3rem; font-weight: var(--font-weight-bold); color: #8b5cf6; margin: var(--space-md) 0; line-height: 1;">
-              {{ planner_count }}
-            </div>
+        {# Planners #}
+        <a href="{{ url_for('users.list_users', role='planner') }}" class="card stat-card">
+          <div class="stat-card-body">
+            <div class="stat-icon color-planner">📋</div>
+            <h3 class="stat-title">Planificadores</h3>
+            <div class="stat-value color-planner">{{ planner_count }}</div>
           </div>
         </a>
         
-        {# Clients Card #}
-        <a href="{{ url_for('users.list_users', role='client') }}" class="card card-clickable" style="text-decoration: none; color: inherit;">
-          <div class="card-body" style="text-align: center;">
-            <div style="font-size: 2rem; margin-bottom: var(--space-md); color: var(--color-warning);">
-              🏢
-            </div>
-            <h3 class="card-title" style="font-size: var(--font-size-base); margin-bottom: var(--space-sm);">
-              Clientes
-            </h3>
-            <div style="font-size: 3rem; font-weight: var(--font-weight-bold); color: var(--color-warning); margin: var(--space-md) 0; line-height: 1;">
-              {{ client_count }}
-            </div>
+        {# Clients #}
+        <a href="{{ url_for('users.list_users', role='client') }}" class="card stat-card">
+          <div class="stat-card-body">
+            <div class="stat-icon color-warning">🏢</div>
+            <h3 class="stat-title">Clientes</h3>
+            <div class="stat-value color-warning">{{ client_count }}</div>
           </div>
         </a>
 
       </div>
     </section>
 
-    {# ============================================
-         planning MANAGEMENT ACTIONS
-         ============================================ #}
-    <section style="margin-bottom: var(--space-2xl);">
-      <h2 style="margin-bottom: var(--space-lg); color: var(--color-text-primary); display: flex; align-items: center; gap: var(--space-sm);">
+    {# PLANNING MANAGEMENT #}
+    <section class="admin-section">
+      <h2 class="section-title">
         <span>📅</span> Gestión de Planificaciones
       </h2>
       
       <div class="card">
-        <div class="card-body" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--space-md);">
-          {# FIX: Link to the resource create endpoint #}
-          <a href="{{ url_for('plannings.create_planning') }}" class="btn btn-primary btn-lg" style="justify-content: center;">
-            <span style="margin-right: var(--space-sm);">+</span> Crear Nueva Planificación
+        <div class="card-body actions-grid">
+          <a href="{{ url_for('plannings.create_planning') }}" class="btn btn-primary btn-lg action-btn">
+            <span class="btn-icon">+</span> Crear Nueva Planificación
           </a>
-          {# FIX: Link to the resource list endpoint #}
-          <a href="{{ url_for('plannings.list_plannings') }}" class="btn btn-secondary btn-lg" style="justify-content: center;">
-            <span style="margin-right: var(--space-sm);">📋</span> Ver Planificaciones
+          <a href="{{ url_for('plannings.list_plannings') }}" class="btn btn-secondary btn-lg action-btn">
+            <span class="btn-icon">📋</span> Ver Planificaciones
           </a>
         </div>
       </div>
     </section>
     
-    {# ============================================
-         USER MANAGEMENT ACTIONS
-         ============================================ #}
+    {# USER MANAGEMENT #}
     <section>
-      <h2 style="margin-bottom: var(--space-lg); color: var(--color-text-primary); display: flex; align-items: center; gap: var(--space-sm);">
+      <h2 class="section-title">
         <span>👤</span> Gestión de Usuarios
       </h2>
       
       <div class="card">
-        <div class="card-body" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--space-md);">
-          {# FIX: Link to the agnostic user create endpoint #}
-          <a href="{{ url_for('users.create_user') }}" class="btn btn-primary btn-lg" style="justify-content: center;">
-            <span style="margin-right: var(--space-sm);">+</span> Crear Nuevo Usuario
+        <div class="card-body actions-grid">
+          <a href="{{ url_for('users.create_user') }}" class="btn btn-primary btn-lg action-btn">
+            <span class="btn-icon">+</span> Crear Nuevo Usuario
           </a>
-          {# FIX: Link to the agnostic user list endpoint #}
-          <a href="{{ url_for('users.list_users') }}" class="btn btn-secondary btn-lg" style="justify-content: center;">
-            <span style="margin-right: var(--space-sm);">👥</span> Ver Todos los Usuarios
+          <a href="{{ url_for('users.list_users') }}" class="btn btn-secondary btn-lg action-btn">
+            <span class="btn-icon">👥</span> Ver Todos los Usuarios
           </a>
         </div>
       </div>
     </section>
 
   </div>
+{% endblock %}
+
+{% block extra_js %}
+  {# NEW: Module-specific JS #}
+  <script src="{{ url_for('static', filename='js/admin/index.js') }}"></script>
 {% endblock %}

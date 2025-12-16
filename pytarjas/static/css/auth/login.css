@@ -1,0 +1,72 @@
+/* pytarjas/static/css/auth/login.css */
+
+/* --- LAYOUT --- */
+.login-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 80vh;
+    padding: var(--space-lg);
+}
+
+.login-card {
+    max-width: 450px;
+    width: 100%;
+    margin-bottom: var(--space-xl);
+}
+
+/* --- CARD HEADER --- */
+.login-header {
+    text-align: center;
+    padding: var(--space-xl);
+}
+
+.login-logo {
+    height: 60px;
+    margin-bottom: var(--space-md);
+}
+
+.login-title {
+    margin-bottom: var(--space-xs);
+}
+
+/* --- CARD BODY --- */
+.login-form-group-last {
+    margin-bottom: 0;
+}
+
+/* --- CARD FOOTER --- */
+.login-footer {
+    text-align: center;
+}
+
+.forgot-password-link {
+    color: var(--color-primary);
+    font-weight: var(--font-weight-medium);
+}
+
+/* --- PWA INFO SECTION --- */
+.pwa-container {
+    margin-top: var(--space-xl);
+    margin-bottom: var(--space-2xl);
+}
+
+.features-list {
+    margin-top: var(--space-lg);
+}
+
+.features-title {
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--space-md);
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.feature-icon {
+    font-size: var(--font-size-xl);
+}

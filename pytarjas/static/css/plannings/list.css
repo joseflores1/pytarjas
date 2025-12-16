@@ -1,0 +1,43 @@
+/* pytarjas/static/css/plannings/list.css */
+
+/* --- EMPTY STATE / CONSTRUCTION --- */
+.planning-empty-card {
+    text-align: center;
+    padding: var(--space-3xl);
+}
+
+.planning-empty-icon {
+    font-size: 5rem;
+    margin-bottom: var(--space-lg);
+    opacity: 0.3;
+}
+
+.planning-title {
+    font-size: var(--font-size-2xl);
+    margin-bottom: var(--space-sm);
+    font-weight: var(--font-weight-bold);
+}
+
+.planning-subtitle {
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--space-xl);
+    color: var(--color-text-secondary);
+}
+
+.planning-status-box {
+    margin-top: var(--space-xl);
+    padding: var(--space-md);
+    background-color: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+}
+
+.planning-status-text {
+    color: var(--color-text-primary);
+    font-size: var(--font-size-lg);
+}
+
+.planning-count {
+    color: var(--color-primary);
+    font-weight: bold;
+}

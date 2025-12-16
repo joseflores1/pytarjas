@@ -1,21 +1,12 @@
 {# pytarjas/templates/users/create_users.html #}
-{#
-Create User Page - Moved to agnostic /users/ resource folder
-
-Updates:
-- Implemented global 'showConfirm' modal for Cancel action
-- Added form change tracking to prevent accidental data loss
-- REMOVED ability to create 'admin' user from the form
-- UPDATED username validation to allow spaces and Latin characters (tildes)
-- FIXED: All links now point to the correct users.list_users endpoint.
-#}
-
 {% extends 'base.html' %}
 
 {% block title %}Crear Usuario{% endblock %}
 
 {% block extra_css %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+  {# NEW: Module-specific CSS #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/users/create.css') }}">
 {% endblock %}
 
 {% block header %}
@@ -27,7 +18,6 @@ Updates:
           Complete los datos del nuevo usuario del sistema
         </p>
       </div>
-      {# FIX: Link to users.list_users #}
       <a href="{{ url_for('users.list_users') }}" class="btn btn-secondary" id="headerBackBtn">
         ← Volver al Listado
       </a>
@@ -46,7 +36,6 @@ Updates:
       </div>
       
       <div class="card-body">
-        {# FIX: Action should point to users.create_user (which defaults to /users/create) #}
         <form method="POST" action="{{ url_for('users.create_user') }}" id="createUserForm" autocomplete="off">
           
           {# USERNAME #}
@@ -100,7 +89,6 @@ Updates:
             </label>
             <select name="role" id="role" class="form-select" required>
               <option value="" selected disabled>-- Seleccione un Rol --</option>
-              {# Removed Admin option for security #}
               <option value="worker">🔧 Trabajador</option>
               <option value="planner">📋 Planificador</option>
               <option value="client">🏢 Cliente</option>
@@ -126,9 +114,12 @@ Updates:
                 autocomplete="new-password"
                 required
                 minlength="8">
+              
+              {# REMOVED onclick, added class and data-target for JS #}
               <button 
                 type="button" 
-                onclick="togglePasswordVisibility('password')"
+                class="toggle-password-btn"
+                data-target="password"
                 style="position: absolute; right: var(--space-md); top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: var(--space-xs); color: var(--color-text-secondary);"
                 title="Mostrar/Ocultar contraseña">
                 <span id="password-toggle-icon">👁️</span>
@@ -166,9 +157,12 @@ Updates:
                 autocomplete="new-password"
                 required
                 minlength="8">
+              
+              {# REMOVED onclick, added class and data-target for JS #}
               <button 
                 type="button" 
-                onclick="togglePasswordVisibility('password_confirm')"
+                class="toggle-password-btn"
+                data-target="password_confirm"
                 style="position: absolute; right: var(--space-md); top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: var(--space-xs); color: var(--color-text-secondary);"
                 title="Mostrar/Ocultar contraseña">
                 <span id="password_confirm-toggle-icon">👁️</span>
@@ -183,7 +177,6 @@ Updates:
             <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
               ✅ Crear Usuario
             </button>
-            {# FIX: Link to users.list_users #}
             <a href="{{ url_for('users.list_users') }}" class="btn btn-secondary btn-lg" id="cancelBtn">
               Cancelar
             </a>
@@ -233,223 +226,9 @@ Updates:
     </div>
     
   </div>
+{% endblock %}
 
-  <style>
-    .strength-bar {
-      height: 4px;
-      flex: 1;
-      background-color: var(--color-bg-tertiary);
-      border-radius: var(--radius-sm);
-      transition: background-color var(--transition-fast);
-    }
-    .strength-bar.active-weak { background-color: var(--color-danger); }
-    .strength-bar.active-fair { background-color: #f59e0b; }
-    .strength-bar.active-good { background-color: #3b82f6; }
-    .strength-bar.active-strong { background-color: var(--color-secondary); }
-  </style>
-
-  <script>
-    let formChanged = false;
-
-    // Track changes
-    document.getElementById('createUserForm').addEventListener('input', function() {
-      formChanged = true;
-    });
-
-    // --- HANDLE CANCEL WITH MODAL ---
-    function handleCancel(e) {
-      e.preventDefault();
-      const targetUrl = this.href;
-      
-      if (formChanged) {
-        showConfirm(
-          'Ha ingresado datos para el nuevo usuario. ¿Desea salir y perder estos datos?',
-          () => {
-            formChanged = false; // Bypass check
-            window.location.href = targetUrl;
-          },
-          'Descartar Usuario',
-          'Sí, salir',
-          'danger'
-        );
-      } else {
-        window.location.href = targetUrl;
-      }
-    }
-
-    document.getElementById('cancelBtn').addEventListener('click', handleCancel);
-    document.getElementById('headerBackBtn').addEventListener('click', handleCancel);
-
-    // Browser native fallback
-    window.addEventListener('beforeunload', function(e) {
-      if (formChanged) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    });
-
-    // --- EXISTING FORM LOGIC ---
-    function togglePasswordVisibility(fieldId) {
-      const field = document.getElementById(fieldId);
-      const icon = document.getElementById(fieldId + '-toggle-icon');
-      if (field.type === 'password') {
-        field.type = 'text';
-        icon.textContent = '🙈';
-      } else {
-        field.type = 'password';
-        icon.textContent = '👁️';
-      }
-    }
-
-    function calculatePasswordStrength(password) {
-      let strength = 0;
-      if (password.length >= 8) strength++;
-      if (password.length >= 12) strength++;
-      if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
-      if (/\d/.test(password)) strength++;
-      if (/[^a-zA-Z\d]/.test(password)) strength++;
-      return Math.min(strength, 4);
-    }
-
-    function updatePasswordStrength() {
-      const password = document.getElementById('password').value;
-      const strengthDiv = document.getElementById('password-strength');
-      const strengthText = document.getElementById('strength-text');
-      
-      if (password.length === 0) {
-        strengthDiv.style.display = 'none';
-        return;
-      }
-      
-      strengthDiv.style.display = 'block';
-      const strength = calculatePasswordStrength(password);
-      
-      for (let i = 1; i <= 4; i++) {
-        document.getElementById('strength-bar-' + i).className = 'strength-bar';
-      }
-      
-      const levels = ['weak', 'fair', 'good', 'strong'];
-      const texts = ['Débil', 'Aceptable', 'Buena', 'Fuerte'];
-      const colors = ['var(--color-danger)', '#f59e0b', '#3b82f6', 'var(--color-secondary)'];
-      
-      for (let i = 1; i <= strength; i++) {
-        document.getElementById('strength-bar-' + i).classList.add('active-' + levels[strength - 1]);
-      }
-      
-      strengthText.textContent = 'Fortaleza: ' + texts[strength - 1];
-      strengthText.style.color = colors[strength - 1];
-    }
-
-    function checkPasswordMatch() {
-      const password = document.getElementById('password').value;
-      const confirm = document.getElementById('password_confirm').value;
-      const matchMessage = document.getElementById('password-match-message');
-      
-      if (confirm === '') {
-        matchMessage.textContent = '';
-        matchMessage.style.color = '';
-        return;
-      }
-      
-      if (password === confirm) {
-        matchMessage.textContent = '✓ Las contraseñas coinciden';
-        matchMessage.style.color = 'var(--color-secondary)';
-      } else {
-        matchMessage.textContent = '✗ Las contraseñas no coinciden';
-        matchMessage.style.color = 'var(--color-danger)';
-      }
-    }
-
-    function validateUsername() {
-      const username = document.getElementById('username');
-      const feedback = document.getElementById('username-feedback');
-      // Updated regex to match the new HTML pattern: [a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s_-]+
-      const pattern = /^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s_-]+$/;
-      
-      if (username.value.length > 0 && !pattern.test(username.value)) {
-        username.classList.add('is-invalid');
-        feedback.textContent = 'Solo se permiten letras, números, espacios, guiones y guiones bajos (incluye tildes)';
-        return false;
-      } else if (username.value.length > 0 && username.value.length < 3) {
-        username.classList.add('is-invalid');
-        feedback.textContent = 'Mínimo 3 caracteres';
-        return false;
-      } else {
-        username.classList.remove('is-invalid');
-        feedback.textContent = '';
-        return true;
-      }
-    }
-
-    function validateEmail() {
-      const email = document.getElementById('email');
-      const feedback = document.getElementById('email-feedback');
-      const pattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      
-      if (email.value.length > 0 && !pattern.test(email.value)) {
-        email.classList.add('is-invalid');
-        feedback.textContent = 'Ingrese un correo electrónico válido';
-        return false;
-      } else {
-        email.classList.remove('is-invalid');
-        feedback.textContent = '';
-        return true;
-      }
-    }
-
-    document.getElementById('password').addEventListener('input', function() {
-      updatePasswordStrength();
-      checkPasswordMatch();
-    });
-    document.getElementById('password_confirm').addEventListener('input', checkPasswordMatch);
-    document.getElementById('username').addEventListener('input', validateUsername);
-    document.getElementById('email').addEventListener('input', validateEmail);
-
-    document.getElementById('createUserForm').addEventListener('submit', function(e) {
-      const username = document.getElementById('username').value;
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-      const confirm = document.getElementById('password_confirm').value;
-      const role = document.getElementById('role').value;
-      
-      let isValid = true;
-      
-      if (username.trim() === '' || !validateUsername()) {
-        document.getElementById('username').classList.add('is-invalid');
-        isValid = false;
-      }
-      if (email.trim() === '' || !validateEmail()) {
-        document.getElementById('email').classList.add('is-invalid');
-        isValid = false;
-      }
-      if (role === '') {
-        document.getElementById('role').classList.add('is-invalid');
-        isValid = false;
-      }
-      if (password.length < 8) {
-        document.getElementById('password').classList.add('is-invalid');
-        document.getElementById('password-feedback').textContent = 'La contraseña debe tener al menos 8 caracteres';
-        isValid = false;
-      }
-      if (password !== confirm) {
-        document.getElementById('password_confirm').classList.add('is-invalid');
-        document.getElementById('password-confirm-feedback').textContent = 'Las contraseñas no coinciden';
-        isValid = false;
-      }
-      
-      if (!isValid) {
-        e.preventDefault();
-        alert('Por favor, corrija los errores en el formulario antes de continuar.');
-        return false;
-      }
-      
-      // Submit successful - disable flag
-      formChanged = false;
-      
-      const submitBtn = document.getElementById('submitBtn');
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '⏳ Creando Usuario...';
-      submitBtn.classList.add('btn-loading');
-    });
-  </script>
+{% block extra_js %}
+  {# NEW: Module-specific JS #}
+  <script src="{{ url_for('static', filename='js/users/create.js') }}"></script>
 {% endblock %}

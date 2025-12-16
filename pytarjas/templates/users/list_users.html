@@ -1,27 +1,17 @@
-{#
-List Users Page
-
-Updates:
-- Template moved from 'admin/' folder to 'users/' resource folder.
-- FIXED: All internal links now use the agnostic 'users' blueprint (e.g., users.list_users).
-- Implemented global 'showConfirm' modal for Delete User action
-- Replaced native browser alerts
-- FIX CRÍTICO: Moved table styling to external file (users_list.css) to fix FOUC and IDE errors.
-#}
-
+{# pytarjas/templates/users/list_users.html #}
 {% extends 'base.html' %}
 
 {% block title %}Gestión de Usuarios{% endblock %}
 
 {% block extra_css %}
-{# Link to external CSS file to prevent IDE/Linter parser errors and ensure clean HTML #}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/users_list.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+  {# NEW: Module-specific CSS #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/users/list.css') }}">
 {% endblock %}
-
 
 {% block header %}
   <div class="container">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-md); margin-top: var(--space-lg); margin-bottom: var(--space-lg);">
+    <div class="page-header-container">
       <div>
         <h1 style="margin-bottom: var(--space-xs);">Gestión de Usuarios</h1>
         <p style="color: var(--color-text-secondary); margin-bottom: 0;">
@@ -32,7 +22,6 @@ Updates:
           {% endif %}
         </p>
       </div>
-      {# FIX: Use users.create_user #}
       <a href="{{ url_for('users.create_user') }}" class="btn btn-primary btn-lg">
         + Crear Nuevo Usuario
       </a>
@@ -44,124 +33,83 @@ Updates:
   <div class="container">
     
     {# ROLE FILTERS #}
-    <div style="margin-bottom: var(--space-xl);">
-      <div style="display: flex; flex-wrap: wrap; gap: var(--space-sm);">
-        
-        {# FIX: Use users.list_users #}
+    <div class="filters-container">
+      <div class="filters-wrapper">
         <a href="{{ url_for('users.list_users') }}" 
            class="btn {% if not role_filter %}btn-primary{% else %}btn-secondary{% endif %}"
            style="min-width: 120px;">
-          <span style="margin-right: var(--space-xs);">👥</span>
-          Todos
+          <span style="margin-right: var(--space-xs);">👥</span> Todos
         </a>
-        
-        {# FIX: Use users.list_users #}
         <a href="{{ url_for('users.list_users', role='admin') }}" 
            class="btn {% if role_filter == 'admin' %}btn-primary{% else %}btn-secondary{% endif %}"
            style="min-width: 120px;">
-          <span style="margin-right: var(--space-xs);">👑</span>
-          Administradores
+          <span style="margin-right: var(--space-xs);">👑</span> Administradores
         </a>
-        
-        {# FIX: Use users.list_users #}
         <a href="{{ url_for('users.list_users', role='worker') }}" 
            class="btn {% if role_filter == 'worker' %}btn-primary{% else %}btn-secondary{% endif %}"
            style="min-width: 120px;">
-          <span style="margin-right: var(--space-xs);">🔧</span>
-          Trabajadores
+          <span style="margin-right: var(--space-xs);">🔧</span> Trabajadores
         </a>
-        
-        {# FIX: Use users.list_users #}
         <a href="{{ url_for('users.list_users', role='planner') }}" 
            class="btn {% if role_filter == 'planner' %}btn-primary{% else %}btn-secondary{% endif %}"
            style="min-width: 120px;">
-          <span style="margin-right: var(--space-xs);">📋</span>
-          Planificadores
+          <span style="margin-right: var(--space-xs);">📋</span> Planificadores
         </a>
-        
-        {# FIX: Use users.list_users #}
         <a href="{{ url_for('users.list_users', role='client') }}" 
            class="btn {% if role_filter == 'client' %}btn-primary{% else %}btn-secondary{% endif %}"
            style="min-width: 120px;">
-          <span style="margin-right: var(--space-xs);">🏢</span>
-          Clientes
+          <span style="margin-right: var(--space-xs);">🏢</span> Clientes
         </a>
-        
       </div>
     </div>
     
     {# USERS TABLE #}
     {% if users %}
       
-      <div class="card" style="overflow-x: auto;">
-        <table style="width: 100%; border-collapse: collapse;">
+      <div class="card users-table-card">
+        <table class="users-table">
           <thead>
-            <tr style="background-color: var(--color-bg-secondary); border-bottom: 2px solid var(--color-border);">
-              <th style="padding: var(--space-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-text-primary); white-space: nowrap;">
-                Usuario
-              </th>
-              <th style="padding: var(--space-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-text-primary); white-space: nowrap;">
-                Email
-              </th>
-              <th style="padding: var(--space-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-text-primary); white-space: nowrap;">
-                Rol
-              </th>
-              <th style="padding: var(--space-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-text-primary); white-space: nowrap;">
-                Creado
-              </th>
-              <th style="padding: var(--space-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-text-primary); white-space: nowrap;">
-                Último Login
-              </th>
-              <th style="padding: var(--space-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-text-primary); white-space: nowrap;">
-                Última Actualización
-              </th>
-              <th style="padding: var(--space-md); text-align: center; font-weight: var(--font-weight-semibold); color: var(--color-text-primary); white-space: nowrap;">
-                Acciones
-              </th>
+            <tr>
+              <th>Usuario</th>
+              <th>Email</th>
+              <th>Rol</th>
+              <th>Creado</th>
+              <th>Último Login</th>
+              <th>Última Actualización</th>
+              <th class="actions-col">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {% for user in users %}
-            <tr style="border-bottom: 1px solid var(--color-border); transition: background-color var(--transition-fast);"
-                onmouseover="this.style.backgroundColor='var(--color-bg-secondary)'"
-                onmouseout="this.style.backgroundColor='transparent'">
-              
-              <td style="padding: var(--space-md); color: var(--color-text-primary); font-weight: var(--font-weight-medium);">
+            <tr>
+              <td class="user-name-cell">
                 {{ user.username }}
                 {% if user.id == g.user.id %}
                   <span class="badge badge-info" style="margin-left: var(--space-xs);">Tú</span>
                 {% endif %}
               </td>
               
-              <td style="padding: var(--space-md); color: var(--color-text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis;">
+              <td class="user-email-cell">
                 {{ user.email }}
               </td>
               
-              <td style="padding: var(--space-md);">
+              <td>
                 {% if user.role == 'admin' %}
-                  <span class="badge badge-danger" style="display: inline-flex; align-items: center; gap: var(--space-xs);">
-                    <span>👑</span> Admin
-                  </span>
+                  <span class="badge badge-danger role-badge"><span>👑</span> Admin</span>
                 {% elif user.role == 'worker' %}
-                  <span class="badge badge-success" style="display: inline-flex; align-items: center; gap: var(--space-xs);">
-                    <span>🔧</span> Worker
-                  </span>
+                  <span class="badge badge-success role-badge"><span>🔧</span> Worker</span>
                 {% elif user.role == 'planner' %}
-                  <span class="badge" style="display: inline-flex; align-items: center; gap: var(--space-xs); background-color: #8b5cf6; color: white;">
-                    <span>📋</span> Planner
-                  </span>
+                  <span class="badge role-badge role-planner"><span>📋</span> Planner</span>
                 {% elif user.role == 'client' %}
-                  <span class="badge badge-warning" style="display: inline-flex; align-items: center; gap: var(--space-xs);">
-                    <span>🏢</span> Client
-                  </span>
+                  <span class="badge badge-warning role-badge"><span>🏢</span> Client</span>
                 {% endif %}
               </td>
               
-              <td style="padding: var(--space-md); color: var(--color-text-secondary); font-size: var(--font-size-sm); white-space: nowrap;">
+              <td class="date-cell">
                 {{ user.created_at.strftime('%d/%m/%Y') if user.created_at else 'N/A' }}
               </td>
               
-              <td style="padding: var(--space-md); color: var(--color-text-secondary); font-size: var(--font-size-sm); white-space: nowrap;">
+              <td class="date-cell">
                 {% if user.login_at %}
                   {{ user.login_at.strftime('%d/%m/%Y %H:%M') }}
                 {% else %}
@@ -169,7 +117,7 @@ Updates:
                 {% endif %}
               </td>
               
-              <td style="padding: var(--space-md); color: var(--color-text-secondary); font-size: var(--font-size-sm); white-space: nowrap;">
+              <td class="date-cell">
                 {% if user.updated_at %}
                   {{ user.updated_at.strftime('%d/%m/%Y %H:%M') }}
                 {% else %}
@@ -177,10 +125,8 @@ Updates:
                 {% endif %}
               </td>
               
-              <td style="padding: var(--space-md); text-align: center;">
-                <div style="display: flex; gap: var(--space-sm); justify-content: center; flex-wrap: wrap;">
-                  
-                  {# FIX: Use users.edit_user #}
+              <td class="actions-cell">
+                <div class="actions-wrapper">
                   <a href="{{ url_for('users.edit_user', user_id=user.id) }}" 
                      class="btn btn-sm btn-secondary"
                      title="Editar usuario">
@@ -188,7 +134,6 @@ Updates:
                   </a>
                   
                   {% if user.id != g.user.id %}
-                    {# FIX: Use users.delete_user #}
                     <form method="POST" 
                           action="{{ url_for('users.delete_user', user_id=user.id) }}" 
                           style="display: inline;"
@@ -209,10 +154,8 @@ Updates:
                       🔒 Eliminar
                     </button>
                   {% endif %}
-                  
                 </div>
               </td>
-              
             </tr>
             {% endfor %}
           </tbody>
@@ -228,10 +171,8 @@ Updates:
     {% else %}
       
       <div class="card">
-        <div class="card-body" style="text-align: center; padding: var(--space-2xl);">
-          <div style="font-size: 4rem; margin-bottom: var(--space-lg); opacity: 0.3;">
-            👤
-          </div>
+        <div class="card-body empty-state">
+          <div class="empty-icon">👤</div>
           <h3 style="color: var(--color-text-primary); margin-bottom: var(--space-sm);">
             No se encontraron usuarios
           </h3>
@@ -244,12 +185,10 @@ Updates:
           </p>
           
           {% if role_filter %}
-            {# FIX: Use users.list_users #}
             <a href="{{ url_for('users.list_users') }}" class="btn btn-secondary">
               Ver Todos los Usuarios
             </a>
           {% else %}
-            {# FIX: Use users.create_user #}
             <a href="{{ url_for('users.create_user') }}" class="btn btn-primary">
               + Crear Primer Usuario
             </a>
@@ -260,48 +199,9 @@ Updates:
     {% endif %}
     
   </div>
-
 {% endblock %}
 
 {% block extra_js %}
-  <script>
-    // Handle Delete Confirmation with custom modal
-    document.querySelectorAll('.delete-user-form').forEach(form => {
-      form.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const username = this.dataset.username;
-        
-        showConfirm(
-          `¿Está seguro que desea eliminar al usuario "${username}"?\n\nEsta acción no se puede deshacer y eliminará todos los datos asociados.`,
-          () => {
-            this.submit();
-          },
-          'Eliminar Usuario',
-          'Sí, eliminar',
-          'danger'
-        );
-      });
-    });
-
-    // Keyboard shortcuts
-    document.addEventListener('keydown', function(e) {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
-        e.preventDefault();
-        // FIX: Use users.create_user
-        window.location.href = "{{ url_for('users.create_user') }}";
-      }
-    });
-
-    // Highlight current user row
-    document.addEventListener('DOMContentLoaded', function() {
-      const currentUserBadges = document.querySelectorAll('.badge-info');
-      currentUserBadges.forEach(function(badge) {
-        const row = badge.closest('tr');
-        if (row) {
-          row.style.backgroundColor = 'var(--color-primary-light)';
-          row.style.border = '2px solid var(--color-primary)';
-        }
-      });
-    });
-  </script>
+  {# NEW: Module-specific JS #}
+  <script src="{{ url_for('static', filename='js/users/list.js') }}"></script>
 {% endblock %}

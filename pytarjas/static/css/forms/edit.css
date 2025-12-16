@@ -1,0 +1,89 @@
+/* pytarjas/static/css/forms/edit.css */
+
+.question-card {
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
+  background-color: var(--color-bg-primary);
+  transition: all var(--transition-fast);
+}
+
+.question-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.question-card.collapsed {
+  padding: var(--space-md);
+}
+
+.question-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.question-body {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+}
+
+.question-card.collapsed .question-body {
+  display: none;
+}
+
+.drag-handle {
+  cursor: grab;
+  padding: var(--space-sm);
+  color: var(--color-text-tertiary);
+  font-size: 1.2rem;
+}
+
+.delete-question-btn {
+  opacity: 0.7;
+  transition: opacity var(--transition-fast);
+}
+
+.delete-question-btn:hover {
+  opacity: 1;
+}
+
+/* Styles for Choices Management */
+.choices-container {
+  background-color: var(--color-bg-tertiary);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  margin-top: var(--space-sm);
+  border: 1px solid var(--color-border);
+  grid-column: 1 / -1;
+}
+
+.raw-options-wrapper {
+  grid-column: 1 / -1;
+}
+
+/* Helper utility for hiding elements (used by JS) */
+.hidden {
+    display: none !important;
+}
+
+.choice-item {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  align-items: center;
+}
+
+.choice-item:last-child {
+  margin-bottom: 0;
+}
+
+/* Style for Move Buttons */
+.move-up-btn, .move-down-btn {
+  padding: 0.5rem 0.6rem;
+  min-height: 36px;
+}

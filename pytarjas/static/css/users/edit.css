@@ -1,0 +1,35 @@
+/* pytarjas/static/css/users/edit.css */
+
+/* --- LAYOUT OVERRIDES --- */
+.form-group { margin-bottom: var(--space-lg); }
+.form-row { display: flex; gap: var(--space-lg); }
+.form-row > * { flex: 1; }
+.card-content-override { padding: var(--space-2xl) !important; }
+
+/* --- RESPONSIVE --- */
+@media (max-width: 600px) {
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+}
+
+/* --- ALERT WARNING (Theme-aware) --- */
+.alert-warning { 
+    padding: var(--space-md); 
+    border-radius: var(--radius-md); 
+    margin-bottom: var(--space-lg); 
+    font-weight: var(--font-weight-semibold);
+
+    /* Light Mode Default */
+    background-color: #ffda79; 
+    color: #724300;           
+    border: 1px solid #ffbe0b;
+}
+
+[data-theme="dark"] .alert-warning {
+    /* Dark Mode Override */
+    background-color: #ff9f00; 
+    color: var(--color-text-primary);
+    border-color: #f7a73a;
+}

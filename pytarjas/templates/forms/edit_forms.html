@@ -1,102 +1,12 @@
-{# pytarjas/templates/forms/edit_form.html #}
-{#
-Edit Form Page
-
-Updates:
-- Implemented global 'showConfirm' modal for Cancel and Delete actions
-- Replaced native browser alerts
-- REMOVED 'seal_verification' form type option.
-- UPDATED: Replaced Order input with quick-reorder dropdown and move buttons.
-#}
-
+{# pytarjas/templates/forms/edit_forms.html #}
 {% extends 'base.html' %}
 
 {% block title %}Editar Formulario{% endblock %}
 
 {% block extra_css %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
-  <style>
-    /* Question card styling */
-    .question-card {
-      border: 2px solid var(--color-border);
-      border-radius: var(--radius-md);
-      padding: var(--space-lg);
-      margin-bottom: var(--space-md);
-      background-color: var(--color-bg-primary);
-      transition: all var(--transition-fast);
-    }
-    
-    .question-card:hover {
-      border-color: var(--color-primary);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-    
-    .question-card.collapsed {
-      padding: var(--space-md);
-    }
-    
-    .question-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      cursor: pointer;
-      user-select: none;
-    }
-    
-    .question-body {
-      margin-top: var(--space-lg);
-      padding-top: var(--space-lg);
-      border-top: 1px solid var(--color-border);
-    }
-    
-    .question-card.collapsed .question-body {
-      display: none;
-    }
-    
-    .drag-handle {
-      cursor: grab;
-      padding: var(--space-sm);
-      color: var(--color-text-tertiary);
-      font-size: 1.2rem;
-    }
-    
-    .delete-question-btn {
-      opacity: 0.7;
-      transition: opacity var(--transition-fast);
-    }
-    
-    .delete-question-btn:hover {
-      opacity: 1;
-    }
-
-    /* Styles for Choices Management */
-    .choices-container {
-      background-color: var(--color-bg-tertiary);
-      padding: var(--space-md);
-      border-radius: var(--radius-md);
-      margin-top: var(--space-sm);
-      border: 1px solid var(--color-border);
-      grid-column: 1 / -1; /* Full width in grid */
-    }
-
-    /* Wrapper for the raw JSON textarea */
-    .raw-options-wrapper {
-      grid-column: 1 / -1; /* Full width in grid */
-    }
-
-    .choice-item {
-      display: flex;
-      gap: var(--space-sm);
-      margin-bottom: var(--space-sm);
-      align-items: center;
-    }
-    
-    /* Style for Move Buttons */
-    .move-up-btn, .move-down-btn {
-      padding: 0.5rem 0.6rem;
-      min-height: 36px;
-    }
-  </style>
+  {# NEW: Module-specific CSS #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/forms/edit.css') }}">
 {% endblock %}
 
 {% block header %}
@@ -181,8 +91,8 @@ Updates:
               {% for question in form.questions|sort(attribute='order') %}
                 <div class="question-card" data-question-id="{{ question.id }}">
                   
-                  {# Header #}
-                  <div class="question-header" onclick="toggleQuestionCard(this)">
+                  {# Header (Handlers in JS via Delegation) #}
+                  <div class="question-header">
                     <div style="display: flex; align-items: center; gap: var(--space-md); flex: 1;">
                       <span class="drag-handle">☰</span>
                       <div style="flex: 1;">
@@ -195,7 +105,7 @@ Updates:
                       </div>
                       <span class="badge badge-info">{{ question.question_type }}</span>
                     </div>
-                    <button type="button" class="btn btn-sm btn-ghost delete-question-btn" onclick="deleteQuestion(event, '{{ question.id }}')">🗑️</button>
+                    <button type="button" class="btn btn-sm btn-ghost delete-question-btn">🗑️</button>
                   </div>
                   
                   {# Body #}
@@ -209,7 +119,6 @@ Updates:
                         <input type="text" name="question_text_{{ question.id }}" class="form-control" value="{{ question.question_text }}" required>
                       </div>
 
-                      {# NEW FIELD: Description #}
                       <div class="form-group" style="grid-column: 1 / -1;">
                         <label class="form-label">Descripción de la Pregunta (Opcional)</label>
                         <textarea name="question_description_{{ question.id }}" class="form-control" rows="2" placeholder="Ej: Registrar el valor del sello que se encuentra en la puerta.">{{ question.question_description or '' }}</textarea>
@@ -218,7 +127,7 @@ Updates:
                       
                       <div class="form-group">
                         <label class="form-label">Tipo <span style="color: var(--color-danger);">*</span></label>
-                        <select name="question_type_{{ question.id }}" class="form-control" required onchange="toggleChoicesSection(this, '{{ question.id }}')">
+                        <select name="question_type_{{ question.id }}" class="form-control" required>
                           <option value="text" {% if question.question_type == 'text' %}selected{% endif %}>📝 Texto Corto</option>
                           <option value="textarea" {% if question.question_type == 'textarea' %}selected{% endif %}>📄 Texto Largo</option>
                           <option value="number" {% if question.question_type == 'number' %}selected{% endif %}>🔢 Número</option>
@@ -236,10 +145,9 @@ Updates:
                         <label class="form-label">Orden</label>
                         <div style="display: flex; gap: var(--space-sm); align-items: center;">
                           <input type="hidden" name="question_order_{{ question.id }}" class="question-order-input" value="{{ loop.index }}" required min="1">
-                          <select name="question_new_order_{{ question.id }}" class="form-control form-control-sm reorder-select" onchange="handleQuickReorder(this)">
-                            </select>
-                          <button type="button" class="btn btn-sm btn-secondary move-up-btn" onclick="moveQuestion('{{ question.id }}', -1)" title="Mover Arriba">▲</button>
-                          <button type="button" class="btn btn-sm btn-secondary move-down-btn" onclick="moveQuestion('{{ question.id }}', 1)" title="Mover Abajo">▼</button>
+                          <select name="question_new_order_{{ question.id }}" class="form-control form-control-sm reorder-select"></select>
+                          <button type="button" class="btn btn-sm btn-secondary move-up-btn" title="Mover Arriba">▲</button>
+                          <button type="button" class="btn btn-sm btn-secondary move-down-btn" title="Mover Abajo">▼</button>
                         </div>
                       </div>
                       
@@ -250,9 +158,9 @@ Updates:
                         </label>
                       </div>
                       
-                      {# Visual Choices Builder - Toggled via class #}
+                      {# Choices Builder #}
                       <div id="choices_container_{{ question.id }}" 
-                           class="choices-container {% if question.question_type != 'select' %}hidden{% endif %}">
+                           class="choices-container hidden">
                         <label class="form-label">Opciones de Selección <span style="color: var(--color-danger);">*</span></label>
                         <div id="choices_list_{{ question.id }}">
                           {% if question.question_type == 'select' and question.options and question.options.choices %}
@@ -260,19 +168,18 @@ Updates:
                               <div class="choice-item">
                                 <span style="color: var(--color-text-tertiary);">•</span>
                                 <input type="text" class="form-control form-control-sm choice-input" value="{{ choice }}" required>
-                                <button type="button" class="btn btn-sm btn-ghost text-danger" onclick="this.parentElement.remove()">🗑️</button>
+                                <button type="button" class="btn btn-sm btn-ghost text-danger remove-choice-btn">🗑️</button>
                               </div>
                             {% endfor %}
                           {% endif %}
                         </div>
-                        <button type="button" class="btn btn-sm btn-secondary" style="margin-top: var(--space-sm);" onclick="addChoiceInput('{{ question.id }}')">
+                        <button type="button" class="btn btn-sm btn-secondary add-choice-btn" style="margin-top: var(--space-sm);">
                           + Agregar Opción
                         </button>
                       </div>
 
-                      {# Raw JSON Options - Toggled via class #}
-                      <div class="form-group raw-options-wrapper {% if question.question_type == 'select' or question.question_type == 'client_select' %}hidden{% endif %}" 
-                           id="options_wrapper_{{ question.id }}">
+                      {# Raw JSON Options #}
+                      <div class="form-group raw-options-wrapper hidden" id="options_wrapper_{{ question.id }}">
                         <label class="form-label">Opciones Avanzadas (JSON)</label>
                         <textarea name="question_options_{{ question.id }}" class="form-control" rows="2" style="font-family: monospace;">{{ question.options|tojson if question.options else '' }}</textarea>
                       </div>
@@ -305,363 +212,6 @@ Updates:
 {% endblock %}
 
 {% block extra_js %}
-<script>
-  let formChanged = false;
-  let questionCounter = parseInt("{{ form.questions|length if form.questions else 0 }}");
-  
-  document.getElementById('editFormForm').addEventListener('input', () => formChanged = true);
-  
-  // Native browser check
-  window.addEventListener('beforeunload', (e) => {
-    if (formChanged) {
-      e.preventDefault();
-      e.returnValue = 'Cambios sin guardar.';
-    }
-  });
-
-  // Custom Modal for Cancel Actions
-  function handleCancel(e) {
-    e.preventDefault();
-    const targetUrl = this.href;
-    
-    if (formChanged) {
-      showConfirm(
-        'Tienes cambios sin guardar. ¿Seguro que deseas salir? Los cambios se perderán.',
-        () => {
-          formChanged = false; // Bypass beforeunload
-          window.location.href = targetUrl;
-        },
-        'Descartar Cambios',
-        'Sí, salir',
-        'danger'
-      );
-    } else {
-      window.location.href = targetUrl;
-    }
-  }
-  
-  document.getElementById('cancelButton').addEventListener('click', handleCancel);
-  document.getElementById('headerBackBtn').addEventListener('click', handleCancel);
-
-  function toggleQuestionCard(header) {
-    header.closest('.question-card').classList.toggle('collapsed');
-  }
-  
-  // --- CHOICE MANAGEMENT ---
-  function toggleChoicesSection(select, qId) {
-    const choicesContainer = document.getElementById(`choices_container_${qId}`);
-    const optionsWrapper = document.getElementById(`options_wrapper_${qId}`);
-    
-    if (select.value === 'select') {
-      choicesContainer.classList.remove('hidden');
-      optionsWrapper.classList.add('hidden');
-      
-      // If empty, add first choice input
-      if (document.getElementById(`choices_list_${qId}`).children.length === 0) {
-        addChoiceInput(qId);
-      }
-    } else if (select.value === 'client_select') {
-        // NEW LOGIC: Client select has no options configuration
-        choicesContainer.classList.add('hidden');
-        optionsWrapper.classList.add('hidden');
-    }
-    else {
-      choicesContainer.classList.add('hidden');
-      optionsWrapper.classList.remove('hidden');
-    }
-  }
-
-  function addChoiceInput(qId, value = '') {
-    const list = document.getElementById(`choices_list_${qId}`);
-    const div = document.createElement('div');
-    div.className = 'choice-item';
-    div.innerHTML = `
-      <span>•</span>
-      <input type="text" class="form-control form-control-sm choice-input" value="${value}" placeholder="Opción" required>
-      <button type="button" class="btn btn-sm btn-ghost text-danger" onclick="this.parentElement.remove()">🗑️</button>
-    `;
-    list.appendChild(div);
-  }
-
-  /**
-   * Generates options for the order select dropdown.
-   * @param {number} currentOrder - The current 1-based index of the question.
-   * @param {number} totalCount - The total number of questions.
-   * @returns {string} HTML string for options.
-   */
-  function populateOrderDropdown(currentOrder, totalCount) {
-      let options = '';
-      for (let i = 1; i <= totalCount; i++) {
-          options += `<option value="${i}" ${i === currentOrder ? 'selected' : ''}>#${i}</option>`;
-      }
-      return options;
-  }
-
-  /**
-   * Handles quick reordering via the select dropdown.
-   * @param {HTMLSelectElement} selectElement
-   */
-  function handleQuickReorder(selectElement) {
-      const newOrder = parseInt(selectElement.value);
-      const card = selectElement.closest('.question-card');
-      const container = document.getElementById('questionsContainer');
-      const cards = Array.from(container.querySelectorAll('.question-card'));
-      const currentOrder = cards.indexOf(card) + 1; // 1-based index
-      
-      if (newOrder === currentOrder) return;
-      
-      const targetIndex = newOrder - 1;
-      const targetCard = cards[targetIndex];
-      
-      if (newOrder > currentOrder) {
-          // Move Down: Insert current card after target card
-          targetCard.after(card);
-      } else {
-          // Move Up: Insert current card before target card
-          targetCard.before(card);
-      }
-
-      formChanged = true;
-      updateQuestionCount(); // Re-index all questions
-  }
-
-  /**
-   * Moves a question card up or down in the DOM and re-indexes all questions.
-   * @param {string} id The data-question-id of the card to move.
-   * @param {number} direction -1 to move up, 1 to move down.
-   */
-  function moveQuestion(id, direction) {
-    const currentCard = document.querySelector(`[data-question-id="${id}"]`);
-    if (!currentCard) return;
-
-    const container = document.getElementById('questionsContainer');
-    const cards = Array.from(container.querySelectorAll('.question-card'));
-    const currentIndex = cards.indexOf(currentCard);
-    
-    // Calculate new index
-    let newIndex = currentIndex + direction;
-
-    // Check bounds
-    if (newIndex < 0 || newIndex >= cards.length) {
-        return;
-    }
-
-    const targetCard = cards[newIndex];
-
-    // Swap the DOM elements
-    if (direction === -1) {
-        // Move Up: Insert current card before target card
-        container.insertBefore(currentCard, targetCard);
-    } else if (direction === 1) {
-        // Move Down: Insert current card after target card
-        container.insertBefore(currentCard, targetCard.nextSibling);
-    }
-
-    formChanged = true;
-    updateQuestionCount(); // Re-index all questions
-}
-  
-  function addNewQuestion() {
-    questionCounter++;
-    const container = document.getElementById('questionsContainer');
-    const noMsg = document.getElementById('noQuestionsMessage');
-    if (noMsg) noMsg.remove();
-    
-    const tempId = 'new_' + Date.now();
-    const currentQuestionCount = document.querySelectorAll('.question-card').length + 1;
-    
-    // Using inline styles here for dynamic elements is fine as per base.css utility classes are available
-    const html = `
-      <div class="question-card" data-question-id="${tempId}">
-        <div class="question-header" onclick="toggleQuestionCard(this)">
-          <div style="display: flex; align-items: center; gap: var(--space-md); flex: 1;">
-            <span class="drag-handle">☰</span>
-            <div style="flex: 1;">
-              <div style="font-weight: bold;">Pregunta #${currentQuestionCount}</div>
-              <div class="text-secondary">Nueva</div>
-            </div>
-            <button type="button" class="btn btn-sm btn-ghost delete-question-btn" onclick="deleteQuestion(event, '${tempId}')">🗑️</button>
-          </div>
-        </div>
-        
-        <div class="question-body">
-          <input type="hidden" name="question_ids[]" value="${tempId}">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md);">
-            <div class="form-group" style="grid-column: 1/-1;">
-              <label class="form-label">Texto *</label>
-              <input type="text" name="question_text_${tempId}" class="form-control" required>
-            </div>
-            
-            <div class="form-group" style="grid-column: 1 / -1;">
-              <label class="form-label">Descripción de la Pregunta (Opcional)</label>
-              <textarea name="question_description_${tempId}" class="form-control" rows="2" placeholder="Ej: Registrar el valor del sello que se encuentra en la puerta."></textarea>
-              <small class="form-help">Este texto aparecerá bajo la pregunta en el formulario de campo.</small>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Tipo *</label>
-              <select name="question_type_${tempId}" class="form-control" required onchange="toggleChoicesSection(this, '${tempId}')">
-                <option value="text" selected>📝 Texto Corto</option>
-                <option value="textarea">📄 Texto Largo</option>
-                <option value="number">🔢 Número</option>
-                <option value="date">📅 Fecha</option>
-                <option value="datetime">🕐 Fecha y Hora</option>
-                <option value="photo">📷 Fotografía</option>
-                <option value="boolean">✓ Sí/No (Radio)</option>
-                <option value="select">📋 Selección Múltiple</option>
-                <option value="file">📁 Archivo</option>
-                <option value="client_select">🏢 Selector de Cliente</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Orden</label>
-              <div style="display: flex; gap: var(--space-sm); align-items: center;">
-                <input type="hidden" name="question_order_${tempId}" class="question-order-input" value="${currentQuestionCount}" required min="1">
-                <select name="question_new_order_${tempId}" class="form-control form-control-sm reorder-select" onchange="handleQuickReorder(this)">
-                  </select>
-                <button type="button" class="btn btn-sm btn-secondary move-up-btn" onclick="moveQuestion('${tempId}', -1)" title="Mover Arriba">▲</button>
-                <button type="button" class="btn btn-sm btn-secondary move-down-btn" onclick="moveQuestion('${tempId}', 1)" title="Mover Abajo">▼</button>
-              </div>
-            </div>
-            <div class="form-group" style="grid-column: 1/-1;">
-              <label style="display: flex; align-items: center; gap: 8px;">
-                <input type="checkbox" name="question_required_${tempId}" value="true" checked style="width: 20px; height: 20px;">
-                <span>Obligatoria</span>
-              </label>
-            </div>
-
-            <div id="choices_container_${tempId}" class="choices-container hidden">
-              <label class="form-label">Opciones *</label>
-              <div id="choices_list_${tempId}"></div>
-              <button type="button" class="btn btn-sm btn-secondary mt-2" onclick="addChoiceInput('${tempId}')">+ Opción</button>
-            </div>
-
-            <div class="form-group raw-options-wrapper" id="options_wrapper_${tempId}">
-              <label class="form-label">Opciones (JSON)</label>
-              <textarea name="question_options_${tempId}" class="form-control" rows="2"></textarea>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    container.insertAdjacentHTML('beforeend', html);
-    formChanged = true;
-    
-    // Init toggle state
-    const newCard = container.lastElementChild;
-    toggleChoicesSection(newCard.querySelector('select'), tempId);
-    newCard.scrollIntoView({ behavior: 'smooth' });
-    updateQuestionCount(); // Re-index everything after adding
-  }
-  
-  function deleteQuestion(e, id) {
-    e.stopPropagation();
-    
-    showConfirm(
-      '¿Estás seguro que deseas eliminar esta pregunta? La acción se confirmará al guardar el formulario.',
-      () => {
-        document.querySelector(`[data-question-id="${id}"]`).remove();
-        formChanged = true;
-        updateQuestionCount(); // Re-index after deletion
-      },
-      'Eliminar Pregunta',
-      'Eliminar',
-      'danger'
-    );
-  }
-
-  /**
-   * Re-indexes all question cards by updating the visible number, the hidden input order,
-   * re-populating the reorder dropdowns, and enabling/disabling the move buttons.
-   */
-  function updateQuestionCount() {
-    const cards = document.querySelectorAll('.question-card');
-    const totalCount = cards.length;
-    
-    cards.forEach((card, index) => {
-        const newOrder = index + 1; // 1-based order
-        
-        // 1. Update visible question number in the header
-        const numberSpan = card.querySelector('.question-number');
-        if (numberSpan) numberSpan.textContent = newOrder;
-        
-        // 2. Update hidden order input value (important for submission)
-        const orderInput = card.querySelector('.question-order-input');
-        if (orderInput) orderInput.value = newOrder;
-        
-        // 3. Update/Re-populate the reorder dropdown
-        const reorderSelect = card.querySelector('.reorder-select');
-        if (reorderSelect) {
-            reorderSelect.innerHTML = populateOrderDropdown(newOrder, totalCount);
-        }
-        
-        // 4. Disable Up/Down buttons at boundaries
-        const moveUpBtn = card.querySelector('.move-up-btn');
-        const moveDownBtn = card.querySelector('.move-down-btn');
-
-        if (moveUpBtn) moveUpBtn.disabled = (index === 0);
-        if (moveDownBtn) moveDownBtn.disabled = (index === cards.length - 1);
-    });
-    // Update global counter for new questions
-    questionCounter = totalCount; 
-  }
-
-  // Submit Handler: Serialize choices to JSON
-  document.getElementById('editFormForm').addEventListener('submit', function(e) {
-    const cards = document.querySelectorAll('.question-card');
-    let isValid = true;
-
-    cards.forEach(card => {
-      const qId = card.getAttribute('data-question-id');
-      const typeSelect = card.querySelector(`select[name="question_type_${qId}"]`);
-      const optionsArea = card.querySelector(`textarea[name="question_options_${qId}"]`);
-      
-      if (typeSelect.value === 'select') {
-        const choices = [];
-        card.querySelectorAll('.choice-input').forEach(input => {
-          if (input.value.trim()) choices.push(input.value.trim());
-        });
-        
-        if (choices.length === 0) {
-          alert(`La pregunta #${card.querySelector('.question-number').textContent} debe tener opciones.`);
-          isValid = false;
-          card.classList.remove('collapsed');
-          return;
-        }
-        
-        let opts = {};
-        try { if (optionsArea.value.trim()) opts = JSON.parse(optionsArea.value); } catch(e) {}
-        opts.choices = choices;
-        optionsArea.value = JSON.stringify(opts);
-      }
-      else if (typeSelect.value === 'client_select') {
-          optionsArea.value = '';
-      }
-    });
-
-    if (!isValid) e.preventDefault();
-    else {
-      formChanged = false;
-      this.querySelector('button[type="submit"]').textContent = '💾 Creando...';
-    }
-  });
-
-  // Initialize: Collapse all and ensure choices visible for existing selects + button states
-  document.addEventListener('DOMContentLoaded', () => {
-    // We only need to attach event listeners if there are existing forms
-    if (document.getElementById('questionsContainer').children.length > 1) { // >1 because of noQuestionsMessage
-      document.querySelectorAll('.question-card').forEach(card => {
-        card.classList.add('collapsed');
-        const qId = card.getAttribute('data-question-id');
-        const select = card.querySelector('select');
-        if (select) toggleChoicesSection(select, qId);
-      });
-      // The old HTML structure used to embed 'noQuestionsMessage' but now it relies on JS cleanup.
-      // We will skip removing the non-existent message and just call updateQuestionCount
-    }
-
-    updateQuestionCount(); 
-  });
-</script>
-{% endblock extra_js %}
+  {# NEW: Module-specific JS #}
+  <script src="{{ url_for('static', filename='js/forms/edit.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,14 @@
+/* pytarjas/static/css/users/create.css */
+
+.strength-bar {
+  height: 4px;
+  flex: 1;
+  background-color: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--transition-fast);
+}
+
+.strength-bar.active-weak { background-color: var(--color-danger); }
+.strength-bar.active-fair { background-color: #f59e0b; }
+.strength-bar.active-good { background-color: #3b82f6; }
+.strength-bar.active-strong { background-color: var(--color-secondary); }

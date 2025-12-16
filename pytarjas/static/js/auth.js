@@ -1,9 +1,9 @@
 // pytarjas/static/js/auth.js
 /**
  * Authentication helper for PWA
- * * This module handles authentication using the JSON API.
- * All functions are async and return promises.
- * * UPDATES: Changed login from username to email.
+ * This module acts as a shared service for handling authentication 
+ * API calls and session state management across the application.
+ * * LOCATION: pytarjas/static/js/auth.js (Shared Utility)
  */
 
 const AUTH_API = {
@@ -14,7 +14,7 @@ const AUTH_API = {
 
 /**
  * Login user with email and password
- * * @param {string} email - User's email
+ * @param {string} email - User's email
  * @param {string} password - User's password
  * @returns {Promise<Object>} User data if successful
  * @throws {Error} If authentication fails
@@ -29,7 +29,6 @@ async function login(email, password) {
       // IMPORTANT: Include credentials to maintain session cookies
       credentials: 'same-origin',
       body: JSON.stringify({
-        // CHANGE: Send 'email' instead of 'username'
         email: email, 
         password: password
       })
@@ -57,7 +56,7 @@ async function login(email, password) {
 
 /**
  * Logout current user
- * * @returns {Promise<boolean>} True if logout successful
+ * @returns {Promise<boolean>} True if logout successful
  */
 async function logout() {
   try {
@@ -81,13 +80,15 @@ async function logout() {
     }
   } catch (error) {
     console.error('Logout error:', error);
-    throw error;
+    // Even if server call fails (e.g. offline), clear local state
+    localStorage.removeItem('user');
+    return true;
   }
 }
 
 /**
  * Check if user is currently authenticated
- * * @returns {Promise<Object|null>} User data if authenticated, null otherwise
+ * @returns {Promise<Object|null>} User data if authenticated, null otherwise
  */
 async function checkSession() {
   try {
@@ -126,8 +127,8 @@ async function checkSession() {
 
 /**
  * Get currently logged in user from localStorage
- * Useful for offline mode
- * * @returns {Object|null} User data or null
+ * Useful for offline mode synchronous checks
+ * @returns {Object|null} User data or null
  */
 function getCurrentUser() {
   const userStr = localStorage.getItem('user');
@@ -136,7 +137,7 @@ function getCurrentUser() {
 
 /**
  * Check if user has specific role
- * * @param {string} role - Role to check (admin, worker, planner, client)
+ * @param {string} role - Role to check (admin, worker, planner, client)
  * @returns {boolean} True if user has the role
  */
 function hasRole(role) {
@@ -146,7 +147,7 @@ function hasRole(role) {
 
 /**
  * Redirect to login page if not authenticated
- * Call this on page load for protected pages
+ * Call this on page load for protected pages (e.g. in main.js or specific page scripts)
  */
 async function requireAuth() {
   const user = await checkSession();
@@ -156,73 +157,7 @@ async function requireAuth() {
   return user;
 }
 
-/**
- * Example: Login form handler
- * * HTML:
- * <form id="loginForm">
- * <input type="email" name="email" required>
- * <input type="password" name="password" required>
- * <button type="submit">Login</button>
- * <div id="error"></div>
- * </form>
- */
-function setupLoginForm() {
-  const form = document.getElementById('loginForm');
-  const errorDiv = document.getElementById('error');
-  
-  if (!form) return;
-  
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    // Clear previous errors
-    errorDiv.textContent = '';
-    
-    // Get form data
-    const formData = new FormData(form);
-    // CHANGE: Get 'email' instead of 'username'
-    const email = formData.get('email'); 
-    const password = formData.get('password');
-    
-    try {
-      // Show loading state
-      const submitBtn = form.querySelector('button[type="submit"]');
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Logging in...';
-      
-      // Attempt login
-      const user = await login(email, password); // CHANGE: Pass email
-      
-      // Success! Redirect based on role
-      if (user.role === 'admin') {
-        window.location.href = '/admin';
-      } else if (user.role === 'worker') {
-        // NOTE: Redirection needs to be updated if the backend logic changes the target
-        window.location.href = '/worker/'; 
-      } else {
-        window.location.href = '/';
-      }
-    } catch (error) {
-      // Show error message
-      errorDiv.textContent = error.message;
-      errorDiv.style.color = 'red';
-      
-      // Re-enable submit button
-      const submitBtn = form.querySelector('button[type="submit"]');
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Login';
-    }
-  });
-}
-
-// Initialize when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', setupLoginForm);
-} else {
-  setupLoginForm();
-}
-
-// Export functions for use in other modules
+// Export functions for use in other modules (like main.js or auth/login.js)
 export {
   login,
   logout,
