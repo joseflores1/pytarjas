@@ -41,7 +41,6 @@
     </div>
 
     {# Form #}
-    {# NEW: Added data attributes for status and permission to replace JS global variables #}
     <form id="taskForm" 
           data-task-id="{{ task.id }}" 
           data-total-questions="{{ task.form.questions|length }}"
@@ -177,7 +176,6 @@
               {% set accepted_types = 'image/*' if q_type == 'photo' else '.pdf,.doc,.docx,.jpg,.jpeg,.png' %}
               {% set display_placeholder = 'Seleccionar o tomar fotografía(s)' if q_type == 'photo' else 'Seleccionar archivo(s) (PDF, DOC, Imagen)' %}
 
-              {# NEW: data-question-id added to help JS initialization #}
               <input type="hidden" 
                      name="response_{{ question.id }}" 
                      id="path-input-{{ question.id }}"
@@ -187,7 +185,6 @@
                      {% if is_input_disabled %}disabled{% endif %}
                      {% if question.is_required %}data-required="true"{% endif %}>
 
-              {# NEW: Clean div without inline script loop #}
               <div class="file-display-box mb-md {% if current_paths == '[]' %} hidden-by-jinja{% endif %}" id="file-display-{{ question.id }}"></div>
               
               <input type="file" 
@@ -218,29 +215,38 @@
     {% set can_transition = task.status not in ['completed', 'reviewed', 'approved'] %}
     {% set show_action_bar = can_transition or can_override_edit %}
     
-    {% if show_action_bar %}
     <div class="action-bar">
+      {# CHANGED: Back button always visible #}
       <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary" id="backBtn">Volver</a>
       
-      <button type="button" class="btn btn-primary" id="startBtn">▶️ Iniciar Tarea</button>
+      {# NEW: Download PDF Button - Always visible for valid tasks #}
+      {% if task.status != 'pending' %}
+        <a href="{{ url_for('tasks.download_task_pdf', task_id=task.id) }}" class="btn btn-warning" target="_blank" style="margin-left: 10px;">
+            📄 Descargar PDF
+        </a>
+      {% endif %}
 
-      <button type="button" class="btn btn-secondary" id="saveBtn">💾 Guardar Progreso</button>
-      
-      <button type="button" 
-              class="btn btn-success" 
-              id="completeBtn"
-              {% if task.status != 'in_progress' %}style="display:none;" disabled{% endif %}>
-          ✓ Completar Tarea
-      </button>
+      {# Editable Buttons are conditional #}
+      {% if show_action_bar %}
+        <button type="button" class="btn btn-primary" id="startBtn">▶️ Iniciar Tarea</button>
 
-      {% if is_finalized and can_override_edit and task.status != 'in_progress' %}
-        <button type="button" class="btn btn-primary" id="saveBtnOverride" style="margin-left: 20px;">
-          💾 Guardar (Admin Override)
+        <button type="button" class="btn btn-secondary" id="saveBtn">💾 Guardar Progreso</button>
+        
+        <button type="button" 
+                class="btn btn-success" 
+                id="completeBtn"
+                {% if task.status != 'in_progress' %}style="display:none;" disabled{% endif %}>
+            ✓ Completar Tarea
         </button>
+
+        {% if is_finalized and can_override_edit and task.status != 'in_progress' %}
+          <button type="button" class="btn btn-primary" id="saveBtnOverride" style="margin-left: 20px;">
+            💾 Guardar (Admin Override)
+          </button>
+        {% endif %}
       {% endif %}
 
     </div>
-    {% endif %}
     
     <div class="save-indicator" id="saveIndicator"><span id="saveIndicatorText">Guardando...</span></div>
     

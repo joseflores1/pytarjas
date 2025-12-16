@@ -50,15 +50,29 @@
             <textarea name="description" id="description" class="form-control" rows="4" placeholder="Describe el propósito de este formulario..."></textarea>
           </div>
           
+          {# CHANGED: Dynamic Select + Other Input #}
           <div class="form-group">
             <label for="form_type" class="form-label">
               Tipo de Formulario <span style="color: var(--color-danger);">*</span>
             </label>
-            <select name="form_type" id="form_type" class="form-control" required>
-              <option value="">-- Seleccionar tipo --</option>
-              <option value="consolidado">📦 Consolidado</option>
-              <option value="desconsolidado">📤 Desconsolidado</option>
+            
+            {# Hidden input stores the final value sent to server #}
+            <input type="hidden" name="form_type" id="form_type_final">
+
+            {# Dropdown populated from backend #}
+            <select id="form_type_select" class="form-control" onchange="handleFormTypeChange()">
+              <option value="">-- Seleccionar tipo existente --</option>
+              {% for type in existing_types %}
+                <option value="{{ type }}">{{ type|capitalize }}</option>
+              {% endfor %}
+              <option value="other">➕ Otro (Nuevo Tipo)</option>
             </select>
+            
+            {# Hidden input for custom type #}
+            <div id="other_type_container" style="display: none; margin-top: 10px;">
+              <input type="text" id="form_type_custom" class="form-control" placeholder="Escriba el nombre del nuevo tipo (ej: inspección, inventario)..." oninput="handleCustomTypeInput()">
+            </div>
+            <small class="form-help">Selecciona un tipo existente o elige "Otro" para crear uno nuevo.</small>
           </div>
         </div>
       </div>
@@ -116,4 +130,29 @@
 {% block extra_js %}
   {# NEW: Module-specific JS #}
   <script src="{{ url_for('static', filename='js/forms/create.js') }}"></script>
+  
+  {# NEW: Logic for Select/Other Toggle #}
+  <script>
+    function handleFormTypeChange() {
+        const select = document.getElementById('form_type_select');
+        const customContainer = document.getElementById('other_type_container');
+        const finalInput = document.getElementById('form_type_final');
+        const customInput = document.getElementById('form_type_custom');
+        
+        if (select.value === 'other') {
+            customContainer.style.display = 'block';
+            customInput.required = true;
+            customInput.focus();
+            finalInput.value = customInput.value;
+        } else {
+            customContainer.style.display = 'none';
+            customInput.required = false;
+            finalInput.value = select.value;
+        }
+    }
+
+    function handleCustomTypeInput() {
+        document.getElementById('form_type_final').value = document.getElementById('form_type_custom').value;
+    }
+  </script>
 {% endblock %}

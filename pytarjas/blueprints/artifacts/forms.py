@@ -19,6 +19,23 @@ from pytarjas.auth import login_required, form_access_required
 # Create blueprint with URL prefix /forms
 bp = Blueprint("forms", __name__, url_prefix="/forms")
 
+# Helper function to get types
+def get_existing_form_types():
+    """Fetches all unique form types currently in the database."""
+    # Start with your default standard types
+    types = {"consolidado", "desconsolidado"}
+    
+    try:
+        # Query distinct types from DB
+        db_types = db.session.query(Form.form_type).distinct().all()
+        for t in db_types:
+            if t[0]: # Ensure not None
+                types.add(t[0])
+    except Exception:
+        pass # Fallback to defaults if DB fails
+        
+    return sorted(list(types))
+
 # ============================================================================
 # ROUTE: List all forms
 # ============================================================================
@@ -94,7 +111,7 @@ def get_form(form_id):
                     {
                         "id": q.id,
                         "question_text": q.question_text,
-                        "question_description": q.question_description, # NEW FIELD
+                        "question_description": q.question_description,
                         "question_type": q.question_type,
                         "is_required": q.is_required,
                         "order": q.order,
@@ -126,13 +143,13 @@ def create_form():
         else: 
             name = request.form.get("name")
             description = request.form.get("description")
+            # The HTML logic ensures 'form_type' contains the final selected/typed string
             form_type = request.form.get("form_type")
             
             questions_data = []
             question_ids = request.form.getlist("question_ids[]")
             
             for q_id in question_ids:
-                # FIX: Parse JSON string for options
                 options_str = request.form.get(f"question_options_{q_id}")
                 options_dict = None
                 if options_str and options_str.strip():
@@ -144,7 +161,7 @@ def create_form():
 
                 question_data = {
                     "question_text": request.form.get(f"question_text_{q_id}"),
-                    "question_description": request.form.get(f"question_description_{q_id}"), # NEW FIELD
+                    "question_description": request.form.get(f"question_description_{q_id}"),
                     "question_type": request.form.get(f"question_type_{q_id}"),
                     "order": int(request.form.get(f"question_order_{q_id}", 0)),
                     "is_required": request.form.get(f"question_required_{q_id}") == "true",
@@ -189,7 +206,7 @@ def create_form():
                         "id": str(uuid.uuid4()),
                         "form_id": new_form.id,
                         "question_text": q_data.get("question_text", ""),
-                        "question_description": q_data.get("question_description"), # NEW FIELD
+                        "question_description": q_data.get("question_description"),
                         "question_type": q_data.get("question_type", "text"),
                         "is_required": q_data.get("is_required", True),
                         "order": q_data.get("order", 0),
@@ -235,8 +252,9 @@ def create_form():
         else:
             flash(error, "error")
     
-    # FIX: Corrected template path from "forms/create_form.html" to "forms/create_forms.html"
-    return render_template("forms/create_forms.html")
+    # NEW: Fetch existing types to populate the dropdown
+    existing_types = get_existing_form_types()
+    return render_template("forms/create_forms.html", existing_types=existing_types)
 
 
 # ============================================================================
@@ -259,15 +277,14 @@ def edit_form(form_id):
         else:
             name = request.form.get("name", form.name)
             description = request.form.get("description", form.description)
+            # HTML Logic ensures 'form_type' holds the correct string (from select or input)
             form_type = request.form.get("form_type", form.form_type)
             is_active = request.form.get("is_active", "true").lower() == "true"
             
-            # IMPLEMENTED: Parse questions from HTML form for updates
             questions_data = []
             question_ids = request.form.getlist("question_ids[]")
             
             for q_id in question_ids:
-                # FIX: Parse JSON string for options
                 options_str = request.form.get(f"question_options_{q_id}")
                 options_dict = None
                 if options_str and options_str.strip():
@@ -277,9 +294,9 @@ def edit_form(form_id):
                         options_dict = None
 
                 q_data = {
-                    "id": q_id, # ID is passed for existing/new questions
+                    "id": q_id, 
                     "question_text": request.form.get(f"question_text_{q_id}"),
-                    "question_description": request.form.get(f"question_description_{q_id}"), # NEW FIELD
+                    "question_description": request.form.get(f"question_description_{q_id}"),
                     "question_type": request.form.get(f"question_type_{q_id}"),
                     "order": int(request.form.get(f"question_order_{q_id}", 0)),
                     "is_required": request.form.get(f"question_required_{q_id}") == "true",
@@ -326,11 +343,11 @@ def edit_form(form_id):
                         q_id = q_data.get("id")
                         
                         if q_id and q_id in existing_q_ids:
-                            # UPDATE existing question
+                            # UPDATE
                             question = Question.query.get(q_id)
                             if question:
                                 question.question_text = q_data.get("question_text", question.question_text)
-                                question.question_description = q_data.get("question_description", question.question_description) # NEW FIELD
+                                question.question_description = q_data.get("question_description", question.question_description)
                                 question.question_type = q_data.get("question_type", question.question_type)
                                 question.is_required = q_data.get("is_required", question.is_required)
                                 question.order = q_data.get("order", question.order)
@@ -338,23 +355,18 @@ def edit_form(form_id):
                                 question.updated_at = datetime.now(timezone.utc)
                                 updated_q_ids.add(q_id)
                         else:
-                            # CREATE new question (ignore the temp 'new_xxx' ID and let DB/Model handle UUID)
+                            # CREATE
                             new_question = Question(
                                 id=str(uuid.uuid4()),
                                 form_id=form.id,
                                 question_text=q_data.get("question_text", ""),
-                                question_description=q_data.get("question_description"), # NEW FIELD
+                                question_description=q_data.get("question_description"),
                                 question_type=q_data.get("question_type", "text"),
                                 is_required=q_data.get("is_required", True),
                                 order=q_data.get("order", 0),
                                 options=q_data.get("options")
                             )
                             db.session.add(new_question)
-                    
-                    # Optional: Delete questions not present in update
-                    # for q in form.questions:
-                    #     if q.id not in updated_q_ids:
-                    #         db.session.delete(q)
                 
                 db.session.commit()
                 
@@ -397,7 +409,7 @@ def edit_form(form_id):
                     {
                         "id": q.id,
                         "question_text": q.question_text,
-                        "question_description": q.question_description, # NEW FIELD
+                        "question_description": q.question_description,
                         "question_type": q.question_type,
                         "is_required": q.is_required,
                         "order": q.order,
@@ -408,8 +420,9 @@ def edit_form(form_id):
             }
         }), 200
     else:
-        # FIX: Corrected template path from "forms/edit_form.html" to "forms/edit_forms.html"
-        return render_template("forms/edit_forms.html", form=form)
+        # NEW: Fetch types to populate dropdown
+        existing_types = get_existing_form_types()
+        return render_template("forms/edit_forms.html", form=form, existing_types=existing_types)
 
 
 # ============================================================================

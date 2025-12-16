@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Tarja {{ form_type|capitalize }} - {{ task_id }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pdfs/tarja.css', _external=True) }}">
+</head>
+<body>
+
+    <table class="header-table">
+        <tr>
+            <td>
+                <img src="{{ url_for('static', filename='icons/HGT-Logo-greyblue-orange-RGB.svg', _external=True) }}" class="header-logo" alt="HGT Logo">
+            </td>
+            <td class="header-title">
+                <h1>Documento de {{ form_type|capitalize }}</h1>
+                <span>ID Tarea: #{{ task_id }}</span><br>
+                <span>Generado: {{ now.strftime('%d-%m-%Y %H:%M') }}</span>
+            </td>
+        </tr>
+    </table>
+
+    <div class="section-title">Datos de la Operación</div>
+    <table class="data-grid">
+        <tr>
+            <td>
+                <span class="label">Cliente</span>
+                <div class="value">{{ cliente or client_name or '---' }}</div>
+            </td>
+            <td>
+                <span class="label">RUT Cliente</span>
+                <div class="value">{{ rut_cliente or '---' }}</div>
+            </td>
+            <td>
+                <span class="label">Contenedor</span>
+                <div class="value">{{ contenedor or container_number or '---' }}</div>
+            </td>
+            <td>
+                <span class="label">Sello (Seal)</span>
+                <div class="value">{{ sello or seal_number or '---' }}</div>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="label">Nave</span>
+                <div class="value">{{ nave or ship_name or '---' }}</div>
+            </td>
+            <td>
+                <span class="label">Viaje / Booking</span>
+                <div class="value">{{ reserva or viaje or booking_number or '---' }}</div>
+            </td>
+            <td>
+                <span class="label">Línea Naviera</span>
+                <div class="value">{{ linea or shipping_line or '---' }}</div>
+            </td>
+            <td>
+                <span class="label">Peso / Bultos</span>
+                <div class="value">{{ peso or bultos or '---' }}</div>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="label">Origen</span>
+                <div class="value">{{ origen or '---' }}</div>
+            </td>
+            <td>
+                <span class="label">Destino</span>
+                <div class="value">{{ destino or '---' }}</div>
+            </td>
+            <td>
+                <span class="label">Tarjador</span>
+                <div class="value">{{ worker_name or '---' }}</div>
+            </td>
+            <td>
+                <span class="label">Fecha Faena</span>
+                <div class="value">{{ completed_at.strftime('%d-%m-%Y') if completed_at else '---' }}</div>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="label">Duración Faena</span>
+                <div class="value" style="font-weight: bold;">{{ duration or '---' }}</div>
+            </td>
+            <td></td>
+            <td></td>
+            <td></td>
+        </tr>
+    </table>
+
+    <div class="section-title">Observaciones y Control</div>
+    <table class="obs-table">
+        <thead>
+            <tr>
+                <th width="40%">Ítem / Pregunta</th>
+                <th width="60%">Respuesta / Detalle</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in table_rows %}
+            <tr class="{{ loop.cycle('obs-row-odd', 'obs-row-even') }}">
+                <td>{{ item.label }}</td>
+                <td>{{ item.value }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="2" style="text-align:center; color:#999; padding:15px;">
+                    No se registraron observaciones o datos adicionales.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="section-title" style="page-break-before: always;">Registro Fotográfico</div>
+    
+    <div class="gallery">
+        {% for group in gallery_groups %}
+            <div class="gallery-group">
+                <div class="gallery-label">{{ group.label }}</div>
+                
+                <div class="gallery-images">
+                    {% for path in group.paths %}
+                        <div class="photo-wrapper">
+                             <img src="{{ path }}" alt="Foto">
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% else %}
+            <div style="text-align:center; padding: 20px; color:#999; width:100%;">
+                <p>No hay fotografías adjuntas en esta tarea.</p>
+            </div>
+        {% endfor %}
+    </div>
+
+</body>
+</html>

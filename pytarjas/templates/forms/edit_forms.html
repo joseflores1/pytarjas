@@ -47,12 +47,24 @@
             <textarea name="description" id="description" class="form-control" rows="4">{{ form.description or '' }}</textarea>
           </div>
           
+          {# CHANGED: Dynamic Select + Other Input #}
           <div class="form-group">
             <label for="form_type" class="form-label">Tipo de Formulario <span style="color: var(--color-danger);">*</span></label>
-            <select name="form_type" id="form_type" class="form-control" required>
-              <option value="consolidado" {% if form.form_type == 'consolidado' %}selected{% endif %}>📦 Consolidado</option>
-              <option value="desconsolidado" {% if form.form_type == 'desconsolidado' %}selected{% endif %}>📤 Desconsolidado</option>
+            
+            {# Store initial value and final value #}
+            <input type="hidden" name="form_type" id="form_type_final" value="{{ form.form_type }}">
+            
+            <select id="form_type_select" class="form-control" onchange="handleFormTypeChange()">
+              <option value="">-- Seleccionar tipo existente --</option>
+              {% for type in existing_types %}
+                <option value="{{ type }}" {% if form.form_type == type %}selected{% endif %}>{{ type|capitalize }}</option>
+              {% endfor %}
+              <option value="other">➕ Otro (Nuevo Tipo)</option>
             </select>
+            
+            <div id="other_type_container" style="display: none; margin-top: 10px;">
+              <input type="text" id="form_type_custom" class="form-control" placeholder="Escriba el nombre del nuevo tipo..." oninput="handleCustomTypeInput()">
+            </div>
           </div>
           
           <div class="form-group">
@@ -214,4 +226,51 @@
 {% block extra_js %}
   {# NEW: Module-specific JS #}
   <script src="{{ url_for('static', filename='js/forms/edit.js') }}"></script>
+  
+  {# NEW: Logic for Select/Other Toggle in Edit Mode #}
+  <script>
+    function handleFormTypeChange() {
+        const select = document.getElementById('form_type_select');
+        const customContainer = document.getElementById('other_type_container');
+        const finalInput = document.getElementById('form_type_final');
+        const customInput = document.getElementById('form_type_custom');
+        
+        if (select.value === 'other') {
+            customContainer.style.display = 'block';
+            customInput.required = true;
+            customInput.focus();
+            finalInput.value = customInput.value;
+        } else {
+            customContainer.style.display = 'none';
+            customInput.required = false;
+            finalInput.value = select.value;
+        }
+    }
+
+    function handleCustomTypeInput() {
+        document.getElementById('form_type_final').value = document.getElementById('form_type_custom').value;
+    }
+
+    // Initialize: Check if current type is in dropdown. If not (rare), set to Other.
+    document.addEventListener('DOMContentLoaded', function() {
+        const currentType = document.getElementById('form_type_final').value;
+        const select = document.getElementById('form_type_select');
+        
+        // Try to match current value in dropdown
+        let match = false;
+        for (let i = 0; i < select.options.length; i++) {
+            if (select.options[i].value === currentType) {
+                match = true;
+                break;
+            }
+        }
+        
+        // If not found in dropdown options (e.g. legacy type not in DB list anymore?)
+        if (!match && currentType) {
+            select.value = 'other';
+            document.getElementById('other_type_container').style.display = 'block';
+            document.getElementById('form_type_custom').value = currentType;
+        }
+    });
+  </script>
 {% endblock %}

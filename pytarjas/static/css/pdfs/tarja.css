@@ -1,0 +1,96 @@
+/* pytarjas/static/css/pdfs/tarja.css */
+
+@page {
+    size: A4;
+    margin: 1.5cm;
+    @bottom-center {
+        content: "Página " counter(page) " de " counter(pages);
+        font-family: 'Helvetica', sans-serif;
+        font-size: 9pt;
+        color: #7f8c8d;
+    }
+}
+
+body {
+    font-family: 'Helvetica', 'Arial', sans-serif;
+    font-size: 10pt;
+    color: #2c3e50;
+    line-height: 1.4;
+    margin: 0; padding: 0;
+}
+
+/* Header & Table Styles (Unchanged) */
+.header-table {
+    width: 100%; margin-bottom: 20px;
+    border-bottom: 2px solid #f58220; padding-bottom: 10px;
+}
+.header-logo { width: 150px; display: block; }
+.header-title { text-align: right; vertical-align: middle; }
+.header-title h1 { margin: 0; font-size: 18pt; text-transform: uppercase; color: #2c3e50; }
+.header-title span { font-size: 10pt; color: #7f8c8d; }
+
+.section-title {
+    font-size: 12pt; font-weight: bold; color: #f58220;
+    margin-top: 20px; margin-bottom: 10px;
+    border-bottom: 1px solid #ddd; padding-bottom: 4px; text-transform: uppercase;
+}
+
+.data-grid { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+.data-grid td { padding: 6px 4px; vertical-align: top; width: 25%; }
+.label { font-weight: bold; color: #34495e; display: block; font-size: 8pt; text-transform: uppercase; margin-bottom: 2px; }
+.value { font-size: 10pt; color: #000; background-color: #f9f9f9; padding: 4px; border-radius: 4px; min-height: 18px; border: 1px solid #eee; }
+
+.obs-table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+.obs-table th { background-color: #ecf0f1; text-align: left; padding: 8px; font-weight: bold; border-bottom: 2px solid #bdc3c7; color: #2c3e50; }
+.obs-table td { padding: 8px; border-bottom: 1px solid #eee; }
+.obs-row-odd { background-color: #ffffff; }
+.obs-row-even { background-color: #fafafa; }
+
+/* --- NEW GALLERY STYLES --- */
+
+.gallery {
+    width: 100%;
+    margin-top: 10px;
+}
+
+/* Container for a single question's photos */
+.gallery-group {
+    margin-bottom: 25px;
+    page-break-inside: avoid; /* Keep title and images together if possible */
+}
+
+/* Title ABOVE the photos */
+.gallery-label {
+    font-size: 10pt;
+    font-weight: bold;
+    color: #34495e;
+    margin-bottom: 8px;
+    padding-left: 4px;
+    border-left: 3px solid #f58220;
+    line-height: 1.2;
+}
+
+/* The wrapper for individual images */
+.photo-wrapper {
+    display: inline-block;
+    width: 48%; /* 2 photos per row looks best for quality */
+    margin-right: 2%;
+    margin-bottom: 10px;
+    vertical-align: top;
+    border: 1px solid #eee;
+    padding: 4px;
+    background: #fff;
+    box-sizing: border-box;
+}
+
+.photo-wrapper:nth-child(2n) {
+    margin-right: 0;
+}
+
+/* CHANGED: Logic to prevent trimming */
+.photo-wrapper img {
+    width: 100%;
+    height: auto;     /* Maintains aspect ratio (no stretching/trimming) */
+    display: block;   /* Removes bottom whitespace */
+    object-fit: contain; /* Ensures the whole image fits in the box */
+}
