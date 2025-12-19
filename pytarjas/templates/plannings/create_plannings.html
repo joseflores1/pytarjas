@@ -1,0 +1,107 @@
+{# pytarjas/templates/plannings/create_plannings.html #}
+{% extends 'base.html' %}
+
+{% block title %}Crear Nueva Planificación{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/planner/index.css') }}">
+{% endblock %}
+
+{% block content %}
+  <div class="container" style="max-width: 1000px; margin: var(--space-xl) auto;">
+    
+    <div style="margin-bottom: var(--space-xl);">
+        <h1 style="margin-bottom: var(--space-xs);">📅 Nueva Planificación</h1>
+        <p style="color: var(--color-text-secondary);">Configure la faena y asigne trabajadores a cada contenedor.</p>
+    </div>
+
+    {# HIDDEN DATA FOR JAVASCRIPT #}
+    <textarea id="assignableUsersData" style="display:none;">
+        {{ assignable_users | map(attribute='id') | list | tojson | safe }}
+    </textarea>
+    <div id="usersMap" style="display:none;">
+        {% for u in assignable_users %}
+            <span data-id="{{ u.id }}" data-username="{{ u.username }}"></span>
+        {% endfor %}
+    </div>
+
+    <form id="createPlanningForm" method="POST">
+      
+      {# SECTION: BASIC INFO #}
+      <div class="card" style="margin-bottom: var(--space-lg);">
+        <div class="card-header">
+          <h2 class="card-title">📋 Configuración General</h2>
+        </div>
+        <div class="card-body">
+          <div class="form-group">
+            <label for="client_name" class="form-label">Nombre del Cliente / Faena <span style="color: var(--color-danger);">*</span></label>
+            <input type="text" name="client_name" id="client_name" class="form-control" placeholder="Ej: Terminal Puerto Arica - Lote 45" required>
+          </div>
+
+          <div class="form-group">
+            <label for="form_id" class="form-label">Seleccionar Formulario <span style="color: var(--color-danger);">*</span></label>
+            <select name="form_id" id="form_id" class="form-control" required>
+              <option value="">-- Seleccione una plantilla --</option>
+              {% for form in forms %}
+                <option value="{{ form.id }}">
+                    {{ form.display_name }} - {{ form.form_type|capitalize if form.form_type else 'General' }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {# SECTION: RECORDS LOADING & MANUAL ENTRY #}
+      <div class="card" style="margin-bottom: var(--space-lg);">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <h2 class="card-title">📄 Registros de Tareas</h2>
+          <button type="button" id="addRowBtn" class="btn btn-secondary btn-sm">+ Agregar Fila</button>
+        </div>
+        <div class="card-body">
+            
+            <div id="drop-zone" class="upload-zone" style="border: 2px dashed var(--color-border); padding: var(--space-lg); text-align: center; border-radius: var(--radius-md); background-color: var(--color-bg-secondary); margin-bottom: var(--space-md);">
+                <p style="margin: 0;">Arrastre un Excel/CSV o use la tabla inferior para ingreso manual</p>
+                <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display: none;">
+            </div>
+
+            <div id="records-container" style="overflow-x: auto;">
+                <table class="table" id="planningTable" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="min-width: 150px;">N° Contenedor</th>
+                            <th style="min-width: 120px;">Sello</th>
+                            <th style="min-width: 100px;">Tipo</th>
+                            <th style="min-width: 100px;">Peso (kg)</th>
+                            <th style="min-width: 180px;">Asignado a</th>
+                            <th style="width: 50px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="planningTableBody">
+                        {# Rows will be added here via JS #}
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="emptyState" style="text-align: center; padding: var(--space-xl); color: var(--color-text-secondary);">
+                <p>No hay tareas agregadas. Haga clic en "+ Agregar Fila" para comenzar.</p>
+            </div>
+        </div>
+      </div>
+
+      {# ACTIONS #}
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-xl);">
+        <a href="{{ url_for('plannings.list_plannings') }}" class="btn btn-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+            🚀 Crear Planificación
+        </button>
+      </div>
+
+    </form>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{{ url_for('static', filename='js/planner/index.js') }}"></script>
+{% endblock %}

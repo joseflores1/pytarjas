@@ -1,57 +1,121 @@
 {# pytarjas/templates/plannings/list_plannings.html #}
 {% extends 'base.html' %}
 
-{% block title %}Listado de Planificaciones{% endblock %}
+{% block title %}Lista de Planificaciones{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
-  {# NEW: Module-specific CSS #}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/plannings/list.css') }}">
 {% endblock %}
 
 {% block header %}
   <div class="container">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-md); margin-top: var(--space-lg); margin-bottom: var(--space-lg);">
-      <div>
-        <h1 style="margin-bottom: var(--space-xs);">📅 Listado de Planificaciones</h1>
-        <p style="color: var(--color-text-secondary); margin-bottom: 0;">
-          Mostrando todas las planificaciones del sistema.
+    <div class="header-action-container">
+      <div class="header-text">
+        <h1 class="page-title">📅 Listado de Planificaciones</h1>
+        <p class="page-subtitle">
+          Gestione las faenas y supervise el avance de las tareas cargadas.
         </p>
       </div>
       <a href="{{ url_for('plannings.create_planning') }}" class="btn btn-primary btn-lg">
-        ➕ Crear Nueva Planificación
+        <span class="btn-icon-plus">+</span> Nueva Planificación
       </a>
     </div>
   </div>
 {% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="card">
-        <div class="card-body planning-empty-card">
-            <div class="planning-empty-icon">
-                📋
-            </div>
-            <h3 class="card-title planning-title">Módulo de Planificaciones</h3>
-            <p class="card-subtitle planning-subtitle">
-                Esta lista está en construcción. El backend está funcionando, pero el diseño de la tabla y los filtros están pendientes.
-            </p>
-            
-            <div class="planning-status-box">
-                <span class="planning-status-text">
-                    {% if plannings is defined and plannings|length > 0 %}
-                        Backend cargó: <strong class="planning-count">{{ plannings|length }}</strong> planificaciones (Total: {{ total }})
-                    {% else %}
-                        No hay planificaciones para mostrar con los filtros actuales.
-                    {% endif %}
-                </span>
-            </div>
+  <div class="container">
+    
+    {# ADVANCED FILTER FORM #}
+    <form method="GET" action="{{ url_for('plannings.list_plannings') }}" id="filterForm">
+      <div class="filter-grid-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: var(--space-md); margin-bottom: var(--space-lg);">
+        
+        {# Filter: Client Name #}
+        <div class="filter-card card" style="padding: var(--space-sm);">
+          <label for="client_name" class="filter-label" style="display: block; margin-bottom: 4px; font-weight: bold; font-size: 0.85rem;">Cliente / Faena</label>
+          <input type="text" name="client_name" id="client_name" 
+                 class="form-control" value="{{ client_search or '' }}" 
+                 placeholder="Buscar por cliente..." 
+                 onchange="this.form.submit()">
         </div>
-    </div>
-</div>
+
+        {# Filter: Status #}
+        <div class="filter-card card" style="padding: var(--space-sm);">
+          <label for="status" class="filter-label" style="display: block; margin-bottom: 4px; font-weight: bold; font-size: 0.85rem;">Estado de Faena</label>
+          <select name="status" id="status" class="form-control" onchange="this.form.submit()">
+            <option value="all" {% if status_filter == 'all' %}selected{% endif %}>-- Todos --</option>
+            <option value="uploaded" {% if status_filter == 'uploaded' %}selected{% endif %}>Cargada</option>
+            <option value="in_progress" {% if status_filter == 'in_progress' %}selected{% endif %}>En Progreso</option>
+            <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Finalizada</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="filter-actions-bottom" style="margin-bottom: var(--space-lg);">
+          <a href="{{ url_for('plannings.list_plannings') }}" class="btn btn-secondary btn-sm">
+            Limpiar Filtros
+          </a>
+      </div>
+    </form>
+
+    {# PLANNINGS TABLE #}
+    {% if plannings %}
+      <div class="table-responsive card">
+        <table class="tasks-table" style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr>
+                <th class="text-center" style="padding: var(--space-sm); border-bottom: 2px solid var(--color-border);">Acciones</th> 
+                <th class="text-left" style="padding: var(--space-sm); border-bottom: 2px solid var(--color-border);">Cliente / Faena</th>
+                <th class="text-center" style="padding: var(--space-sm); border-bottom: 2px solid var(--color-border);">Formulario</th>
+                <th class="text-center" style="padding: var(--space-sm); border-bottom: 2px solid var(--color-border);">Planificador</th>
+                <th class="text-center" style="padding: var(--space-sm); border-bottom: 2px solid var(--color-border);">Tareas</th>
+                <th class="text-center" style="padding: var(--space-sm); border-bottom: 2px solid var(--color-border);">Estado</th>
+                <th class="text-center" style="padding: var(--space-sm); border-bottom: 2px solid var(--color-border);">Fecha Creación</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for plan in plannings %}
+            <tr class="task-row" style="border-bottom: 1px solid var(--color-border);">
+              <td class="text-center align-middle" style="padding: var(--space-sm);"> 
+                <a href="{{ url_for('plannings.get_planning', planning_id=plan.id) }}" class="btn btn-sm btn-secondary">Ver Detalle</a>
+              </td>
+              <td class="align-middle font-bold" style="padding: var(--space-sm);">
+                {{ plan.client_name }}
+              </td>
+              <td class="text-center align-middle" style="padding: var(--space-sm);">
+                {{ plan.form_name }}
+              </td>
+              <td class="text-center align-middle" style="padding: var(--space-sm);">
+                📋 {{ plan.planner }}
+              </td>
+              <td class="text-center align-middle" style="padding: var(--space-sm);">
+                <strong>{{ plan.total_tasks }}</strong>
+              </td>
+              <td class="text-center align-middle" style="padding: var(--space-sm);">
+                <span class="status-badge status-{{ plan.status }}" style="padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; text-transform: uppercase;">
+                    {{ plan.status|replace('_', ' ') }}
+                </span>
+              </td>
+              <td class="text-center align-middle" style="padding: var(--space-sm); white-space: nowrap;">
+                {{ plan.created_at }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state-container" style="text-align: center; padding: var(--space-xl); background: var(--color-bg-secondary); border-radius: var(--radius-md);">
+        <div class="empty-state-icon" style="font-size: 3rem; margin-bottom: var(--space-md);">📂</div>
+        <h2 class="empty-state-title">No hay planificaciones</h2>
+        <p class="empty-state-text">No se encontraron registros que coincidan con su búsqueda.</p>
+        <a href="{{ url_for('plannings.create_planning') }}" class="btn btn-primary btn-lg" style="margin-top: var(--space-md);">Crear Nueva Planificación</a>
+      </div>
+    {% endif %}
+
+  </div>
 {% endblock %}
 
 {% block extra_js %}
-  {# NEW: Module-specific JS #}
   <script src="{{ url_for('static', filename='js/plannings/list.js') }}"></script>
 {% endblock %}

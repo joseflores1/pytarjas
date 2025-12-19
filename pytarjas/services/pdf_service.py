@@ -1,3 +1,9 @@
+# pytarjas/services/pdf_service.py
+"""
+Service for generating PDF reports.
+Uses absolute paths with file:// protocol to ensure WeasyPrint renders images correctly.
+"""
+
 import io
 import os
 import json
@@ -18,6 +24,7 @@ def get_absolute_path(web_path):
         
     upload_folder_name = current_app.config.get('UPLOAD_FOLDER', 'uploads')
     
+    # Check if path belongs to uploads
     if web_path.startswith(upload_folder_name):
         abs_path = os.path.join(current_app.instance_path, web_path)
         if not os.path.exists(abs_path):
@@ -29,40 +36,44 @@ def get_absolute_path(web_path):
     
     if os.path.exists(abs_path):
         return f"file://{abs_path}"
+        
     return None
 
 def format_value(value):
     """
     Helper to format dates, times, and booleans into friendly strings.
+    Ensures dates always show hours and minutes.
     """
     if value is None:
         return ""
     
-    # 1. Handle Booleans
+    # Handle Booleans
     if str(value).lower() == 'true': 
         return 'Sí'
+        
     if str(value).lower() == 'false': 
         return 'No'
     
-    # 2. Handle Datetime Objects (Native)
+    # Handle Datetime Objects (Native)
     if isinstance(value, datetime):
-        return value.strftime('%d-%m-%Y %H:%M')
+        return value.strftime('%d/%m/%Y %H:%M')
         
-    # 3. Handle Date Strings (ISO format detection)
+    # Handle Date Strings (ISO format detection)
     if isinstance(value, str):
         try:
             # Check for basic date format (YYYY-MM-DD)
             if len(value) == 10 and value[4] == '-' and value[7] == '-':
                 dt = datetime.strptime(value, '%Y-%m-%d')
-                return dt.strftime('%d-%m-%Y')
+                # Even for simple dates, we keep consistency if needed, 
+                # but usually day/month/year is enough for a "date-only" field.
+                return dt.strftime('%d/%m/%Y')
             
             # Check for datetime format (YYYY-MM-DDTHH:MM...)
             if len(value) > 10 and value[4] == '-' and value[7] == '-':
-                 # fromisoformat handles 'T' and basic ISO variations
                  dt = datetime.fromisoformat(value)
-                 return dt.strftime('%d-%m-%Y %H:%M')
+                 return dt.strftime('%d/%m/%Y %H:%M')
         except ValueError:
-            # If parsing fails (e.g. it's just regular text), return original string
+            # Not a date, return as is
             pass
             
     return value
@@ -78,17 +89,22 @@ def calculate_duration(task: Task) -> str:
         parts = []
         if hours > 0:
             parts.append(f"{hours} hrs")
+            
         if minutes > 0 or hours == 0:
             parts.append(f"{minutes} min")
             
         return " ".join(parts)
+        
     return "---"
 
 def generate_tarja_pdf(task: Task) -> bytes:
     """
-    Generates a PDF for a specific completed Task.
+    Generates a PDF for a specific completed Task using WeasyPrint.
     """
-    form_type = task.form.form_type if task.form else 'generic'
+    form_type = 'generic'
+    if task.form:
+        form_type = task.form.form_type
+        
     template_name = 'pdfs/tarja_consolidado.html'
 
     table_rows = []
@@ -102,7 +118,7 @@ def generate_tarja_pdf(task: Task) -> bytes:
             if response_value is None:
                 continue
 
-            # LOGIC A: Handle Photos (Gallery)
+            # Handle Photos and Files (Gallery)
             if question.question_type in ['photo', 'file']:
                 paths = []
                 if isinstance(response_value, str) and response_value.startswith('['):
@@ -119,6 +135,7 @@ def generate_tarja_pdf(task: Task) -> bytes:
                 for p in paths:
                     if not p: 
                         continue
+                        
                     abs_p = get_absolute_path(p)
                     if abs_p:
                         valid_paths.append(abs_p)
@@ -129,7 +146,7 @@ def generate_tarja_pdf(task: Task) -> bytes:
                         'paths': valid_paths
                     })
 
-            # LOGIC B: Standard Data (Apply Formatting)
+            # Handle Standard Data
             else:
                 formatted_val = format_value(response_value)
                 table_rows.append({
@@ -137,11 +154,11 @@ def generate_tarja_pdf(task: Task) -> bytes:
                     'value': formatted_val
                 })
 
-    # Prepare Context with formatted data
-    # 1. Format header data (record_data)
-    formatted_record_data = {k: format_value(v) for k, v in task.record_data.items()}
+    # Prepare Context
+    formatted_record_data = {}
+    for k, v in task.record_data.items():
+        formatted_record_data[k] = format_value(v)
     
-    # 2. Calculate Duration
     duration_str = calculate_duration(task)
 
     context = {
@@ -152,22 +169,20 @@ def generate_tarja_pdf(task: Task) -> bytes:
         'form_name': task.form.name if task.form else "Formulario",
         'form_type': form_type,
         'now': datetime.now(),
-        
-        # New Metadata
         'duration': duration_str,
-        
-        # Header Data (Formatted)
-        **formatted_record_data,
-        
-        # Body Data
         'table_rows': table_rows,
         'gallery_groups': gallery_groups
     }
+    
+    # Merge formatted record data into context
+    context.update(formatted_record_data)
 
     html_string = render_template(template_name, **context)
 
     static_folder = os.path.join(current_app.root_path, 'static')
     pdf_file = io.BytesIO()
+    
+    # base_url is set to the static folder to resolve relative links in the template
     HTML(string=html_string, base_url=static_folder).write_pdf(pdf_file)
     
     pdf_file.seek(0)

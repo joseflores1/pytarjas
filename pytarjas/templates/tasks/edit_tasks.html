@@ -1,11 +1,10 @@
 {# pytarjas/templates/tasks/task_detail.html #}
 {% extends 'base.html' %}
 
-{% block title %}{{ task.form.name }}{% endblock %}
+{% block title %}{{ task.form.display_name }}{% endblock %}
 
 {% block extra_css %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
-  {# NEW: Module-specific CSS #}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tasks/detail.css') }}">
 {% endblock %}
 
@@ -22,10 +21,13 @@
     <div class="task-header">
       <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: var(--space-md);">
         <div>
-          <h1 class="task-header-title">{{ task.form.name }}</h1>
+          {# UPDATED: Now uses display_name to show the version (e.g., "Consolidado (v2)") #}
+          <h1 class="task-header-title">{{ task.form.display_name }}</h1>
           <div class="task-meta">
             <span>📝 {{ task.form.form_type or 'General' }}</span>
-            {% if task.worker %}<span>👤 {{ task.worker.username }}</span>{% endif %}
+            {% if task.worker %}
+              <span>👤 {{ task.worker.username }}</span>
+            {% endif %}
           </div>
         </div>
         <span class="status-badge status-{{ task.status }}">
@@ -68,7 +70,9 @@
               {{ type_map.get(question.question_type|default(''), '?') }} {{ question.question_type|default('Tipo Desconocido') | capitalize }}
             </span>
             
-            {% if question.is_required %}<span style="color:var(--color-danger)">*</span>{% endif %}
+            {% if question.is_required %}
+              <span style="color:var(--color-danger)">*</span>
+            {% endif %}
           </div>
 
           {% if question.question_description %}
@@ -81,7 +85,8 @@
           {% if q_type == 'text' %}
             <input type="text" name="response_{{ question.id }}" id="response_{{ question.id }}"
                    class="form-control response-input" value="{{ current_answer if current_answer is not none else '' }}"
-                   {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
+                   {% if question.is_required %}required{% endif %} 
+                   {% if is_input_disabled %}disabled{% endif %}>
           
           {% elif q_type == 'textarea' %}
             <textarea name="response_{{ question.id }}" id="response_{{ question.id }}"
@@ -92,23 +97,27 @@
           {% elif q_type == 'number' %}
             <input type="number" name="response_{{ question.id }}" id="response_{{ question.id }}"
                    class="form-control response-input" value="{{ current_answer if current_answer is not none else '' }}"
-                   {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
+                   {% if question.is_required %}required{% endif %} 
+                   {% if is_input_disabled %}disabled{% endif %}>
 
           {% elif q_type == 'date' %}
             <input type="date" name="response_{{ question.id }}" id="response_{{ question.id }}"
                    class="form-control response-input" value="{{ current_answer if current_answer is not none else '' }}"
-                   {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
+                   {% if question.is_required %}required{% endif %} 
+                   {% if is_input_disabled %}disabled{% endif %}>
 
           {% elif q_type == 'datetime' %}
             <input type="datetime-local" name="response_{{ question.id }}" id="response_{{ question.id }}"
                    class="form-control response-input" value="{{ current_answer if current_answer is not none else '' }}"
-                   {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
+                   {% if question.is_required %}required{% endif %} 
+                   {% if is_input_disabled %}disabled{% endif %}>
 
           {# SELECT #}
           {% elif q_type == 'select' %}
             <select name="response_{{ question.id }}" id="response_{{ question.id }}"
                     class="form-control response-input"
-                    {% if question.is_required %}required{% endif %} {% if is_input_disabled %}disabled{% endif %}>
+                    {% if question.is_required %}required{% endif %} 
+                    {% if is_input_disabled %}disabled{% endif %}>
               <option value="">-- Seleccionar --</option>
               {% if question.options and question.options.choices %}
                 {% for choice in question.options.choices %}
@@ -216,22 +225,17 @@
     {% set show_action_bar = can_transition or can_override_edit %}
     
     <div class="action-bar">
-      {# CHANGED: Back button always visible #}
       <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary" id="backBtn">Volver</a>
       
-      {# NEW: Download PDF Button - Always visible for valid tasks #}
       {% if task.status != 'pending' %}
         <a href="{{ url_for('tasks.download_task_pdf', task_id=task.id) }}" class="btn btn-warning" target="_blank" style="margin-left: 10px;">
             📄 Descargar PDF
         </a>
       {% endif %}
 
-      {# Editable Buttons are conditional #}
       {% if show_action_bar %}
         <button type="button" class="btn btn-primary" id="startBtn">▶️ Iniciar Tarea</button>
-
         <button type="button" class="btn btn-secondary" id="saveBtn">💾 Guardar Progreso</button>
-        
         <button type="button" 
                 class="btn btn-success" 
                 id="completeBtn"
@@ -245,10 +249,11 @@
           </button>
         {% endif %}
       {% endif %}
-
     </div>
     
-    <div class="save-indicator" id="saveIndicator"><span id="saveIndicatorText">Guardando...</span></div>
+    <div class="save-indicator" id="saveIndicator">
+      <span id="saveIndicatorText">Guardando...</span>
+    </div>
     
     <div id="validationModal" class="modal-overlay" style="display:none;">
       <div class="modal-content">
@@ -270,6 +275,5 @@
 {% endblock %}
 
 {% block extra_js %}
-{# NEW: Module-specific JS #}
 <script src="{{ url_for('static', filename='js/tasks/detail.js') }}"></script>
 {% endblock %}

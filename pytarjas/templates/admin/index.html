@@ -4,7 +4,6 @@
 {% block title %}Panel de Administración{% endblock %}
 
 {% block extra_css %}
-  {# NEW: Module-specific CSS #}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/index.css') }}">
 {% endblock %}
 
@@ -20,13 +19,11 @@
 {% block content %}
   <div class="container">
     
-    {# STATS SECTION #}
+    {# STATS SECTION: USERS #}
     <section class="admin-section">
-      <h2 class="section-title">Resumen del Sistema</h2>
+      <h2 class="section-title">Resumen de Usuarios</h2>
       
       <div class="stats-grid">
-        
-        {# Total Users #}
         <a href="{{ url_for('users.list_users') }}" class="card stat-card">
           <div class="stat-card-body">
             <div class="stat-icon color-primary">👥</div>
@@ -35,7 +32,6 @@
           </div>
         </a>
         
-        {# Admins #}
         <a href="{{ url_for('users.list_users', role='admin') }}" class="card stat-card">
           <div class="stat-card-body">
             <div class="stat-icon color-danger">👑</div>
@@ -44,7 +40,6 @@
           </div>
         </a>
         
-        {# Workers #}
         <a href="{{ url_for('users.list_users', role='worker') }}" class="card stat-card">
           <div class="stat-card-body">
             <div class="stat-icon color-secondary">🔧</div>
@@ -53,7 +48,6 @@
           </div>
         </a>
 
-        {# Planners #}
         <a href="{{ url_for('users.list_users', role='planner') }}" class="card stat-card">
           <div class="stat-card-body">
             <div class="stat-icon color-planner">📋</div>
@@ -62,7 +56,6 @@
           </div>
         </a>
         
-        {# Clients #}
         <a href="{{ url_for('users.list_users', role='client') }}" class="card stat-card">
           <div class="stat-card-body">
             <div class="stat-icon color-warning">🏢</div>
@@ -70,7 +63,29 @@
             <div class="stat-value color-warning">{{ client_count }}</div>
           </div>
         </a>
+      </div>
+    </section>
 
+    {# NEW SECTION: FORM VERSIONING STATS #}
+    <section class="admin-section">
+      <h2 class="section-title">Plantillas y Versiones</h2>
+      
+      <div class="stats-grid">
+        <a href="{{ url_for('forms.list_forms', is_active='true') }}" class="card stat-card">
+          <div class="stat-card-body">
+            <div class="stat-icon" style="color: var(--color-success);">✅</div>
+            <h3 class="stat-title">Formularios Activos</h3>
+            <div class="stat-value" style="color: var(--color-success);">{{ active_forms }}</div>
+          </div>
+        </a>
+
+        <a href="{{ url_for('forms.list_forms', is_active='false') }}" class="card stat-card">
+          <div class="stat-card-body">
+            <div class="stat-icon" style="color: var(--color-text-secondary);">📚</div>
+            <h3 class="stat-title">Total de Versiones</h3>
+            <div class="stat-value" style="color: var(--color-text-secondary);">{{ total_versions }}</div>
+          </div>
+        </a>
       </div>
     </section>
 
@@ -114,6 +129,5 @@
 {% endblock %}
 
 {% block extra_js %}
-  {# NEW: Module-specific JS #}
   <script src="{{ url_for('static', filename='js/admin/index.js') }}"></script>
 {% endblock %}

@@ -100,7 +100,13 @@
           
           <div class="form-card-header">
             <div style="flex: 1; min-width: 0;">
-              <h3 class="form-card-title">{{ form.name }}</h3>
+              {# UPDATED: Added version span #}
+              <h3 class="form-card-title">
+                {{ form.name }} 
+                <span style="font-size: 0.7em; color: var(--color-text-secondary); font-weight: normal;">
+                  v{{ form.version }}
+                </span>
+              </h3>
               
               {% if form.form_type == 'consolidado' %}
                 <span class="badge" style="background-color: #3b82f6; color: white;">📦 Consolidado</span>

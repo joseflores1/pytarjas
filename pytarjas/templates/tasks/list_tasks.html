@@ -1,0 +1,355 @@
+{# pytarjas/templates/tasks/list_tasks.html #}
+{% extends 'base.html' %}
+
+{% block title %}Lista de Tareas{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tasks/list.css') }}">
+{% endblock %}
+
+{% block header %}
+  <div class="container">
+    <div class="header-action-container">
+      <div class="header-text">
+        <h1 class="page-title">📋 Listado de Tareas</h1>
+        <p class="page-subtitle">
+          Mostrando <strong>{{ total }}</strong> tareas. Utilice los filtros para refinar la búsqueda.
+        </p>
+      </div>
+      <a href="{{ url_for('tasks.create_task') }}" class="btn btn-primary btn-lg">
+        <span class="btn-icon-plus">+</span> Nueva Tarea
+      </a>
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div class="container">
+    
+    {# HIDDEN JSON DATA BLOCK #}
+    <textarea id="allFormsData" style="display:none;">
+        {% set form_data = {} %}
+        {% for form in all_forms %}
+            {% set questions_list = [] %}
+            {% for q in form.questions|sort(attribute='order') %}
+                {% if q.question_type|default('')|string|trim == 'client_select' %}
+                    {% set filter_key = 'q_record_client_name' %}
+                {% else %}
+                    {% set filter_key = 'q_' + q.id %}
+                {% endif %}
+                {% set _ = questions_list.append({
+                    'id': q.id, 
+                    'text': q.question_text, 
+                    'type': q.question_type,
+                    'name_key': filter_key
+                }) %}
+            {% endfor %}
+            {% set _ = form_data.update({
+                form.id: { 'name': form.name, 'questions': questions_list }
+            }) %}
+        {% endfor %}
+        {{ form_data | tojson | safe }}
+    </textarea>
+    
+    {# Group users by role #}
+    {% set all_users_for_filters = all_assignable_users %}
+    {% set grouped_users = {'admin': [], 'planner': [], 'worker': []} %}
+    {% for user_obj in all_users_for_filters %}
+        {% if user_obj.role in grouped_users %}
+            {% set _ = grouped_users[user_obj.role].append(user_obj) %}
+        {% endif %}
+    {% endfor %}
+    
+    {# ADVANCED FILTER FORM #}
+    <form method="GET" action="{{ url_for('tasks.list_tasks') }}" id="filterForm">
+      <div class="filter-grid-container">
+        
+        {# Card 1: Status #}
+        <div class="filter-card">
+          <label for="status" class="filter-label">Estado</label>
+          <select name="status" id="status" class="form-control filter-input-field filter-input">
+            <option value="all" {% if status == 'all' %}selected{% endif %}>-- Todos --</option>
+            <option value="pending" {% if status == 'pending' %}selected{% endif %}>Pendientes</option>
+            <option value="in_progress" {% if status == 'in_progress' %}selected{% endif %}>En Progreso</option>
+            <option value="completed" {% if status == 'completed' %}selected{% endif %}>Completadas</option>
+            <option value="reviewed" {% if status == 'reviewed' %}selected{% endif %}>Revisadas</option>
+            <option value="approved" {% if status == 'approved' %}selected{% endif %}>Aprobadas</option>
+          </select>
+        </div>
+        
+        {# Card 2: Form #}
+        <div class="filter-card">
+          <label for="form_id_filter" class="filter-label">Formulario</label>
+          <select name="form_id_filter" id="form_id_filter" class="form-control filter-input-field filter-input">
+            <option value="">-- Todos los formularios --</option>
+            {% for f in all_forms %}
+              <option value="{{ f.id }}" {% if f.id == form_id_filter %}selected{% endif %}>
+                {{ f.display_name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        {# Card 3: Created By #}
+        {% if user.role != 'client' %}
+        <div class="filter-card">
+          <label class="filter-label">Creado por</label>
+          <div class="custom-filter-container" id="created-by-filter-container">
+            <input type="hidden" name="created_by_id" id="created_by_id_input" class="filter-input" value="{{ created_by_id_filter or '' }}">
+            <div class="custom-filter-display" id="created-by-display">
+                {% set selected_creator = all_creators | selectattr('id', '==', created_by_id_filter) | first %}
+                {% if selected_creator %}
+                    {{ selected_creator.username }}
+                {% else %}
+                    -- Todos --
+                {% endif %}
+                <span>▼</span>
+            </div>
+            <div class="custom-filter-menu" id="created-by-menu">
+                <input type="text" class="form-control filter-search-input" placeholder="Buscar..." id="created-by-search">
+                <ul class="filter-role-group" id="created-by-list">
+                    <li class="filter-role-item filter-user-list-item all-option" data-id="" data-username="-- Todos --">-- Todos --</li>
+                    {% for role, users in grouped_users.items() %}
+                        {% if users %}
+                        <li class="filter-role-item filter-role-category">
+                            {% if role == 'admin' %}👑 Administradores{% elif role == 'planner' %}📋 Planificadores{% elif role == 'worker' %}🔧 Trabajadores{% endif %}
+                        </li>
+                        <ul class="filter-user-list">
+                            {% for user_obj in users %}
+                                <li data-id="{{ user_obj.id }}" data-username="{{ user_obj.username }}" data-role="{{ user_obj.role }}">
+                                    {{ user_obj.username }}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        {# Card 4: Assigned To #}
+        {% if user.role in ['admin', 'planner'] %}
+        <div class="filter-card">
+          <label class="filter-label">Asignado a</label>
+          <div class="custom-filter-container" id="assigned-to-filter-container">
+            <input type="hidden" name="worker_id" id="worker_id_input" class="filter-input" value="{{ worker_id_filter or '' }}">
+            <div class="custom-filter-display" id="assigned-to-display">
+                {% set selected_worker = all_assignable_users | selectattr('id', '==', worker_id_filter) | first %}
+                {% if selected_worker %}
+                    {{ selected_worker.username }}
+                {% else %}
+                    -- Todos --
+                {% endif %}
+                <span>▼</span>
+            </div>
+            <div class="custom-filter-menu" id="assigned-to-menu">
+                <input type="text" class="form-control filter-search-input" placeholder="Buscar..." id="assigned-to-search">
+                <ul class="filter-role-group" id="assigned-to-list">
+                    <li class="filter-role-item filter-user-list-item all-option" data-id="" data-username="-- Todos --">-- Todos --</li>
+                    {% for role, users in grouped_users.items() %}
+                        {% if users %}
+                        <li class="filter-role-item filter-role-category">
+                            {% if role == 'admin' %}👑 Administradores{% elif role == 'planner' %}📋 Planificadores{% elif role == 'worker' %}🔧 Trabajadores{% endif %}
+                        </li>
+                        <ul class="filter-user-list">
+                            {% for user_obj in users %}
+                                <li data-id="{{ user_obj.id }}" data-username="{{ user_obj.username }}" data-role="{{ user_obj.role }}">
+                                    {{ user_obj.username }}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        {# Card 5: Created Date #}
+        <div class="filter-card">
+            <label class="filter-label">Creada</label>
+            <div class="date-input-range">
+                <input type="date" name="created_at_min" value="{{ created_at_min or '' }}" class="form-control date-input-field filter-input">
+                <input type="date" name="created_at_max" value="{{ created_at_max or '' }}" class="form-control date-input-field filter-input">
+            </div>
+        </div>
+
+        {# Card 6: Started Date #}
+        <div class="filter-card">
+            <label class="filter-label">Iniciada</label>
+            <div class="date-input-range">
+                <input type="date" name="started_at_min" value="{{ started_at_min or '' }}" class="form-control date-input-field filter-input">
+                <input type="date" name="started_at_max" value="{{ started_at_max or '' }}" class="form-control date-input-field filter-input">
+            </div>
+        </div>
+
+        {# Card 7: Completed Date #}
+        <div class="filter-card">
+            <label class="filter-label">Completada</label>
+            <div class="date-input-range">
+                <input type="date" name="completed_at_min" value="{{ completed_at_min or '' }}" class="form-control date-input-field filter-input">
+                <input type="date" name="completed_at_max" value="{{ completed_at_max or '' }}" class="form-control date-input-field filter-input">
+            </div>
+        </div>
+      </div>
+
+      {# Container for dynamic question filters generated by JS #}
+      <div id="dynamic-question-filters" class="dynamic-filters-container"></div>
+
+      {# Clean Filters Action #}
+      <div class="filter-actions-bottom">
+          <a href="{{ url_for('tasks.list_tasks') }}" class="btn-clean-filters">
+            Limpiar Filtros
+          </a>
+      </div>
+    </form>
+
+    {# TASKS TABLE #}
+    {% if tasks %}
+      <div class="table-responsive card">
+        <table class="tasks-table">
+          <thead>
+            <tr>
+                <th class="col-icon"></th> 
+                <th class="col-fixed-action text-center">Acciones</th> 
+                <th class="col-form-name text-center">Formulario</th>
+                <th class="col-wrapping-text text-center">Asignado a</th>
+                <th class="col-wrapping-text text-center">Creado por</th>
+                <th class="col-fixed-status text-center">Estado</th>
+                <th class="col-fixed-date text-center">Creada</th>
+                <th class="col-fixed-date text-center">Iniciada</th>
+                <th class="col-fixed-date text-center">Completada</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for task in tasks %}
+            <tr data-task-id="{{ task.id }}" class="task-row">
+              <td class="text-center align-middle">
+                {% if task.form.questions %}
+                  <span class="toggle-icon" data-task-id="{{ task.id }}">▶</span>
+                {% endif %}
+              </td>
+              <td class="col-fixed-action text-center align-middle"> 
+                <a href="{{ url_for('tasks.get_task', task_id=task.id) }}" class="btn btn-sm btn-secondary">Ver / Editar</a>
+              </td>
+              <td class="col-form-name text-center align-middle font-bold">
+                <a href="{{ url_for('tasks.get_task', task_id=task.id) }}" class="text-primary">
+                    {{ task.form.display_name }}
+                </a>
+              </td>
+              <td class="col-wrapping-text text-center align-middle">
+                {% if task.worker %}
+                    {% if task.worker.role == 'admin' %}👑{% endif %}
+                    {% if task.worker.role == 'planner' %}📋{% endif %}
+                    {% if task.worker.role == 'worker' %}🔧{% endif %}
+                    {{ task.worker.username }}
+                {% else %}
+                    N/A
+                {% endif %}
+              </td>
+              <td class="col-wrapping-text text-center align-middle">
+                {% if task.created_by %}
+                    {% if task.created_by.role == 'admin' %}👑{% endif %}
+                    {% if task.created_by.role == 'planner' %}📋{% endif %}
+                    {% if task.created_by.role == 'worker' %}🔧{% endif %}
+                    {{ task.created_by.username }}
+                {% else %}
+                    N/A
+                {% endif %}
+              </td>
+              <td class="text-center align-middle">
+                <span class="status-badge status-{{ task.status }}">{{ task.status|replace('_', ' ')|capitalize }}</span>
+              </td>
+              <td class="col-fixed-date text-center align-middle">
+                {% if task.created_at %}
+                    {{ task.created_at.strftime('%d/%m/%Y %H:%M') }}
+                {% else %}
+                    N/A
+                {% endif %}
+              </td>
+              <td class="col-fixed-date text-center align-middle">
+                {% if task.started_at %}
+                    {{ task.started_at.strftime('%d/%m/%Y %H:%M') }}
+                {% else %}
+                    N/A
+                {% endif %}
+              </td>
+              <td class="col-fixed-date text-center align-middle">
+                {% if task.completed_at %}
+                    {{ task.completed_at.strftime('%d/%m/%Y %H:%M') }}
+                {% else %}
+                    N/A
+                {% endif %}
+              </td>
+            </tr>
+            <tr id="detail-{{ task.id }}" class="collapsible-row" style="display: none;">
+                <td colspan="9" class="detail-row"> 
+                    <div class="detail-content">
+                        {% if task.responses and task.form.questions %}
+                            {% set response_map = task.responses %}
+                            {% for question in task.form.questions %}
+                                {% set answer = response_map.get(question.id) %}
+                                {% if answer is not none and answer != '' %}
+                                <div class="qa-group">
+                                    <div class="qa-question">{{ question.question_text }}</div>
+                                    <div class="qa-answer">
+                                      {% set q_type = question.question_type|default('')|string|trim %}
+                                      {% if q_type == 'photo' or q_type == 'file' %}
+                                        Archivo Adjunto (Ver detalle)
+                                      {% elif answer == 'true' %}
+                                        Sí
+                                      {% elif answer == 'false' %}
+                                        No
+                                      {% else %}
+                                        {{ answer }}
+                                      {% endif %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-center text-muted">No hay respuestas registradas.</p>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {# Pagination Block #}
+      {% if total > limit %}
+        <div class="pagination-container">
+          {% set filter_params = request.args.to_dict() %}
+          {% set _ = filter_params.pop('offset', None) %}
+          {% set current_url = url_for('tasks.list_tasks', **filter_params) %}
+          {% if offset > 0 %}
+            <a href="{{ current_url }}&offset={{ offset - limit }}" class="btn btn-secondary">← Anterior</a>
+          {% endif %}
+          <div class="pagination-info">Página {{ (offset // limit) + 1 }}</div>
+          {% if offset + limit < total %}
+            <a href="{{ current_url }}&offset={{ offset + limit }}" class="btn btn-secondary">Siguiente →</a>
+          {% endif %}
+        </div>
+      {% endif %}
+
+    {% else %}
+      <div class="empty-state-container">
+        <div class="empty-state-icon">📭</div>
+        <h2 class="empty-state-title">No se encontraron tareas</h2>
+        <p class="empty-state-text">Ajuste sus filtros o cree una nueva tarea.</p>
+        <a href="{{ url_for('tasks.create_task') }}" class="btn btn-primary btn-lg">Crear Nueva Tarea</a>
+      </div>
+    {% endif %}
+
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{{ url_for('static', filename='js/tasks/list.js') }}"></script>
+{% endblock %}

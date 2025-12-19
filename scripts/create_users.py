@@ -1,45 +1,50 @@
+# scripts/create_users.py
 from pytarjas import create_app
-from pytarjas.models.user_models import db, Admin, Worker, Planner, Client
+from pytarjas.models.user_models import db, User
 
 app = create_app()
 
 with app.app_context():
-    admin=Admin(
+    # Recreate tables after delete_tables.sql runs
+    db.create_all()
+    print("Database schema created successfully.")
+
+    # Create Admin
+    admin = User(
         username="admin",
         email="admin@example.com",
-        role="admin",
+        role="admin"
     )
-    admin.set_user_password(admin, "admin123")
+    # Corrected method name based on your user_models.py
+    admin.reset_password("admin123") 
     db.session.add(admin)
 
-    worker=Worker(
+    # Create Worker
+    worker = User(
         username="worker",
         email="worker@example.com",
-        role="worker",
+        role="worker"
     )
-    admin.set_user_password(worker, "worker123")
+    worker.reset_password("worker123")
     db.session.add(worker)
 
-    planner=Planner(
+    # Create Planner
+    planner = User(
         username="planner",
         email="planner@example.com",
-        role="planner",
+        role="planner"
     )
-    admin.set_user_password(planner, "planner123")
+    planner.reset_password("planner123")
     db.session.add(planner)
 
-    client=Client(
+    # Create Client
+    client = User(
         username="client",
         email="client@example.com",
-        role="client",
+        role="client"
     )
-
-    admin.set_user_password(client, "client123")
+    client.reset_password("client123")
     db.session.add(client)
 
-
     db.session.commit()
-    print(f"Created admin: {admin.username}")
-    print(f"Created worker: {worker.username}")
-    print(f"Created planner: {planner.username}")
-    print(f"Created client: {client.username}")
+    print(f"Created users: {admin.username}, {worker.username}, {planner.username}, {client.username}")
