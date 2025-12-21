@@ -3,22 +3,34 @@
  * Purpose: Structural layout elements (Navbar, Sidebar, Grid, etc.)
  */
 
-/* ... [Keep all your existing Button, Card, Alert, Badge, Modal styles here] ... */
+/* ============================================
+   LAYOUT WRAPPERS
+   ============================================ */
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    margin: 0;
+}
+
+.layout-content {
+    flex: 1 0 auto;
+    /* Added padding to push content away from the navbar */
+    padding-top: 40px; 
+}
 
 /* ============================================
    NAVIGATION (Custom Inverted Theme)
    ============================================ */
 
-/* THEME VARIABLES 
-   Defines the "Dark Navbar on Light Mode" look 
-*/
+/* THEME VARIABLES */
 :root {
   /* Default (Light Mode) -> Dark Navbar */
   --nav-bg: #1e293b;       
   --nav-text: #cbd5e1;     
   --nav-text-hover: #ffffff;
   --nav-active-bg: rgba(255, 255, 255, 0.1);
-  --nav-active-text: #fb923c; /* Orange */
+  --nav-active-text: #fb923c; 
   --nav-border: #0f172a;
   --nav-btn-hover: rgba(255, 255, 255, 0.1);
 }
@@ -38,14 +50,15 @@
 .navbar {
   background-color: var(--nav-bg);
   border-bottom: 1px solid var(--nav-border);
-  height: 100px !important; /* Increased Height */
+  height: 100px !important;
   padding: 0 !important;
-  position: relative; /* CHANGED: sticky -> relative */
-  /* top: 0; REMOVED for non-sticky */
+  position: relative; 
   z-index: 1000;
   width: 100%;
   transition: background-color 0.3s ease, box-shadow 0.3s ease;
   box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  /* Added margin to separate navbar from the main content */
+  margin-bottom: 20px;
 }
 
 .navbar-container {
@@ -53,7 +66,7 @@
   align-items: center;
   justify-content: space-between;
   height: 100%;
-  max-width: 1600px; /* Wider container for the big logo */
+  max-width: 1600px;
   margin: 0 auto;
   padding: 0 24px;
 }
@@ -65,20 +78,20 @@
   gap: 10px;  
   text-decoration: none;
   margin-right: 24px; 
-  height: 100px; /* Matches navbar height */
+  height: 100px;
   overflow: visible; 
-  min-width: 350px; /* Reserves space so logo doesn't jitter */
+  min-width: 350px;
 }
 
 .navbar-brand .navbar-logo {
-  height: 108px !important; /* Maximized Logo Size */
+  height: 108px !important;
   max-height: 108px !important; 
-  width: 100% !important; /* Forces stretch over internal padding */
+  width: 100% !important;
   object-fit: cover; 
   object-position: left center;
   transform: none; 
   margin-left: -120px; 
-  display: none; /* Hidden by default, toggled by theme below */
+  display: none;
 }
 
 .brand-text {
@@ -90,8 +103,18 @@
 }
 
 /* Logo Theme Toggling */
-:root:not([data-theme="dark"]) .logo-for-dark-bg { display: block !important; }
-[data-theme="dark"] .logo-for-light-bg { display: block !important; }
+.logo-for-dark-bg,
+.logo-for-light-bg {
+  display: none !important;
+}
+
+:root:not([data-theme="dark"]) .logo-for-dark-bg { 
+  display: block !important; 
+}
+
+[data-theme="dark"] .logo-for-light-bg { 
+  display: block !important; 
+}
 
 /* Navigation Links */
 .navbar-nav {
@@ -116,7 +139,7 @@
   transition: all 0.2s ease;
   background-color: transparent;
   border: none;
-  min-height: 44px; /* Touch target */
+  min-height: 44px;
 }
 
 .navbar-nav .nav-link:hover {
@@ -207,6 +230,105 @@
   margin-left: 16px;
 }
 
+/* ============================================
+   FOOTER (Ultra Compact Grid)
+   ============================================ */
+.footer {
+  background-color: var(--nav-bg);
+  color: var(--nav-text);
+  border-top: 1px solid var(--nav-border);
+  padding: 10px 0 5px; 
+  margin-top: 60px; 
+  width: 100%;
+  transition: background-color 0.3s ease;
+}
+
+.footer-container {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: minmax(350px, 2fr) repeat(auto-fit, minmax(180px, 1fr));
+  gap: 15px;
+}
+
+.footer-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.footer-section h4 {
+  color: var(--nav-text-hover);
+  font-size: 1rem; 
+  font-weight: 700;
+  margin-bottom: 2px; 
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.footer-section .tagline {
+  font-size: 0.8rem;
+  line-height: 1.2;
+  margin-top: 2px;
+  max-width: 400px;
+}
+
+.footer-logo {
+  width: 240px !important; 
+  height: auto;
+  margin-left: -10px;
+}
+
+.footer-links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.footer-links li {
+  margin-bottom: 1px;
+}
+
+.footer-links a {
+  color: var(--nav-text);
+  text-decoration: none;
+  transition: color 0.2s;
+  font-size: 0.85rem; 
+}
+
+.footer-links a:hover {
+  color: var(--nav-active-text);
+}
+
+.social-links {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.social-links a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.social-links svg {
+  width: 16px;
+  height: 16px;
+}
+
+.footer-bottom {
+  max-width: 1600px;
+  margin: 5px auto 0; 
+  padding: 3px 24px 0; 
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--nav-text);
+  opacity: 0.7;
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
   .brand-text { display: none; }
@@ -219,7 +341,7 @@
     display: flex;
     flex-direction: column;
     position: absolute;
-    top: 100px; /* Matches new navbar height */
+    top: 100px;
     left: 0; right: 0;
     background: var(--nav-bg);
     padding: 20px;
@@ -227,4 +349,9 @@
     border-bottom: 1px solid var(--nav-border);
   }
   .nav-link { width: 100%; }
+  
+  .footer-container {
+      grid-template-columns: 1fr;
+      gap: 15px;
+  }
 }

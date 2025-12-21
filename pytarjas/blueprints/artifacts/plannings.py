@@ -1,16 +1,16 @@
 # pytarjas/blueprints/artifacts/plannings.py
 """
 Plannings API blueprint for managing work plannings and tasks.
-Updated to support per-task worker assignment and dynamic records.
+Updated to support Planning Templates and dynamic batch metadata.
 """
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for, jsonify, g, abort 
-from sqlalchemy.orm import joinedload
-from datetime import datetime, timezone
 import uuid
+from datetime import datetime, timezone
+from flask import Blueprint, flash, redirect, render_template, request, url_for, jsonify, g, abort
+from sqlalchemy.orm import joinedload
 
 from pytarjas.models.user_models import db, User
-from pytarjas.models.docs_models import Planning, Task, Form   
+from pytarjas.models.docs_models import Planning, Task, Form, PlanningTemplate
 from pytarjas.auth import login_required, planning_access_required
 from pytarjas.helper import wants_json
 
@@ -23,6 +23,7 @@ def check_planning_access(planning_id: str) -> Planning:
     planning = Planning.query.options(
         joinedload(Planning.planner),
         joinedload(Planning.form),
+        joinedload(Planning.template).joinedload(PlanningTemplate.fields),
         joinedload(Planning.tasks)
     ).get_or_404(planning_id)
     
@@ -39,14 +40,15 @@ def check_planning_access(planning_id: str) -> Planning:
 @planning_access_required
 def list_plannings():
     """
-    List all plannings showing versioned form names.
+    List all plannings showing versioned form names and template names.
     """
     status_filter = request.args.get('status', 'all')
     client_search = request.args.get('client_name', '').strip()
     
     query = Planning.query.options(
         joinedload(Planning.planner),
-        joinedload(Planning.form)
+        joinedload(Planning.form),
+        joinedload(Planning.template)
     )
     
     if status_filter != 'all':
@@ -63,6 +65,7 @@ def list_plannings():
             "id": plan.id,
             "client_name": plan.client_name,
             "form_name": plan.form.display_name if plan.form else "N/A",
+            "template_name": plan.template.name if plan.template else "Sin Plantilla",
             "status": plan.status,
             "total_tasks": plan.total_tasks,
             "planner": plan.planner.username if plan.planner else "System",
@@ -87,12 +90,14 @@ def list_plannings():
 @planning_access_required
 def create_planning():
     """
-    Create a new planning using the latest active form version and assign tasks to workers.
+    Create a new planning using a PlanningTemplate for header metadata and a Form for tasks.
     """
     if request.method == "GET":
         active_forms = Form.query.filter_by(is_active=True).order_by(Form.name).all()
+        planning_templates = PlanningTemplate.query.options(
+            joinedload(PlanningTemplate.fields)
+        ).order_by(PlanningTemplate.name).all()
         
-        # Fetch assignable users (workers and planners) for per-task assignment
         assignable_users = User.query.filter(
             User.role.in_(["worker", "planner"])
         ).order_by(User.username).all()
@@ -101,19 +106,37 @@ def create_planning():
             return jsonify({
                 "success": True,
                 "forms": [{"id": f.id, "name": f.display_name} for f in active_forms],
+                "templates": [
+                    {
+                        "id": t.id, 
+                        "name": t.name, 
+                        "fields": [
+                            {
+                                "name": f.field_name, 
+                                "label": f.field_label, 
+                                "type": f.field_type, 
+                                "required": f.is_required,
+                                "options": f.options
+                            } 
+                            for f in t.fields
+                        ]
+                    } for t in planning_templates
+                ],
                 "assignable_users": [{"id": u.id, "username": u.username} for u in assignable_users]
             })
         
         return render_template(
             "plannings/create_plannings.html",
             forms=active_forms,
+            planning_templates=planning_templates,
             assignable_users=assignable_users
         )
     
-    # POST logic
     data = request.get_json() if wants_json() else request.form
     client_name = data.get("client_name")
     form_id = data.get("form_id")
+    template_id = data.get("template_id")
+    metadata_values = data.get("metadata_values", {})
     records = data.get("records", [])
 
     if not client_name or not form_id:
@@ -128,6 +151,8 @@ def create_planning():
             id=str(uuid.uuid4()),
             planner_id=g.user.id,
             form_id=form_id,
+            template_id=template_id if template_id else None,
+            metadata_values=metadata_values,
             client_name=client_name,
             status="uploaded",
             total_tasks=len(records),
@@ -136,7 +161,6 @@ def create_planning():
         db.session.add(planning)
         
         for record in records:
-            # Extract worker_id if provided in the record row
             task_worker_id = record.pop('worker_id', None)
             
             task = Task(
@@ -145,7 +169,9 @@ def create_planning():
                 form_id=form_id, 
                 record_data=record,
                 worker_id=task_worker_id,
+                created_by_id=g.user.id,
                 status="pending",
+                responses={},
                 created_at=datetime.now(timezone.utc)
             )
             db.session.add(task)
@@ -171,7 +197,7 @@ def create_planning():
 @planning_access_required
 def get_planning(planning_id):
     """
-    View details of a specific planning.
+    View details of a specific planning, including metadata and generated tasks.
     """
     planning = check_planning_access(planning_id)
     
@@ -181,13 +207,16 @@ def get_planning(planning_id):
             "planning": {
                 "id": planning.id,
                 "client_name": planning.client_name,
-                "form_version": planning.form.display_name,
+                "form_version": planning.form.display_name if planning.form else "N/A",
+                "template_name": planning.template.name if planning.template else "Sin Plantilla",
+                "metadata": planning.metadata_values,
                 "status": planning.status,
-                "tasks_count": len(planning.tasks)
+                "tasks_count": len(planning.tasks),
+                "created_at": planning.created_at.strftime('%d/%m/%Y %H:%M')
             }
         })
     
     return render_template(
-        "plannings/view_planning.html",
+        "plannings/edit_plannings.html",
         planning=planning
     )

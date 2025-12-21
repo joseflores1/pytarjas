@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+
+{% block title %}Detalle de Planificación - {{ planning.client_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/plannings/edit.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="edit-container">
+    <div class="edit-header">
+        <div class="header-title">
+            <i class="fas fa-calendar-check"></i>
+            <h1>Planificación: {{ planning.client_name }}</h1>
+        </div>
+        <div class="header-actions">
+            <a href="{{ url_for('plannings.list_plannings') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+        </div>
+    </div>
+
+    <div class="info-grid-container">
+        <div class="form-section">
+            <h3><i class="fas fa-info-circle"></i> Información General</h3>
+            <div class="details-grid">
+                <div class="detail-item">
+                    <span class="detail-label">Estado</span>
+                    <span class="status-badge status-{{ planning.status }}">
+                        {{ planning.status|title }}
+                    </span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Cliente</span>
+                    <span class="detail-value">{{ planning.client_name }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Formulario</span>
+                    <span class="detail-value">{{ planning.form.display_name }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Planificador</span>
+                    <span class="detail-value">{{ planning.planner.username }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Total Tareas</span>
+                    <span class="detail-value">{{ planning.total_tasks }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Fecha Creación</span>
+                    <span class="detail-value">{{ planning.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-section">
+        <h3><i class="fas fa-tasks"></i> Tareas Generadas</h3>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Trabajador</th>
+                        <th>Estado</th>
+                        <th>Última Actividad</th>
+                        <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in planning.tasks %}
+                    <tr>
+                        <td class="text-mono">{{ task.id[:8] }}</td>
+                        <td>
+                            {% if task.worker %}
+                                <i class="fas fa-user-circle"></i> {{ task.worker.username }}
+                            {% else %}
+                                <span class="text-muted">Sin asignar</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="status-badge status-{{ task.status }}">
+                                {{ task.status|title }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if task.updated_at %}
+                                {{ task.updated_at.strftime('%d/%m/%Y %H:%M') }}
+                            {% else %}
+                                {{ task.created_at.strftime('%d/%m/%Y %H:%M') }}
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <a href="{{ url_for('tasks.get_task', task_id=task.id) }}" class="btn-icon" title="Ver Detalle">
+                                <i class="fas fa-external-link-alt"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="empty-row">
+                            <i class="fas fa-folder-open"></i>
+                            <p>No hay tareas asociadas.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/plannings/edit.js') }}"></script>
+{% endblock %}

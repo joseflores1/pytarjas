@@ -1,247 +1,395 @@
 # docs_models.py
 """
 Task and form management models for the Pytarjas application.
+Includes Planning Templates for dynamic batch metadata and Task-level metadata.
 """
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import String, Integer, Text, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.orm.attributes import flag_modified
 from .user_models import db, User
 
-class Form(db.Model):
+class PlanningTemplate(db.Model):
     """
-    Predefined questionnaire template for tarjas.
-    Now supports VERSIONING to preserve historical data.
+    Template for Planning metadata (the 'header' information for a batch of tasks).
     """
-    __tablename__="form"
+    __tablename__ = "planning_template"
 
-    id: Mapped[str]=mapped_column(
+    id: Mapped[str] = mapped_column(
         String(36),
         primary_key=True,
         default=lambda: str(uuid.uuid4()),
     )
 
-    # CHANGED: Removed unique=True to allow multiple versions with same name
-    name: Mapped[str]=mapped_column(
+    name: Mapped[str] = mapped_column(
         String(100),
         nullable=False,
-        unique=False, 
         index=True,
     )
-    
-    # NEW: Version number (starts at 1)
-    version: Mapped[int]=mapped_column(
-        Integer,
-        nullable=False,
-        default=1,
-    )
 
-    description: Mapped[str | None]=mapped_column(
+    description: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
-    form_type: Mapped[str]=mapped_column(
-        String(50),
-        nullable=True,
-        index=True,
-    )
 
-    is_active: Mapped[bool]=mapped_column(
-        Boolean,
-        nullable=False,
-        default=True,
-    )
-
-    created_by_id: Mapped[str | None]=mapped_column(
+    created_by_id: Mapped[str | None] = mapped_column(
         String(36),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
 
-    created_at: Mapped[datetime]=mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
-    updated_at: Mapped[datetime | None]=mapped_column(
+    
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime,
         nullable=True,
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
-    questions: Mapped[list["Question"]]=relationship(
-        "Question",
-        back_populates="form",
+    # Relationships
+    fields: Mapped[list["PlanningMetadataField"]] = relationship(
+        "PlanningMetadataField",
+        back_populates="template",
         cascade="all, delete-orphan",
-    )
-    plannings: Mapped[list["Planning"]]=relationship(
-        "Planning",
-        back_populates="form"
-    )
-    created_by: Mapped["User"]=relationship(
-        "User",
-        foreign_keys=[created_by_id],
+        order_by="PlanningMetadataField.order",
     )
     
-    # NEW: Helper to get display name with version
-    @property
-    def display_name(self):
-        if self.version > 1:
-            return f"{self.name} (v{self.version})"
-        return self.name
+    plannings: Mapped[list["Planning"]] = relationship(
+        "Planning",
+        back_populates="template"
+    )
 
-class Question(db.Model):
+    def __repr__(self):
+        return f"<PlanningTemplate: {self.name}>"
+
+class PlanningMetadataField(db.Model):
     """
-    Individual question/field within a Form.
+    Individual metadata field definition within a PlanningTemplate.
     """
+    __tablename__ = "planning_metadata_field"
 
-    __tablename__="question"
-
-    id: Mapped[str]=mapped_column(
+    id: Mapped[str] = mapped_column(
         String(36),
         primary_key=True,
         default=lambda: str(uuid.uuid4()),
     )
 
-    form_id: Mapped[str]=mapped_column(
+    template_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("planning_template.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    field_label: Mapped[str] = mapped_column(
+        String(200),
+        nullable=False,
+    )
+
+    field_name: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+
+    field_type: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="text",
+    )
+
+    is_required: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    order: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+
+    options: Mapped[dict | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    template: Mapped["PlanningTemplate"] = relationship(
+        "PlanningTemplate",
+        back_populates="fields",
+    )
+
+class Form(db.Model):
+    """
+    Predefined questionnaire template for tasks.
+    Supports versioning to preserve historical data.
+    """
+    __tablename__ = "form"
+
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+
+    name: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        index=True,
+    )
+    
+    version: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+    )
+
+    description: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    form_type: Mapped[str] = mapped_column(
+        String(50),
+        nullable=True,
+        index=True,
+    )
+
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    created_by_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    questions: Mapped[list["Question"]] = relationship(
+        "Question",
+        back_populates="form",
+        cascade="all, delete-orphan",
+    )
+
+    plannings: Mapped[list["Planning"]] = relationship(
+        "Planning",
+        back_populates="form"
+    )
+
+    @property
+    def display_name(self):
+        if self.version > 1:
+            return f"{self.name} (v{self.version})"
+        
+        return self.name
+
+class Question(db.Model):
+    """
+    Individual question within a Form.
+    """
+    __tablename__ = "question"
+
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+
+    form_id: Mapped[str] = mapped_column(
         String(36),
         ForeignKey("form.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     
-    question_text: Mapped[str]=mapped_column(
+    question_text: Mapped[str] = mapped_column(
         String(500),
         nullable=False,
     )
     
-    question_description: Mapped[str | None]=mapped_column(
+    question_description: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
     
-    question_type: Mapped[str]=mapped_column(
+    question_type: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
     )
-    is_required: Mapped[bool]=mapped_column(
+
+    is_required: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
         default=True,
     )
-    order: Mapped[int]=mapped_column(
+
+    order: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
         default=0,
     )
 
-    options: Mapped[dict | None]=mapped_column(
+    options: Mapped[dict | None] = mapped_column(
         JSON,
         nullable=True,
     )
 
-    created_at: Mapped[datetime]=mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
         default=lambda: datetime.now(timezone.utc)
     )
-    updated_at: Mapped[datetime | None]=mapped_column(
+
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime,
         nullable=True,
+        onupdate=lambda: datetime.now(timezone.utc),
     )
         
-    form: Mapped["Form"]=relationship(
+    form: Mapped["Form"] = relationship(
         "Form",
         back_populates="questions",
     )
 
-    def __repr__(self):
-        return f"<Question: {self.question_text[:50]}... ({self.question_type})>"        
-
 class Planning(db.Model):
-    # ... (Rest of Planning model remains identical to your file) ...
-    __tablename__="planning"
+    """
+    Instance of a planning, grouping several tasks and holding batch metadata.
+    """
+    __tablename__ = "planning"
 
-    id: Mapped[str]=mapped_column(
+    id: Mapped[str] = mapped_column(
         String(36),
         primary_key=True,
         default=lambda: str(uuid.uuid4()),
     )
 
-    planner_id: Mapped[str]=mapped_column(
+    planner_id: Mapped[str] = mapped_column(
         String(36),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
  
-    form_id: Mapped[str]=mapped_column(
+    form_id: Mapped[str] = mapped_column(
         String(36),
         ForeignKey("form.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
     )
 
-    file_path: Mapped[str]=mapped_column(
-        String(255),
-        nullable=False,
-        default="",
+    template_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("planning_template.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
-    file_name: Mapped[str]=mapped_column(
+
+    metadata_values: Mapped[dict | None] = mapped_column(
+        JSON,
+        nullable=True,
+        default=dict,
+    )
+
+    file_path: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
         default="",
     )
 
-    status: Mapped[str]=mapped_column(
+    file_name: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        default="",
+    )
+
+    status: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
         default="uploaded",
         index=True,
     )
 
-    client_name: Mapped[str | None]=mapped_column(
+    client_name: Mapped[str | None] = mapped_column(
         String(200),
         nullable=True,
         index=True,
     )
     
-    total_tasks: Mapped[int]=mapped_column(
+    total_tasks: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
         default=0,
     )
 
-    created_at: Mapped[datetime]=mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
-    updated_at: Mapped[datetime | None]=mapped_column(
+
+    updated_at: Mapped[datetime | None] = mapped_column(
         DateTime,
         nullable=True,
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
-    planner: Mapped["User"]=relationship(
+    planner: Mapped["User"] = relationship(
         "User",
         foreign_keys=[planner_id],
     )
-    form: Mapped["Form"]=relationship(
+
+    form: Mapped["Form"] = relationship(
         "Form",
         back_populates="plannings",
     )
-    tasks: Mapped[list["Task"]]=relationship(
+    
+    template: Mapped["PlanningTemplate"] = relationship(
+        "PlanningTemplate",
+        back_populates="plannings",
+    )
+
+    tasks: Mapped[list["Task"]] = relationship(
         "Task",
         back_populates="planning",
         cascade="all, delete-orphan",
     )
 
-    def __repr__(self) -> str:
-        return f"<Planning: {self.client_name} - {self.total_tasks} tasks>"
-
 class Task(db.Model):
-    # ... (Rest of Task model remains identical to your file) ...
+    """
+    Individual work record (tarja) associated with a planning or created singularly.
+    """
     __tablename__ = "task"
     
     id: Mapped[str] = mapped_column(
@@ -264,6 +412,7 @@ class Task(db.Model):
         index=True,
     )
     
+    # Task-specific input metadata (equivalent to Planning metadata for singular tasks)
     record_data: Mapped[dict] = mapped_column(
         JSON,
         nullable=False,
@@ -291,6 +440,7 @@ class Task(db.Model):
         index=True,
     )
     
+    # Worker's answers to the Form questions
     responses: Mapped[dict | None] = mapped_column(
         JSON,
         nullable=True,
@@ -300,10 +450,12 @@ class Task(db.Model):
         DateTime,
         nullable=True,
     )
+
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime,
         nullable=True,
     )
+
     reviewed_at: Mapped[datetime | None] = mapped_column(
         DateTime,
         nullable=True,
@@ -313,6 +465,7 @@ class Task(db.Model):
         DateTime,
         nullable=True,
     )
+
     is_synced: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
@@ -324,9 +477,11 @@ class Task(db.Model):
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
+
     updated_at: Mapped[datetime | None] = mapped_column(
         DateTime,
         nullable=True,
+        onupdate=lambda: datetime.now(timezone.utc),
     )
     
     planning: Mapped["Planning"] = relationship(
@@ -348,40 +503,3 @@ class Task(db.Model):
         "User",
         foreign_keys=[created_by_id],
     )
-    
-    def get_field(self, field_name: str, default=None):
-        return self.record_data.get(field_name, default)
-    
-    def set_field(self, field_name: str, value):
-        self.record_data[field_name] = value
-        flag_modified(self, 'record_data')
-        self.updated_at = datetime.now(timezone.utc)
-    
-    def update_fields(self, fields_dict: dict):
-        self.record_data.update(fields_dict)
-        flag_modified(self, 'record_data')
-        self.updated_at = datetime.now(timezone.utc)
-    
-    def start_filling(self, worker_id: str) -> None:
-        self.worker_id = worker_id
-        self.status = "in_progress"
-        self.started_at = datetime.now(timezone.utc)
-        self.updated_at = datetime.now(timezone.utc)
-    
-    def complete_filling(self) -> None:
-        self.status = "completed"
-        self.completed_at = datetime.now(timezone.utc)
-        self.updated_at = datetime.now(timezone.utc)
-    
-    def mark_reviewed(self) -> None:
-        self.status = "reviewed"
-        self.reviewed_at = datetime.now(timezone.utc)
-        self.updated_at = datetime.now(timezone.utc)
-    
-    def mark_synced(self) -> None:
-        self.is_synced = True
-        self.synced_at = datetime.now(timezone.utc)
-        self.updated_at = datetime.now(timezone.utc)
-    
-    def __repr__(self) -> str:
-        return f"<Task: {self.id} ({self.status})>"

@@ -9,7 +9,8 @@ DB_PASS="03e+_U#hS9AT"
 # File paths
 SQL_DELETE="scripts/delete_tables.sql"
 PYTHON_USER_CREATE="scripts/create_users.py" 
-SQL_FORM_CREATE="scripts/create_form.sql" 
+# Renamed from create_form.sql to create_objects.sql
+SQL_OBJECTS_CREATE="scripts/create_objects.sql" 
 
 export PGPASSWORD="$DB_PASS"
 
@@ -30,9 +31,9 @@ echo "--- 2. Creating Schema and Users ---"
 python3 "$PYTHON_USER_CREATE"
 check_error "User/Schema Creation"
 
-echo "--- 3. Inserting Demo Versioned Form ---"
-psql -d "$DB_NAME" -U "$DB_USER" -f "$SQL_FORM_CREATE" -v ON_ERROR_STOP=1
-check_error "Form Creation"
+echo "--- 3. Inserting Demo Versioned Form and Planning Template ---"
+psql -d "$DB_NAME" -U "$DB_USER" -f "$SQL_OBJECTS_CREATE" -v ON_ERROR_STOP=1
+check_error "Objects Creation"
 
 echo "--- Setup finished successfully. ---"
 unset PGPASSWORD

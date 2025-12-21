@@ -1,0 +1,74 @@
+{# pytarjas/templates/footer.html #}
+<footer class="footer">
+  <div class="footer-container">
+    <div class="footer-section brand-info">
+      <div class="footer-logo-container">
+        <img src="{{ url_for('static', filename='icons/HGT-Logo-white-orange-RGB.svg') }}" 
+             class="footer-logo logo-for-dark-bg" alt="HGT"
+             width="180"> 
+        <img src="{{ url_for('static', filename='icons/HGT-Logo-greyblue-orange-RGB.svg') }}" 
+             class="footer-logo logo-for-light-bg" alt="HGT"
+             width="180">
+      </div>
+      <p class="tagline">Specialized PWA solution for real-time data collection and management in logistics and port operations.</p>
+    </div>
+
+    <div class="footer-section">
+      <h4>Navigation</h4>
+      <ul class="footer-links">
+        {% if g.user %}
+          {% if g.user.role == 'admin' %}
+            <li><a href="{{ url_for('admin.index') }}">📊 Dashboard</a></li>
+            <li><a href="{{ url_for('users.list_users') }}">👥 Usuarios</a></li>
+          {% elif g.user.role == 'planner' %}
+            <li><a href="{{ url_for('planner.index') }}">🏠 Inicio</a></li>
+          {% elif g.user.role == 'worker' %}
+            <li><a href="{{ url_for('worker.index') }}">🏠 Inicio</a></li>
+          {% elif g.user.role == 'client' %}
+            <li><a href="{{ url_for('client.index') }}">🏠 Reportes</a></li>
+          {% endif %}
+          <li><a href="{{ url_for('tasks.list_tasks') }}">📋 Mis Tareas</a></li>
+        {% else %}
+          <li><a href="{{ url_for('auth.login') }}">🔐 Iniciar Sesión</a></li>
+        {% endif %}
+      </ul>
+    </div>
+
+    <div class="footer-section">
+      <h4>Resources</h4>
+      <ul class="footer-links">
+        <li><a href="{{ url_for('plannings.list_plannings') }}">🗓️ Planificaciones</a></li>
+        <li><a href="{{ url_for('forms.list_forms') }}">📝 Formularios</a></li>
+        <li><a href="/manifest.json">📱 App Manifest</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-section">
+      <h4>Connect With Us</h4>
+      <ul class="footer-links social-links">
+        <li>
+          <a href="https://linkedin.com" target="_blank">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+            </svg>
+            LinkedIn
+          </a>
+        </li>
+        <li>
+          <a href="https://hgt.cl" target="_blank">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+            Official Website
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer-bottom">
+    <p>&copy; 2025 HGT Inland Services. All rights reserved.</p>
+  </div>
+</footer>

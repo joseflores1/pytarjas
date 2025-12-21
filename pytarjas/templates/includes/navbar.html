@@ -1,0 +1,67 @@
+{# pytarjas/templates/includes/navbar.html #}
+<nav class="navbar">
+    <div class="navbar-container">
+        
+        <a href="{% if g.user %}
+                 {% if g.user.role == 'admin' %}{{ url_for('admin.index') }}
+                 {% elif g.user.role == 'planner' %}{{ url_for('planner.index') }}
+                 {% elif g.user.role == 'worker' %}{{ url_for('worker.index') }}
+                 {% elif g.user.role == 'client' %}{{ url_for('client.index') }}
+                 {% else %}{{ url_for('auth.login') }}{% endif %}
+                 {% else %}{{ url_for('auth.login') }}{% endif %}" class="navbar-brand">
+            
+            <img src="{{ url_for('static', filename='icons/HGT-Logo-white-orange-RGB.svg') }}" 
+                 class="navbar-logo logo-for-dark-bg" alt="HGT"
+                 width="192" height="192"> 
+            <img src="{{ url_for('static', filename='icons/HGT-Logo-greyblue-orange-RGB.svg') }}" 
+                 class="navbar-logo logo-for-light-bg" alt="HGT"
+                 width="192" height="192"> 
+            <span class="brand-text">HGT Collector</span>
+        </a>
+
+        <ul class="navbar-nav" id="navbarNav">
+            {% if g.user %}
+                {% if g.user.role == 'admin' %}
+                    <li><a href="{{ url_for('admin.index') }}" class="nav-link {% if request.endpoint == 'admin.index' %}active{% endif %}">📊 Dashboard</a></li>
+                    <li><a href="{{ url_for('plannings.list_plannings') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('plannings.') %}active{% endif %}">🗓️ Planificaciones</a></li>
+                    <li><a href="{{ url_for('tasks.list_tasks') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('tasks.') %}active{% endif %}">📋 Tareas</a></li>
+                    <li><a href="{{ url_for('users.list_users') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('users.') %}active{% endif %}">👥 Usuarios</a></li>
+                    <li><a href="{{ url_for('forms.list_forms') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('forms.') %}active{% endif %}">📝 Formularios</a></li>
+                {% elif g.user.role == 'planner' %}
+                    <li><a href="{{ url_for('planner.index') }}" class="nav-link {% if request.endpoint == 'planner.index' or request.endpoint.startswith('planner.') %}active{% endif %}">🏠 Inicio</a></li>
+                    <li><a href="{{ url_for('plannings.list_plannings') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('plannings.') %}active{% endif %}">🗓️ Planificaciones</a></li>
+                    <li><a href="{{ url_for('tasks.list_tasks') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('tasks.') %}active{% endif %}">📋 Tareas</a></li>
+                    <li><a href="{{ url_for('forms.list_forms') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('forms.') %}active{% endif %}">📝 Formularios</a></li>
+                {% elif g.user.role == 'worker' %}
+                    <li><a href="{{ url_for('worker.index') }}" class="nav-link {% if request.endpoint == 'worker.index' %}active{% endif %}">🏠 Inicio</a></li>
+                    <li><a href="{{ url_for('tasks.list_tasks') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('tasks.') %}active{% endif %}">📋 Mis Tareas</a></li>
+                {% elif g.user.role == 'client' %}
+                    <li><a href="{{ url_for('client.index') }}" class="nav-link {% if request.endpoint == 'client.index' %}active{% endif %}">🏠 Reportes</a></li>
+                {% endif %}
+            {% endif %}
+        </ul>
+
+        <div class="navbar-right">
+            {% if g.user %}
+                <button id="themeToggle" class="icon-btn" title="Cambiar Tema">
+                    <span id="themeIcon" style="font-size: 1.2rem;">☀</span>
+                </button>
+
+                <div class="user-profile">
+                    <div class="user-details">
+                        <span class="user-name">{{ g.user.username }}</span>
+                        <span class="user-role">{{ g.user.role }}</span>
+                    </div>
+                    <a href="{{ url_for('auth.logout') }}" class="icon-btn logout-btn" id="logoutBtn" title="Salir">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    </a>
+                </div>
+
+                <button class="navbar-toggle" id="navbarToggle">☰</button>
+            {% else %}
+                <a href="{{ url_for('auth.login') }}" class="nav-link active">Iniciar Sesión</a>
+            {% endif %}
+        </div>
+
+    </div>
+</nav>
