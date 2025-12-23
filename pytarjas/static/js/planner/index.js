@@ -6,15 +6,116 @@ document.addEventListener('DOMContentLoaded', function() {
     const emptyState = document.getElementById('emptyState');
     const planningForm = document.getElementById('createPlanningForm');
     const fileInput = document.getElementById('fileInput');
-    const dropZone = document.getElementById('drop-zone');
+    const templateSelect = document.getElementById('template_id');
+    const dynamicMetadataSection = document.getElementById('dynamicMetadataSection');
+    const templateFieldsContainer = document.getElementById('templateFieldsContainer');
 
-    // --- 1. User Data Initialization ---
+    // --- 1. Data Initialization ---
     const usersMap = {};
     document.querySelectorAll('#usersMap span').forEach(span => {
         usersMap[span.dataset.id] = span.dataset.username;
     });
 
-    // --- 2. Table Row Management ---
+    let planningTemplates = [];
+    const templatesDataElem = document.getElementById('planningTemplatesData');
+    if (templatesDataElem) {
+        try {
+            planningTemplates = JSON.parse(templatesDataElem.value);
+        } catch (e) {
+            console.error("Error parsing planning templates data", e);
+        }
+    }
+
+    // --- 2. Dynamic Metadata Management ---
+    function renderTemplateFields(templateId) {
+        // Clear previous fields
+        templateFieldsContainer.innerHTML = '';
+        
+        if (!templateId) {
+            dynamicMetadataSection.style.display = 'none';
+            return;
+        }
+
+        const template = planningTemplates.find(t => t.id === templateId);
+        if (!template) {
+            dynamicMetadataSection.style.display = 'none';
+            return;
+        }
+
+        template.fields.forEach(field => {
+            const formGroup = document.createElement('div');
+            formGroup.className = 'form-group';
+            
+            const label = document.createElement('label');
+            label.className = 'form-label';
+            label.textContent = field.label;
+            
+            if (field.required) {
+                const span = document.createElement('span');
+                span.style.color = 'var(--color-danger)';
+                span.textContent = ' *';
+                label.appendChild(span);
+            }
+            formGroup.appendChild(label);
+
+            let input;
+            if (field.type === 'select') {
+                input = document.createElement('select');
+                input.className = 'form-control';
+                
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = '-- Seleccione --';
+                input.appendChild(defaultOption);
+
+                if (field.options && field.options.choices) {
+                    field.options.choices.forEach(choice => {
+                        const opt = document.createElement('option');
+                        opt.value = choice;
+                        opt.textContent = choice;
+                        input.appendChild(opt);
+                    });
+                }
+            } else if (field.type === 'boolean') {
+                input = document.createElement('select');
+                input.className = 'form-control';
+                
+                const optNo = document.createElement('option');
+                optNo.value = 'false';
+                optNo.textContent = 'No';
+                
+                const optYes = document.createElement('option');
+                optYes.value = 'true';
+                optYes.textContent = 'Sí';
+                
+                input.appendChild(optNo);
+                input.appendChild(optYes);
+            } else {
+                input = document.createElement('input');
+                input.type = field.type === 'number' ? 'number' : 'text';
+                input.className = 'form-control';
+            }
+
+            input.name = `metadata_${field.name}`;
+            input.dataset.fieldName = field.name;
+            if (field.required) {
+                input.required = true;
+            }
+
+            formGroup.appendChild(input);
+            templateFieldsContainer.appendChild(formGroup);
+        });
+
+        dynamicMetadataSection.style.display = 'block';
+    }
+
+    if (templateSelect) {
+        templateSelect.addEventListener('change', (e) => {
+            renderTemplateFields(e.target.value);
+        });
+    }
+
+    // --- 3. Table Row Management ---
     function updateEmptyState() {
         if (tableBody.children.length === 0) {
             emptyState.style.display = 'block';
@@ -28,7 +129,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function createRow(data = {}) {
         const tr = document.createElement('tr');
         
-        // Define columns based on your maritime requirements
         const columns = [
             { name: 'container_number', placeholder: 'ABCD1234567', value: data.container_number || '' },
             { name: 'seal', placeholder: 'S12345', value: data.seal || '' },
@@ -47,7 +147,6 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
         });
 
-        // Worker Selection Column
         let workerOptions = '<option value="">-- Sin asignar --</option>';
         for (const [id, name] of Object.entries(usersMap)) {
             const selected = data.worker_id === id ? 'selected' : '';
@@ -69,7 +168,6 @@ document.addEventListener('DOMContentLoaded', function() {
         tableBody.appendChild(tr);
         updateEmptyState();
 
-        // Attach remove listener
         tr.querySelector('.remove-row-btn').addEventListener('click', () => {
             tr.remove();
             updateEmptyState();
@@ -77,12 +175,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     if (addRowBtn) {
-        addRowBtn.addEventListener('click', () => createRow());
+        addRowBtn.addEventListener('click', () => {
+            createRow();
+        });
     }
 
-    // --- 3. File Upload & Parsing (CSV/Excel) ---
-    // Note: For real Excel parsing you'd need a library like SheetJS (xlsx)
-    // Here we implement a basic CSV parser as a fallback or starting point
+    // --- 4. File Upload & Parsing ---
     if (fileInput) {
         fileInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
@@ -101,7 +199,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function processData(csvText) {
         const lines = csvText.split('\n');
-        // Simple logic: assume headers are Container, Seal, Type, Weight
         for (let i = 1; i < lines.length; i++) {
             const cols = lines[i].split(',');
             if (cols.length >= 4) {
@@ -115,7 +212,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- 4. Form Submission ---
+    // --- 5. Form Submission ---
     if (planningForm) {
         planningForm.addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -142,9 +239,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 records.push(record);
             });
 
+            // Gather metadata values from dynamic fields
+            const metadataValues = {};
+            templateFieldsContainer.querySelectorAll('[data-field-name]').forEach(input => {
+                let val = input.value;
+                if (input.tagName === 'SELECT' && (val === 'true' || val === 'false')) {
+                    val = (val === 'true');
+                }
+                metadataValues[input.dataset.fieldName] = val;
+            });
+
             const payload = {
                 client_name: document.getElementById('client_name').value,
                 form_id: document.getElementById('form_id').value,
+                template_id: document.getElementById('template_id').value || null,
+                metadata_values: metadataValues,
                 records: records
             };
 
@@ -176,6 +285,5 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Initial state
     updateEmptyState();
 });

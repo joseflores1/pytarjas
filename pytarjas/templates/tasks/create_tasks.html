@@ -5,7 +5,6 @@
 
 {% block extra_css %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
-  {# NEW: Module-specific CSS #}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tasks/create.css') }}">
 {% endblock %}
 
@@ -15,7 +14,7 @@
       <div>
         <h1 style="margin-bottom: var(--space-xs);">➕ Crear Nueva Tarea</h1>
         <p style="color: var(--color-text-secondary); margin-bottom: 0;">
-          Seleccione un formulario y asigne a un trabajador
+          Configure los datos de la tarea y asigne un trabajador responsable.
         </p>
       </div>
       <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary" id="headerBackBtn">
@@ -26,7 +25,7 @@
 {% endblock %}
 
 {% block content %}
-  <div class="container" style="max-width: 800px;">
+  <div class="container" style="max-width: 900px;">
     
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -38,59 +37,95 @@
       {% endif %}
     {% endwith %}
 
-    {% if not forms %}
-      <div class="card">
-        <div class="card-body" style="text-align: center; padding: var(--space-xl);">
-          <div style="font-size: 3rem; margin-bottom: var(--space-md);">📋</div>
-          <h2 style="margin-bottom: var(--space-sm);">No hay formularios disponibles</h2>
-          <p style="color: var(--color-text-secondary); margin-bottom: var(--space-lg);">
-            Antes de crear tareas, primero debe crear plantillas de formularios.
-          </p>
-          {% if user.role in ['admin', 'planner'] %}
-            <a href="{{ url_for('forms.create_form') }}" class="btn btn-primary">
-              ➕ Crear Primer Formulario
-            </a>
-          {% endif %}
-        </div>
-      </div>
-    {% else %}
+    {# Hidden Data for JS: Stores template field definitions for each Planning #}
+    <div id="planningTemplatesData" style="display: none;">
+        {% for plan in existing_plannings %}
+            {% if plan.template %}
+            <div data-planning-id="{{ plan.id }}">
+                {% for field in plan.template.fields %}
+                <span data-field-name="{{ field.field_name }}"
+                      data-field-label="{{ field.field_label }}"
+                      data-field-type="{{ field.field_type }}"
+                      data-is-required="{{ field.is_required | lower }}"
+                      data-options='{{ field.options | tojson | safe if field.options else "{}" }}'>
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endfor %}
+    </div>
 
     <form method="POST" id="createTaskForm">
       
-      {# SECTION 1: SELECT FORM #}
+      {# SECTION 1: METADATA DE LA TAREA #}
       <div class="card" style="margin-bottom: var(--space-lg);">
         <div class="card-header">
-          <h2 class="card-title">📋 Seleccionar Formulario</h2>
-          <p class="card-subtitle">Elija la plantilla de formulario para esta tarea</p>
+          <h2 class="card-title">📅 Metadata de la tarea</h2>
+          <p class="card-subtitle">Vincule la tarea a una planificación y/o agregue datos dinámicos.</p>
         </div>
-        
+        <div class="card-body">
+          <div class="form-group">
+            <label for="planning_id" class="form-label">Planificación</label>
+            <select name="planning_id" id="planning_id" class="form-control">
+              <option value="">Sin Planificación</option>
+              
+              {% if existing_plannings %}
+                <optgroup label="Con Planificación">
+                  {% for plan in existing_plannings %}
+                    <option value="{{ plan.id }}" 
+                            data-form-id="{{ plan.form_id }}"
+                            data-has-template="{{ 'true' if plan.template else 'false' }}">
+                        {{ plan.client_name }} ({{ plan.created_at.strftime('%d/%m/%Y %H:%M') }})
+                    </option>
+                  {% endfor %}
+                </optgroup>
+              {% endif %}
+            </select>
+          </div>
+
+          {# Container for template-defined fields (appears when a Planning is selected) #}
+          <div id="predefinedMetadataContainer" style="display: none; margin-top: var(--space-md); padding-bottom: var(--space-md); border-bottom: 1px dashed var(--color-border);">
+              {# Rendered dynamically by create.js #}
+          </div>
+
+          {# Ad-hoc Metadata Section (Always available) #}
+          <div id="adhocMetadataSection" style="margin-top: var(--space-md);">
+            <div style="display: flex; justify-content: flex-end; margin-bottom: var(--space-md);">
+                <button type="button" id="addFieldBtn" class="btn btn-secondary btn-sm">+ Agregar Campo</button>
+            </div>
+            
+            <div id="fieldsContainer">
+                {# Ad-hoc field rows added here by create.js #}
+            </div>
+            
+            <div id="emptyFieldsState" style="text-align: center; padding: var(--space-md); color: var(--color-text-secondary); background: var(--color-bg-secondary); border-radius: var(--radius-md);">
+                <p style="margin: 0; font-size: 0.9rem;">No hay campos adicionales. Use "+ Agregar Campo" para insertar datos personalizados.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# SECTION 2: CUESTIONARIO #}
+      <div class="card" style="margin-bottom: var(--space-lg);">
+        <div class="card-header">
+          <h2 class="card-title">📋 Cuestionario de Terreno</h2>
+        </div>
         <div class="card-body">
           <div class="form-group">
             <label for="form_id" class="form-label">
               Formulario <span style="color: var(--color-danger);">*</span>
             </label>
-            {# REMOVED onchange attribute, handled by JS #}
-            <select 
-              id="form_id" 
-              name="form_id" 
-              class="form-control"
-              required
-            >
+            <select id="form_id" name="form_id" class="form-control" required>
               <option value="">-- Seleccione un formulario --</option>
               {% for form in forms %}
-                <option 
-                  value="{{ form.id }}"
-                  data-name="{{ form.name }}"
-                  data-type="{{ form.form_type }}"
-                  data-description="{{ form.description or '' }}"
-                >
-                  {{ form.name }} {% if form.form_type %}({{ form.form_type }}){% endif %}
+                <option value="{{ form.id }}"
+                        data-name="{{ form.name }}"
+                        data-type="{{ form.form_type }}"
+                        data-description="{{ form.description or '' }}">
+                  {{ form.display_name }}
                 </option>
               {% endfor %}
             </select>
-            <small class="form-help">
-              Los formularios definen qué información debe recolectarse en campo
-            </small>
           </div>
 
           <div id="formPreview" class="form-preview">
@@ -103,23 +138,21 @@
         </div>
       </div>
 
-      {# SECTION 2: ASSIGN WORKER #}
+      {# SECTION 3: ASIGNACIÓN #}
       <div class="card" style="margin-bottom: var(--space-lg);">
         <div class="card-header">
-          <h2 class="card-title">👤 Asignar Trabajador</h2>
-          <p class="card-subtitle">Seleccione quién completará esta tarea</p>
+          <h2 class="card-title">👤 Asignación</h2>
         </div>
-        
         <div class="card-body">
           <div class="form-group">
             <label for="worker_id" class="form-label">
-              Asignar a <span style="color: var(--color-danger);">*</span>
+              Trabajador <span style="color: var(--color-danger);">*</span>
             </label>
             
             {% if user.role == 'worker' %}
               <input type="hidden" name="worker_id" value="{{ user.id }}">
               <div class="alert alert-info" style="margin-bottom: 0;">
-                <strong>Auto-asignado:</strong> {{ user.username }} (usted)
+                <strong>Auto-asignado:</strong> {{ user.username }}
               </div>
             {% else %}
               <select id="worker_id" name="worker_id" class="form-control" required>
@@ -130,35 +163,25 @@
                   </option>
                 {% endfor %}
               </select>
-              <small class="form-help">
-                {% if user.role == 'planner' %}
-                  Puede asignar a trabajadores o a usted mismo
-                {% else %}
-                  Puede asignar a cualquier usuario no-administrador
-                {% endif %}
-              </small>
             {% endif %}
           </div>
         </div>
       </div>
 
       {# ACTIONS #}
-      <div class="form-actions">
+      <div class="form-actions" style="margin-top: var(--space-xl); display: flex; justify-content: flex-end; gap: var(--space-md);">
         <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary" id="cancelBtn">
           Cancelar
         </a>
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" class="btn btn-primary" id="submitBtn">
           ✓ Crear Tarea
         </button>
       </div>
 
     </form>
-    {% endif %}
-
   </div>
 {% endblock %}
 
 {% block extra_js %}
-  {# NEW: Module-specific JS #}
   <script src="{{ url_for('static', filename='js/tasks/create.js') }}"></script>
 {% endblock %}

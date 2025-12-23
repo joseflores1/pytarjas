@@ -1,10 +1,11 @@
 -- scripts/create_objects.sql
--- Inserts a demo Form and a demo Planning Template with their respective fields.
+-- Inserts a full demo Form, a Planning Template, and an actual Planning instance with tasks.
 
 DO $$ 
 DECLARE 
     form_uuid UUID := gen_random_uuid();
     planning_template_uuid UUID := gen_random_uuid();
+    planning_uuid UUID := gen_random_uuid();
     -- Fetch an admin ID for the creator field
     creator_id_val VARCHAR(36) := (SELECT id FROM users WHERE role = 'admin' LIMIT 1); 
 BEGIN
@@ -98,5 +99,89 @@ VALUES (gen_random_uuid(), planning_template_uuid, 'Fecha Estimada de Arribo (ET
 
 INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, "order", options, created_at)
 VALUES (gen_random_uuid(), planning_template_uuid, '¿Operación Prioritaria?', 'is_priority', 'boolean', TRUE, 5, '{}'::jsonb, NOW() AT TIME ZONE 'UTC');
+
+
+-- ============================================================================
+-- 3. PLANNING INSTANCE: 'Demo - Faena de Importación'
+-- ============================================================================
+
+INSERT INTO planning (
+    id, 
+    planner_id, 
+    form_id, 
+    template_id, 
+    metadata_values, 
+    client_name, 
+    status, 
+    total_tasks, 
+    created_at
+) VALUES (
+    planning_uuid, 
+    creator_id_val, 
+    form_uuid, 
+    planning_template_uuid, 
+    '{
+        "main_container_id": "HLXU9988776",
+        "vessel_name": "MS Explorer",
+        "terminal": "TPS",
+        "is_priority": true
+    }'::jsonb, 
+    'Importaciones ABC S.A.', 
+    'uploaded', 
+    2, 
+    NOW() AT TIME ZONE 'UTC'
+);
+
+-- ============================================================================
+-- 4. ASSOCIATED TASKS
+-- ============================================================================
+
+INSERT INTO task (
+    id, 
+    planning_id, 
+    form_id, 
+    record_data, 
+    worker_id, 
+    created_by_id, 
+    status, 
+    responses, 
+    is_synced,
+    created_at
+) VALUES (
+    gen_random_uuid(), 
+    planning_uuid, 
+    form_uuid, 
+    '{"container_number": "CONT-A1", "seal": "S-100", "type": "40HC", "weight": "25000"}'::jsonb, 
+    creator_id_val, 
+    creator_id_val, 
+    'pending', 
+    '{}'::jsonb, 
+    TRUE,
+    NOW() AT TIME ZONE 'UTC'
+);
+
+INSERT INTO task (
+    id, 
+    planning_id, 
+    form_id, 
+    record_data, 
+    worker_id, 
+    created_by_id, 
+    status, 
+    responses, 
+    is_synced,
+    created_at
+) VALUES (
+    gen_random_uuid(), 
+    planning_uuid, 
+    form_uuid, 
+    '{"container_number": "CONT-B2", "seal": "S-101", "type": "20GP", "weight": "18000"}'::jsonb, 
+    creator_id_val, 
+    creator_id_val, 
+    'pending', 
+    '{}'::jsonb, 
+    TRUE,
+    NOW() AT TIME ZONE 'UTC'
+);
 
 END $$;

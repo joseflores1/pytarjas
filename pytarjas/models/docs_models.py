@@ -322,16 +322,14 @@ class Planning(db.Model):
         default=dict,
     )
 
-    file_path: Mapped[str] = mapped_column(
+    file_path: Mapped[str | None] = mapped_column(
         String(255),
-        nullable=False,
-        default="",
+        nullable=True,
     )
 
-    file_name: Mapped[str] = mapped_column(
+    file_name: Mapped[str | None] = mapped_column(
         String(255),
-        nullable=False,
-        default="",
+        nullable=True,
     )
 
     status: Mapped[str] = mapped_column(

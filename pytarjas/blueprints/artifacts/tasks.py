@@ -1,20 +1,21 @@
 # pytarjas/blueprints/artifacts/tasks.py
 """
 Complete Tasks API blueprint.
-Updated to support dynamic question filtering and adhere to style guidelines.
+Updated to support hybrid metadata: merging predefined planning fields with ad-hoc dynamic fields.
 """
 
 from flask import Blueprint, request, jsonify, render_template, g, abort, redirect, url_for, flash, send_file
 from datetime import datetime, timezone
 import uuid
 import io 
+import json
 from sqlalchemy import cast, Date, or_, Text 
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm.attributes import flag_modified
 
 from pytarjas.auth import login_required, task_access_required
 from pytarjas.models.user_models import User, db
-from pytarjas.models.docs_models import Task, Form, Planning 
+from pytarjas.models.docs_models import Task, Form, Planning, PlanningTemplate
 from pytarjas.helper import wants_json, save_file_to_disk 
 from pytarjas.services.pdf_service import generate_tarja_pdf
 
@@ -62,10 +63,16 @@ def upload_file_temp(task_id):
 @login_required
 @task_access_required
 def create_task():
-    """Create a standalone task."""
+    """Create a task with support for hybrid metadata (Planning Template + Ad-hoc)."""
     if request.method == "GET":
         active_forms = Form.query.filter_by(is_active=True).order_by(Form.name).all()
         
+        # Fetch Plannings with their Templates and Fields for dynamic rendering
+        existing_plannings = Planning.query.options(
+            joinedload(Planning.form),
+            joinedload(Planning.template).joinedload(PlanningTemplate.fields)
+        ).order_by(Planning.created_at.desc()).all()
+
         assignable_users = []
         if g.user.role == "worker":
             assignable_users = [g.user]
@@ -78,30 +85,77 @@ def create_task():
             return jsonify({
                 "success": True,
                 "forms": [{"id": f.id, "name": f.display_name} for f in active_forms],
+                "plannings": [
+                    {
+                        "id": p.id, 
+                        "client_name": p.client_name, 
+                        "form_id": p.form_id,
+                        "template": {
+                            "id": p.template.id,
+                            "fields": [
+                                {
+                                    "name": f.field_name,
+                                    "label": f.field_label,
+                                    "type": f.field_type,
+                                    "required": f.is_required,
+                                    "options": f.options
+                                } for f in p.template.fields
+                            ]
+                        } if p.template else None
+                    } for p in existing_plannings
+                ],
                 "assignable_users": [{"id": u.id, "username": u.username} for u in assignable_users]
             })
         
         return render_template(
             "tasks/create_tasks.html", 
             forms=active_forms, 
+            existing_plannings=existing_plannings,
             assignable_users=assignable_users,
             user=g.user
         )
     
+    # --- POST Logic ---
     data = request.get_json() if wants_json() else request.form
     form_id = data.get("form_id")
     worker_id = data.get("worker_id") or g.user.id
-    client_name = data.get("client_name_input")
+    planning_id = data.get("planning_id")
+    
+    record_data = {}
+
+    # 1. Process Predefined Metadata (from selected planning template)
+    metadata_values = data.get("metadata_values", {})
+    if isinstance(metadata_values, dict):
+        record_data.update(metadata_values)
+
+    # 2. Process Ad-hoc Dynamic Metadata
+    ad_hoc_definitions = data.get("ad_hoc_metadata", [])
+    
+    # Handle stringified JSON from non-JSON requests
+    if not wants_json() and isinstance(ad_hoc_definitions, str):
+        try:
+            ad_hoc_definitions = json.loads(ad_hoc_definitions)
+        except json.JSONDecodeError:
+            ad_hoc_definitions = []
+                
+    if isinstance(ad_hoc_definitions, list):
+        for item in ad_hoc_definitions:
+            key = item.get('key')
+            val = item.get('value')
+            if key and isinstance(key, str) and key.strip():
+                record_data[key.strip()] = val
 
     if not form_id:
         if wants_json():
             return jsonify({"success": False, "error": "Form is required"}), 400
+        
         abort(400)
     
     task = Task(
         id=str(uuid.uuid4()),
+        planning_id=planning_id if planning_id else None,
         form_id=form_id,
-        record_data={"client_name": client_name} if client_name else {},
+        record_data=record_data, 
         worker_id=worker_id,
         created_by_id=g.user.id,
         status="pending",
@@ -121,13 +175,17 @@ def create_task():
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({"success": False, "error": str(e)}), 500
+        if wants_json():
+            return jsonify({"success": False, "error": str(e)}), 500
+        
+        flash(f"Error: {str(e)}", "error")
+        return redirect(url_for("tasks.create_task"))
 
 @bp.route("/", methods=["GET"])
 @login_required
 @task_access_required
 def list_tasks():
-    """List tasks with advanced filtering and dynamic question filters."""
+    """List tasks with advanced filtering."""
     status = request.args.get('status', 'all')
     limit = min(int(request.args.get('limit', 50)), 100)
     offset = int(request.args.get('offset', 0))
@@ -164,7 +222,6 @@ def list_tasks():
     for key, value in request.args.items():
         if key.startswith('q_') and value:
             question_id = key[2:]
-            # Cast to Text to avoid AttributeError on generic JSON types and perform search
             query = query.filter(cast(Task.responses[question_id], Text).ilike(f"%{value}%"))
             dynamic_filters[key] = value
 
@@ -175,12 +232,14 @@ def list_tasks():
                 q = q.filter(cast(field, Date) >= d)
             except ValueError:
                 pass
+        
         if val_max:
             try:
                 d = datetime.strptime(val_max, '%Y-%m-%d').date()
                 q = q.filter(cast(field, Date) <= d)
             except ValueError:
                 pass
+        
         return q
 
     created_at_min = request.args.get('created_at_min')
@@ -200,9 +259,6 @@ def list_tasks():
     
     all_forms = Form.query.order_by(Form.name.asc(), Form.version.desc()).all()
     all_assignable_users = User.query.filter(User.role.in_(["worker", "planner", "admin"])).all()
-
-    if wants_json():
-        return jsonify({"success": True, "total": total, "tasks": [t.id for t in db_tasks]})
 
     return render_template(
         "tasks/list_tasks.html",
@@ -231,17 +287,13 @@ def list_tasks():
 @login_required
 @task_access_required
 def get_task(task_id):
-    """Task detail view (Viewing/Editing)."""
+    """Task detail view."""
     task = Task.query.options(
         joinedload(Task.form).joinedload(Form.questions),
         joinedload(Task.worker)
     ).get_or_404(task_id)
 
     can_override_edit = g.user.role in ["admin", "planner"]
-    
-    if wants_json():
-        return jsonify({"success": True, "status": task.status, "responses": task.responses})
-    
     all_clients = User.query.filter_by(role='client').all()
     
     return render_template(
@@ -287,7 +339,7 @@ def update_task(task_id):
 @login_required
 @task_access_required
 def download_task_pdf(task_id):
-    """Generates PDF using the task-specific form version."""
+    """Generates PDF."""
     task = Task.query.get_or_404(task_id)
     try:
         pdf_bytes = generate_tarja_pdf(task)
