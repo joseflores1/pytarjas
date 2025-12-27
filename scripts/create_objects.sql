@@ -85,20 +85,27 @@ INSERT INTO planning_template (
 );
 
 -- Metadata Fields for the Planning Template
-INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, "order", options, created_at)
-VALUES (gen_random_uuid(), planning_template_uuid, 'Número de Contenedor Principal', 'main_container_id', 'text', TRUE, 1, '{}'::jsonb, NOW() AT TIME ZONE 'UTC');
+-- Note: 'is_row_field' is FALSE for header fields and TRUE for table row fields.
 
-INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, "order", options, created_at)
-VALUES (gen_random_uuid(), planning_template_uuid, 'Nombre de la Nave', 'vessel_name', 'text', TRUE, 2, '{}'::jsonb, NOW() AT TIME ZONE 'UTC');
+-- Header Fields
+INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, is_row_field, "order", options, created_at)
+VALUES (gen_random_uuid(), planning_template_uuid, 'Número de Contenedor Principal', 'main_container_id', 'text', TRUE, FALSE, 1, '{}'::jsonb, NOW() AT TIME ZONE 'UTC');
 
-INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, "order", options, created_at)
-VALUES (gen_random_uuid(), planning_template_uuid, 'Terminal de Operación', 'terminal', 'select', TRUE, 3, '{"choices": ["TPS", "DP World", "SVTI", "ATI"]}'::jsonb, NOW() AT TIME ZONE 'UTC');
+INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, is_row_field, "order", options, created_at)
+VALUES (gen_random_uuid(), planning_template_uuid, 'Nombre de la Nave', 'vessel_name', 'text', TRUE, FALSE, 2, '{}'::jsonb, NOW() AT TIME ZONE 'UTC');
 
-INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, "order", options, created_at)
-VALUES (gen_random_uuid(), planning_template_uuid, 'Fecha Estimada de Arribo (ETA)', 'eta_date', 'date', FALSE, 4, '{}'::jsonb, NOW() AT TIME ZONE 'UTC');
+INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, is_row_field, "order", options, created_at)
+VALUES (gen_random_uuid(), planning_template_uuid, 'Terminal de Operación', 'terminal', 'select', TRUE, FALSE, 3, '{"choices": ["TPS", "DP World", "SVTI", "ATI"]}'::jsonb, NOW() AT TIME ZONE 'UTC');
 
-INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, "order", options, created_at)
-VALUES (gen_random_uuid(), planning_template_uuid, '¿Operación Prioritaria?', 'is_priority', 'boolean', TRUE, 5, '{}'::jsonb, NOW() AT TIME ZONE 'UTC');
+-- Row Fields (Columns in the task table)
+INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, is_row_field, "order", options, created_at)
+VALUES (gen_random_uuid(), planning_template_uuid, 'N° Contenedor', 'container_number', 'text', TRUE, TRUE, 4, '{}'::jsonb, NOW() AT TIME ZONE 'UTC');
+
+INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, is_row_field, "order", options, created_at)
+VALUES (gen_random_uuid(), planning_template_uuid, 'Sello', 'seal', 'text', FALSE, TRUE, 5, '{}'::jsonb, NOW() AT TIME ZONE 'UTC');
+
+INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, is_row_field, "order", options, created_at)
+VALUES (gen_random_uuid(), planning_template_uuid, 'Tipo', 'type', 'text', FALSE, TRUE, 6, '{}'::jsonb, NOW() AT TIME ZONE 'UTC');
 
 
 -- ============================================================================
@@ -123,8 +130,7 @@ INSERT INTO planning (
     '{
         "main_container_id": "HLXU9988776",
         "vessel_name": "MS Explorer",
-        "terminal": "TPS",
-        "is_priority": true
+        "terminal": "TPS"
     }'::jsonb, 
     'Importaciones ABC S.A.', 
     'uploaded', 
@@ -151,7 +157,7 @@ INSERT INTO task (
     gen_random_uuid(), 
     planning_uuid, 
     form_uuid, 
-    '{"container_number": "CONT-A1", "seal": "S-100", "type": "40HC", "weight": "25000"}'::jsonb, 
+    '{"container_number": "CONT-A1", "seal": "S-100", "type": "40HC"}'::jsonb, 
     creator_id_val, 
     creator_id_val, 
     'pending', 
@@ -175,7 +181,7 @@ INSERT INTO task (
     gen_random_uuid(), 
     planning_uuid, 
     form_uuid, 
-    '{"container_number": "CONT-B2", "seal": "S-101", "type": "20GP", "weight": "18000"}'::jsonb, 
+    '{"container_number": "CONT-B2", "seal": "S-101", "type": "20GP"}'::jsonb, 
     creator_id_val, 
     creator_id_val, 
     'pending', 

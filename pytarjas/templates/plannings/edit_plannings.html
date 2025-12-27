@@ -1,147 +1,151 @@
 {# pytarjas/templates/plannings/edit_plannings.html #}
 {% extends 'base.html' %}
 
-{% block title %}Detalle de Planificación - {{ planning.client_name }}{% endblock %}
+{% block title %}Detalles de Planificación - {{ planning.client_name }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/plannings/edit.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/plannings/edit.css') }}">
 {% endblock %}
 
 {% block content %}
-<div class="edit-container" style="max-width: 1200px; margin: var(--space-xl) auto; padding: 0 var(--space-md);">
-    <div class="edit-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-lg);">
-        <div class="header-title">
-            <h1 style="font-size: 1.75rem; color: var(--color-text-primary);">
-                📅 Planificación: {{ planning.client_name }}
-            </h1>
+<div class="container" style="max-width: 1100px; margin: var(--space-xl) auto;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-xl);">
+        <div>
+            <h1 style="margin-bottom: var(--space-xs);">📋 Detalles de Planificación</h1>
+            <p style="color: var(--color-text-secondary);">ID: <span class="text-mono">{{ planning.id }}</span></p>
         </div>
-        <div class="header-actions">
-            <a href="{{ url_for('plannings.list_plannings') }}" class="btn btn-secondary">
-                ⬅️ Volver al Listado
-            </a>
+        <div class="status-badge status-{{ planning.status }}">
+            {{ planning.status | capitalize }}
         </div>
     </div>
 
-    <div class="info-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg); margin-bottom: var(--space-xl);">
+    <div class="grid-container" style="display: grid; grid-template-columns: 1fr 2fr; gap: var(--space-lg);">
         
-        {# SECTION: GENERAL INFORMATION #}
+        {# LEFT COLUMN: GENERAL INFO #}
         <div class="card">
             <div class="card-header">
-                <h3 class="card-title">ℹ️ Información General</h3>
+                <h2 class="card-title">ℹ️ Información General</h2>
             </div>
             <div class="card-body">
-                <div class="detail-row" style="margin-bottom: 12px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--color-border); padding-bottom: 8px;">
-                    <span style="font-weight: 600; color: var(--color-text-secondary);">Estado:</span>
-                    <span class="status-badge status-{{ planning.status }}" style="padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; text-transform: uppercase;">
-                        {{ planning.status|replace('_', ' ') }}
-                    </span>
+                <div class="info-item">
+                    <label>Cliente / Faena</label>
+                    <p><strong>{{ planning.client_name }}</strong></p>
                 </div>
-                <div class="detail-row" style="margin-bottom: 12px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--color-border); padding-bottom: 8px;">
-                    <span style="font-weight: 600; color: var(--color-text-secondary);">Formulario de Tarea:</span>
-                    <span>{{ planning.form.display_name }}</span>
+                
+                <div class="info-item">
+                    <label>Formulario de Tarea</label>
+                    <p>{{ planning.form.display_name }}</p>
                 </div>
-                <div class="detail-row" style="margin-bottom: 12px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--color-border); padding-bottom: 8px;">
-                    <span style="font-weight: 600; color: var(--color-text-secondary);">Planificador:</span>
-                    <span>{{ planning.planner.username }}</span>
-                </div>
-                <div class="detail-row" style="margin-bottom: 12px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--color-border); padding-bottom: 8px;">
-                    <span style="font-weight: 600; color: var(--color-text-secondary);">Fecha Creación:</span>
-                    <span>{{ planning.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
-                </div>
-            </div>
-        </div>
 
-        {# SECTION: DYNAMIC METADATA #}
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">📌 Metadata de la Faena</h3>
-            </div>
-            <div class="card-body">
+                <div class="info-item">
+                    <label>Fecha de Creación</label>
+                    <p>{{ planning.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                </div>
+
+                <div class="info-item">
+                    <label>Planificador</label>
+                    <p>{{ planning.planner.username }}</p>
+                </div>
+
+                {# DYNAMIC HEADER METADATA #}
                 {% if planning.template %}
-                    <div style="margin-bottom: 15px; padding: 8px; background: var(--color-bg-secondary); border-radius: 4px;">
-                        <small style="text-transform: uppercase; font-weight: bold; color: var(--color-primary);">
-                            Plantilla: {{ planning.template.name }}
-                        </small>
-                    </div>
+                    <hr style="margin: var(--space-md) 0; border: 0; border-top: 1px solid var(--color-border);">
+                    <h3 style="font-size: 0.9rem; color: var(--color-text-secondary); margin-bottom: var(--space-sm);">
+                        Metadatos ({{ planning.template.name }})
+                    </h3>
                     
                     {% for field in planning.template.fields %}
-                        <div class="detail-row" style="margin-bottom: 12px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--color-border); padding-bottom: 8px;">
-                            <span style="font-weight: 600; color: var(--color-text-secondary);">{{ field.field_label }}:</span>
-                            <span style="font-weight: 500;">
-                                {% set val = planning.metadata_values.get(field.field_name) %}
-                                {% if field.field_type == 'boolean' %}
-                                    {{ '✅ Sí' if val == True or val == 'true' else '❌ No' }}
-                                {% else %}
-                                    {{ val if val else '-' }}
-                                {% endif %}
-                            </span>
-                        </div>
+                        {% if not field.is_row_field %}
+                            <div class="info-item">
+                                <label>{{ field.field_label }}</label>
+                                <p>
+                                    {% set val = planning.metadata_values.get(field.field_name) %}
+                                    {% if field.field_type == 'boolean' %}
+                                        {{ 'Sí' if val else 'No' }}
+                                    {% elif field.field_type == 'date' and val %}
+                                        {{ val }} {# Logic for formatting string dates can be added here #}
+                                    {% else %}
+                                        {{ val or '---' }}
+                                    {% endif %}
+                                </p>
+                            </div>
+                        {% endif %}
                     {% endfor %}
-                {% else %}
-                    <div style="text-align: center; padding: var(--space-lg); color: var(--color-text-secondary);">
-                        <p>Esta planificación no utiliza una plantilla de metadata adicional.</p>
-                    </div>
                 {% endif %}
             </div>
         </div>
-    </div>
 
-    {# SECTION: GENERATED TASKS #}
-    <div class="card">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-            <h3 class="card-title">📋 Tareas en esta Faena</h3>
-            <span class="badge" style="background: var(--color-primary); color: white; padding: 4px 12px; border-radius: 20px;">
-                {{ planning.tasks|length }} Registros
-            </span>
-        </div>
-        <div class="card-body" style="padding: 0;">
-            <div class="table-responsive">
-                <table class="table" style="width: 100%; border-collapse: collapse;">
-                    <thead style="background: var(--color-bg-secondary);">
-                        <tr>
-                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--color-border);">ID Tarea</th>
-                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--color-border);">Contenedor / Ref</th>
-                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--color-border);">Asignado a</th>
-                            <th style="padding: 12px; text-align: center; border-bottom: 2px solid var(--color-border);">Estado</th>
-                            <th style="padding: 12px; text-align: center; border-bottom: 2px solid var(--color-border);">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for task in planning.tasks %}
-                        <tr style="border-bottom: 1px solid var(--color-border);">
-                            <td style="padding: 12px; font-family: monospace; font-size: 0.85rem;">
-                                {{ task.id[:8] }}
-                            </td>
-                            <td style="padding: 12px; font-weight: 600;">
-                                {{ task.record_data.get('container_number', 'N/A') }}
-                            </td>
-                            <td style="padding: 12px;">
-                                {% if task.worker %}
-                                    👤 {{ task.worker.username }}
+        {# RIGHT COLUMN: TASKS TABLE #}
+        <div class="card">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 class="card-title">📦 Tareas Planificadas ({{ planning.tasks|length }})</h2>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                {# DYNAMIC COLUMNS BASED ON TEMPLATE OR DEFAULTS #}
+                                {% if planning.template %}
+                                    {% set row_fields = planning.template.fields | selectattr('is_row_field', 'equalto', True) | list %}
+                                    {% if row_fields %}
+                                        {% for field in row_fields %}
+                                            <th>{{ field.field_label }}</th>
+                                        {% endfor %}
+                                    {% else %}
+                                        <th>Contenedor</th>
+                                        <th>Sello</th>
+                                        <th>Tipo</th>
+                                    {% endif %}
                                 {% else %}
-                                    <span style="color: var(--color-text-secondary); font-style: italic;">Sin asignar</span>
+                                    <th>Contenedor</th>
+                                    <th>Sello</th>
+                                    <th>Tipo</th>
                                 {% endif %}
-                            </td>
-                            <td style="padding: 12px; text-align: center;">
-                                <span class="status-badge status-{{ task.status }}" style="padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; text-transform: uppercase;">
-                                    {{ task.status }}
-                                </span>
-                            </td>
-                            <td style="padding: 12px; text-align: center;">
-                                <a href="{{ url_for('tasks.get_task', task_id=task.id) }}" class="btn btn-sm btn-secondary">
-                                    Ver Detalle
-                                </a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                                <th>Asignado</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for task in planning.tasks %}
+                            <tr>
+                                {% if planning.template and row_fields %}
+                                    {% for field in row_fields %}
+                                        <td>{{ task.record_data.get(field.field_name, '---') }}</td>
+                                    {% endfor %}
+                                {% else %}
+                                    <td>{{ task.record_data.get('container_number', '---') }}</td>
+                                    <td>{{ task.record_data.get('seal', '---') }}</td>
+                                    <td>{{ task.record_data.get('type', '---') }}</td>
+                                {% endif %}
+                                <td>
+                                    <span class="user-pill">
+                                        {{ task.worker.username if task.worker else 'Sin asignar' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge badge-{{ task.status }}">
+                                        {{ task.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
+    </div>
+
+    <div style="margin-top: var(--space-xl); display: flex; gap: var(--space-md);">
+        <a href="{{ url_for('plannings.list_plannings') }}" class="btn btn-secondary">
+            &larr; Volver al Listado
+        </a>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/plannings/edit.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/plannings/edit.js') }}"></script>
 {% endblock %}

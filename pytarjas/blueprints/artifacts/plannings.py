@@ -1,7 +1,7 @@
 # pytarjas/blueprints/artifacts/plannings.py
 """
 Plannings API blueprint for managing work plannings and tasks.
-Updated to support Planning Templates and dynamic batch metadata.
+Supports Planning Templates for dynamic batch metadata.
 """
 
 import uuid
@@ -10,7 +10,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for,
 from sqlalchemy.orm import joinedload
 
 from pytarjas.models.user_models import db, User
-from pytarjas.models.docs_models import Planning, Task, Form, PlanningTemplate
+from pytarjas.models.docs_models import Planning, Task, Form, PlanningTemplate, PlanningMetadataField
 from pytarjas.auth import login_required, planning_access_required
 from pytarjas.helper import wants_json
 
@@ -34,6 +34,8 @@ def check_planning_access(planning_id: str) -> Planning:
         return planning
     
     abort(403)
+
+# --- PLANNING ROUTES ---
 
 @bp.route("/", methods=["GET"])
 @login_required
@@ -101,29 +103,6 @@ def create_planning():
         assignable_users = User.query.filter(
             User.role.in_(["worker", "planner"])
         ).order_by(User.username).all()
-        
-        if wants_json():
-            return jsonify({
-                "success": True,
-                "forms": [{"id": f.id, "name": f.display_name} for f in active_forms],
-                "templates": [
-                    {
-                        "id": t.id, 
-                        "name": t.name, 
-                        "fields": [
-                            {
-                                "name": f.field_name, 
-                                "label": f.field_label, 
-                                "type": f.field_type, 
-                                "required": f.is_required,
-                                "options": f.options
-                            } 
-                            for f in t.fields
-                        ]
-                    } for t in planning_templates
-                ],
-                "assignable_users": [{"id": u.id, "username": u.username} for u in assignable_users]
-            })
         
         return render_template(
             "plannings/create_plannings.html",
@@ -197,26 +176,93 @@ def create_planning():
 @planning_access_required
 def get_planning(planning_id):
     """
-    View details of a specific planning, including metadata and generated tasks.
+    View details of a specific planning.
     """
     planning = check_planning_access(planning_id)
+    return render_template("plannings/edit_plannings.html", planning=planning)
+
+# --- TEMPLATE ROUTES ---
+
+@bp.route("/templates", methods=["GET"])
+@login_required
+@planning_access_required
+def list_templates():
+    """
+    List all planning templates.
+    """
+    templates = PlanningTemplate.query.options(
+        joinedload(PlanningTemplate.fields)
+    ).order_by(PlanningTemplate.name).all()
     
-    if wants_json():
-        return jsonify({
-            "success": True,
-            "planning": {
-                "id": planning.id,
-                "client_name": planning.client_name,
-                "form_version": planning.form.display_name if planning.form else "N/A",
-                "template_name": planning.template.name if planning.template else "Sin Plantilla",
-                "metadata": planning.metadata_values,
-                "status": planning.status,
-                "tasks_count": len(planning.tasks),
-                "created_at": planning.created_at.strftime('%d/%m/%Y %H:%M')
-            }
-        })
+    return render_template("plannings/templates/list.html", templates=templates)
+
+@bp.route("/templates/create", methods=["GET", "POST"])
+@login_required
+@planning_access_required
+def create_template():
+    """
+    Create a new planning template with custom metadata fields.
+    """
+    if request.method == "POST":
+        data = request.get_json()
+        name = data.get("name")
+        description = data.get("description")
+        fields_data = data.get("fields", [])
+
+        if not name:
+            return jsonify({"success": False, "error": "El nombre es obligatorio"}), 400
+
+        try:
+            template = PlanningTemplate(
+                id=str(uuid.uuid4()),
+                name=name,
+                description=description,
+                created_by_id=g.user.id
+            )
+            db.session.add(template)
+
+            for idx, f in enumerate(fields_data):
+                field = PlanningMetadataField(
+                    id=str(uuid.uuid4()),
+                    template_id=template.id,
+                    field_name=f.get("field_name"),
+                    field_label=f.get("field_label"),
+                    field_type=f.get("field_type", "text"),
+                    is_required=f.get("is_required", True),
+                    options=f.get("options", {}),
+                    order=idx
+                )
+                db.session.add(field)
+
+            db.session.commit()
+            return jsonify({"success": True, "id": template.id})
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"success": False, "error": str(e)}), 500
+
+    return render_template("plannings/templates/create.html")
+
+@bp.route("/templates/delete/<template_id>", methods=["POST"])
+@login_required
+@planning_access_required
+def delete_template(template_id):
+    """
+    Delete a planning template.
+    """
+    template = PlanningTemplate.query.get_or_404(template_id)
     
-    return render_template(
-        "plannings/edit_plannings.html",
-        planning=planning
-    )
+    # Check if template is in use
+    if Planning.query.filter_by(template_id=template_id).first():
+        flash("No se puede eliminar la plantilla porque está en uso por planificaciones.", "error")
+        return redirect(url_for("plannings.list_templates"))
+
+    try:
+        db.session.delete(template)
+        db.session.commit()
+        flash("Plantilla eliminada exitosamente.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error al eliminar: {str(e)}", "error")
+        
+    return redirect(url_for("plannings.list_templates"))

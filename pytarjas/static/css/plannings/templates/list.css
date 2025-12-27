@@ -1,0 +1,35 @@
+/* pytarjas/static/css/plannings/templates_list.css */
+
+.table-responsive {
+    overflow-x: auto;
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.25em 0.6em;
+    font-size: 75%;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: var(--radius-sm);
+}
+
+.badge-info {
+    background-color: var(--color-primary-light);
+    color: var(--color-primary);
+}
+
+.text-right {
+    text-align: right;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-secondary {
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+}

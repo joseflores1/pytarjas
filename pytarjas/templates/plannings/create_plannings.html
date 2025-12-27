@@ -9,11 +9,11 @@
 {% endblock %}
 
 {% block content %}
-  <div class="container" style="max-width: 1000px; margin: var(--space-xl) auto;">
+  <div class="container" style="max-width: 1100px; margin: var(--space-xl) auto;">
     
     <div style="margin-bottom: var(--space-xl);">
         <h1 style="margin-bottom: var(--space-xs);">📅 Nueva Planificación</h1>
-        <p style="color: var(--color-text-secondary);">Configure la faena y asigne trabajadores a cada contenedor.</p>
+        <p style="color: var(--color-text-secondary);">Configure la cabecera de la faena y cargue los registros de tareas.</p>
     </div>
 
     {# HIDDEN DATA FOR JAVASCRIPT #}
@@ -26,34 +26,86 @@
         {% endfor %}
     </div>
 
+    {# Stores template field definitions for JS #}
+    <textarea id="planningTemplatesData" style="display: none;">
+        [
+            {% for temp in planning_templates %}
+                {
+                    "id": "{{ temp.id }}",
+                    "name": "{{ temp.name }}",
+                    "fields": [
+                        {% for field in temp.fields %}
+                        {
+                            "name": "{{ field.field_name }}",
+                            "label": "{{ field.field_label }}",
+                            "type": "{{ field.field_type }}",
+                            "required": {{ field.is_required | lower }}
+                        }{% if not loop.last %},{% endif %}
+                        {% endfor %}
+                    ]
+                }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ]
+    </textarea>
+
     <form id="createPlanningForm" method="POST">
       
-      {# SECTION: BASIC INFO #}
+      {# SECTION 1: CONFIGURACIÓN GENERAL #}
       <div class="card" style="margin-bottom: var(--space-lg);">
         <div class="card-header">
           <h2 class="card-title">📋 Configuración General</h2>
         </div>
         <div class="card-body">
-          <div class="form-group">
-            <label for="client_name" class="form-label">Nombre del Cliente / Faena <span style="color: var(--color-danger);">*</span></label>
-            <input type="text" name="client_name" id="client_name" class="form-control" placeholder="Ej: Terminal Puerto Arica - Lote 45" required>
-          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md);">
+              <div class="form-group">
+                <label for="client_name" class="form-label">Nombre del Cliente / Faena <span style="color: var(--color-danger);">*</span></label>
+                <input type="text" name="client_name" id="client_name" class="form-control" placeholder="Ej: Puerto Arica - Lote 45" required>
+              </div>
 
-          <div class="form-group">
-            <label for="form_id" class="form-label">Seleccionar Formulario <span style="color: var(--color-danger);">*</span></label>
-            <select name="form_id" id="form_id" class="form-control" required>
-              <option value="">-- Seleccione una plantilla --</option>
-              {% for form in forms %}
-                <option value="{{ form.id }}">
-                    {{ form.display_name }} - {{ form.form_type|capitalize if form.form_type else 'General' }}
-                </option>
-              {% endfor %}
-            </select>
+              <div class="form-group">
+                <label for="form_id" class="form-label">Cuestionario de Terreno <span style="color: var(--color-danger);">*</span></label>
+                <select name="form_id" id="form_id" class="form-control" required>
+                  <option value="">-- Seleccione un formulario --</option>
+                  {% for form in forms %}
+                    <option value="{{ form.id }}">
+                        {{ form.display_name }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
           </div>
         </div>
       </div>
 
-      {# SECTION: RECORDS LOADING & MANUAL ENTRY #}
+      {# SECTION 2: INFORMACIÓN DE CABECERA (METADATA) #}
+      <div class="card" style="margin-bottom: var(--space-lg);">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h2 class="card-title">📌 Información de Cabecera</h2>
+            <p class="card-subtitle">Datos generales que aplicarán a toda la planificación.</p>
+          </div>
+          <div style="display: flex; gap: var(--space-sm);">
+              <select id="template_id" class="form-control form-control-sm" style="width: auto;">
+                  <option value="">Cargar Plantilla...</option>
+                  {% for temp in planning_templates %}
+                    <option value="{{ temp.id }}">{{ temp.name }}</option>
+                  {% endfor %}
+              </select>
+              <button type="button" id="addHeaderFieldBtn" class="btn btn-secondary btn-sm">+ Agregar Campo</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="headerFieldsContainer">
+              {# Field rows (Label, Type, Value) will be rendered here by JS #}
+          </div>
+          
+          <div id="emptyHeaderState" style="text-align: center; padding: var(--space-xl); background: var(--color-bg-secondary); border-radius: var(--radius-md); color: var(--color-text-secondary);">
+              <p style="margin: 0;">No se han definido atributos de cabecera. Use una plantilla o agregue campos manualmente.</p>
+          </div>
+        </div>
+      </div>
+
+      {# SECTION 3: REGISTROS DE TAREAS #}
       <div class="card" style="margin-bottom: var(--space-lg);">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
           <h2 class="card-title">📄 Registros de Tareas</h2>
@@ -62,7 +114,7 @@
         <div class="card-body">
             
             <div id="drop-zone" class="upload-zone" style="border: 2px dashed var(--color-border); padding: var(--space-lg); text-align: center; border-radius: var(--radius-md); background-color: var(--color-bg-secondary); margin-bottom: var(--space-md);">
-                <p style="margin: 0;">Arrastre un Excel/CSV o use la tabla inferior para ingreso manual</p>
+                <p style="margin: 0;">Arrastre un archivo Excel/CSV para carga masiva</p>
                 <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display: none;">
             </div>
 
@@ -79,13 +131,13 @@
                         </tr>
                     </thead>
                     <tbody id="planningTableBody">
-                        {# Rows will be added here via JS #}
+                        {# Task rows added by JS #}
                     </tbody>
                 </table>
             </div>
 
             <div id="emptyState" style="text-align: center; padding: var(--space-xl); color: var(--color-text-secondary);">
-                <p>No hay tareas agregadas. Haga clic en "+ Agregar Fila" para comenzar.</p>
+                <p>No hay tareas individuales agregadas.</p>
             </div>
         </div>
       </div>

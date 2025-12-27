@@ -1,0 +1,68 @@
+{# pytarjas/templates/plannings/templates/create.html #}
+{% extends 'base.html' %}
+
+{% block title %}Crear Plantilla de Planificación{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/planner/index.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/plannings/templates/create.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px; margin: var(--space-xl) auto;">
+    
+    <div style="margin-bottom: var(--space-xl);">
+        <h1 style="margin-bottom: var(--space-xs);">🏗️ Nueva Plantilla de Planificación</h1>
+        <p style="color: var(--color-text-secondary);">Defina los campos de información general que se solicitarán al crear una planificación.</p>
+    </div>
+
+    <form id="templateForm">
+        {# SECTION 1: BASIC INFO #}
+        <div class="card" style="margin-bottom: var(--space-lg);">
+            <div class="card-header">
+                <h2 class="card-title">📋 Información de la Plantilla</h2>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label for="name" class="form-label">Nombre de la Plantilla <span style="color: var(--color-danger);">*</span></label>
+                    <input type="text" id="name" class="form-control" placeholder="Ej: Consolidado de Exportación" required>
+                </div>
+                <div class="form-group">
+                    <label for="description" class="form-label">Descripción</label>
+                    <textarea id="description" class="form-control" rows="2" placeholder="Opcional: Describa el propósito de esta plantilla"></textarea>
+                </div>
+            </div>
+        </div>
+
+        {# SECTION 2: DYNAMIC FIELDS #}
+        <div class="card" style="margin-bottom: var(--space-lg);">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 class="card-title">⚙️ Campos de Metadatos</h2>
+                <button type="button" id="addFieldBtn" class="btn btn-secondary btn-sm">+ Agregar Campo</button>
+            </div>
+            <div class="card-body">
+                <div id="fieldsContainer">
+                    {# Dynamic fields will be added here via JS #}
+                </div>
+                
+                <div id="emptyFieldsState" style="text-align: center; padding: var(--space-lg); color: var(--color-text-secondary);">
+                    <p>No hay campos definidos. Agregue campos como "Nave", "Puerto", "Reserva", etc.</p>
+                </div>
+            </div>
+        </div>
+
+        {# ACTIONS #}
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-xl);">
+            <a href="{{ url_for('plannings.list_templates') }}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary btn-lg" id="saveTemplateBtn">
+                💾 Guardar Plantilla
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+    <script src="{{ url_for('static', filename='js/plannings/templates/create.js') }}"></script>
+{% endblock %}

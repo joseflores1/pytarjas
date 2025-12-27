@@ -1,0 +1,60 @@
+/* pytarjas/static/css/plannings/templates/create.css */
+
+.field-card {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    margin-bottom: var(--space-md);
+    position: relative;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.field-card:hover {
+    box-shadow: var(--shadow-sm);
+}
+
+.remove-field {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-danger-light);
+    color: var(--color-danger);
+    border-radius: 50%;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 1.2rem;
+    line-height: 1;
+    transition: background-color 0.2s ease;
+}
+
+.remove-field:hover {
+    background-color: var(--color-danger);
+    color: white;
+}
+
+.fields-grid {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1.5fr 1fr;
+    gap: var(--space-md);
+    padding-right: var(--space-xl); /* Make room for remove button */
+}
+
+@media (max-width: 768px) {
+    .fields-grid {
+        grid-template-columns: 1fr;
+        padding-right: 0;
+        margin-top: var(--space-md);
+    }
+}
+
+/* Specific styling for the drag-and-drop or empty states if needed later */
+#emptyFieldsState p {
+    margin: 0;
+    font-style: italic;
+}

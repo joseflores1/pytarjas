@@ -1,0 +1,83 @@
+{# pytarjas/templates/plannings/templates/list.html #}
+{% extends 'base.html' %}
+
+{% block title %}Plantillas de Planificación{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/plannings/templates_list.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1000px; margin: var(--space-xl) auto;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-xl);">
+        <div>
+            <h1 style="margin-bottom: var(--space-xs);">🏗️ Plantillas de Planificación</h1>
+            <p style="color: var(--color-text-secondary);">Administre las estructuras de datos para sus faenas.</p>
+        </div>
+        <a href="{{ url_for('plannings.create_template') }}" class="btn btn-primary">
+            + Nueva Plantilla
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body" style="padding: 0;">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Descripción</th>
+                            <th class="text-center">Campos</th>
+                            <th>Fecha Creación</th>
+                            <th class="text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for template in templates %}
+                        <tr>
+                            <td>
+                                <strong>{{ template.name }}</strong>
+                            </td>
+                            <td>
+                                <span class="text-secondary">{{ template.description or 'Sin descripción' }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge badge-info">{{ template.fields|length }}</span>
+                            </td>
+                            <td>
+                                {{ template.created_at.strftime('%d/%m/%Y %H:%M') }}
+                            </td>
+                            <td class="text-right">
+                                <form action="{{ url_for('plannings.delete_template', template_id=template.id) }}" 
+                                      method="POST" 
+                                      class="delete-template-form"
+                                      style="display: inline-block;">
+                                    <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: var(--space-xl); color: var(--color-text-secondary);">
+                                No hay plantillas creadas actualmente.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-top: var(--space-lg);">
+        <a href="{{ url_for('plannings.list_plannings') }}" class="btn btn-secondary">
+            &larr; Volver a Planificaciones
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+    <script src="{{ url_for('static', filename='js/plannings/templates_list.js') }}"></script>
+{% endblock %}

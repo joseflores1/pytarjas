@@ -1,4 +1,4 @@
-# docs_models.py
+# pytarjas/models/docs_models.py
 """
 Task and form management models for the Pytarjas application.
 Includes Planning Templates for dynamic batch metadata and Task-level metadata.
@@ -70,6 +70,7 @@ class PlanningTemplate(db.Model):
 class PlanningMetadataField(db.Model):
     """
     Individual metadata field definition within a PlanningTemplate.
+    Can be a header field (for the faena) or a row field (for each task).
     """
     __tablename__ = "planning_metadata_field"
 
@@ -106,6 +107,12 @@ class PlanningMetadataField(db.Model):
         Boolean,
         nullable=False,
         default=True,
+    )
+
+    is_row_field: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
     )
 
     order: Mapped[int] = mapped_column(
@@ -375,7 +382,7 @@ class Planning(db.Model):
     
     template: Mapped["PlanningTemplate"] = relationship(
         "PlanningTemplate",
-        back_populates="plannings",
+        back_populates="plannings"
     )
 
     tasks: Mapped[list["Task"]] = relationship(
@@ -410,7 +417,7 @@ class Task(db.Model):
         index=True,
     )
     
-    # Task-specific input metadata (equivalent to Planning metadata for singular tasks)
+    # Task-specific input metadata
     record_data: Mapped[dict] = mapped_column(
         JSON,
         nullable=False,
