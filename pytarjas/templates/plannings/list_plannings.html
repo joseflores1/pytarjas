@@ -16,9 +16,14 @@
           Gestione las faenas y supervise el avance de las tareas cargadas.
         </p>
       </div>
-      <a href="{{ url_for('plannings.create_planning') }}" class="btn btn-primary btn-lg">
-        <span class="btn-icon-plus">+</span> Nueva Planificación
-      </a>
+      <div style="display: flex; gap: var(--space-md);">
+        <a href="{{ url_for('plannings.list_templates') }}" class="btn btn-secondary btn-lg">
+          🏗️ Gestionar Plantillas
+        </a>
+        <a href="{{ url_for('plannings.create_planning') }}" class="btn btn-primary btn-lg">
+          <span class="btn-icon-plus">+</span> Nueva Planificación
+        </a>
+      </div>
     </div>
   </div>
 {% endblock %}
@@ -97,6 +102,7 @@
                 </span>
               </td>
               <td class="text-center align-middle" style="padding: var(--space-sm); white-space: nowrap;">
+                {# The created_at value is already formatted in the backend to 'dd/mm/yyyy hh:mm' #}
                 {{ plan.created_at }}
               </td>
             </tr>
@@ -109,7 +115,10 @@
         <div class="empty-state-icon" style="font-size: 3rem; margin-bottom: var(--space-md);">📂</div>
         <h2 class="empty-state-title">No hay planificaciones</h2>
         <p class="empty-state-text">No se encontraron registros que coincidan con su búsqueda.</p>
-        <a href="{{ url_for('plannings.create_planning') }}" class="btn btn-primary btn-lg" style="margin-top: var(--space-md);">Crear Nueva Planificación</a>
+        <div style="display: flex; gap: var(--space-md); justify-content: center; margin-top: var(--space-md);">
+          <a href="{{ url_for('plannings.list_templates') }}" class="btn btn-secondary btn-lg">🏗️ Gestionar Plantillas</a>
+          <a href="{{ url_for('plannings.create_planning') }}" class="btn btn-primary btn-lg">Crear Nueva Planificación</a>
+        </div>
       </div>
     {% endif %}
 

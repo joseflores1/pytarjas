@@ -39,7 +39,9 @@
                             "name": "{{ field.field_name }}",
                             "label": "{{ field.field_label }}",
                             "type": "{{ field.field_type }}",
-                            "required": {{ field.is_required | lower }}
+                            "required": {{ field.is_required | lower }},
+                            "is_row_field": {{ field.is_row_field | lower }},
+                            "options": {{ (field.options or {}) | tojson | safe }}
                         }{% if not loop.last %},{% endif %}
                         {% endfor %}
                     ]
@@ -57,9 +59,37 @@
         </div>
         <div class="card-body">
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md);">
-              <div class="form-group">
+              <div class="form-group autocomplete-container" id="clientAutocompleteContainer">
                 <label for="client_name" class="form-label">Nombre del Cliente / Faena <span style="color: var(--color-danger);">*</span></label>
-                <input type="text" name="client_name" id="client_name" class="form-control" placeholder="Ej: Puerto Arica - Lote 45" required>
+                <div class="autocomplete-wrapper" style="position: relative; display: flex; align-items: center;">
+                    <input type="text" 
+                           name="client_name" 
+                           id="client_name" 
+                           class="form-control" 
+                           placeholder="Busque un cliente o escriba un nombre..." 
+                           required 
+                           style="padding-right: 40px;"
+                           autocomplete="off">
+                    
+                    <button type="button" 
+                            id="toggleClientDropdown" 
+                            style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; color: var(--color-text-tertiary); font-size: 0.8rem; padding: 5px;">
+                        ▼
+                    </button>
+                    
+                    <div id="client_results" class="card shadow-md" style="display: none; position: absolute; width: 100%; top: 100%; left: 0; z-index: var(--z-dropdown); margin-top: 4px; max-height: 250px; overflow-y: auto;">
+                        <ul id="client_list" style="margin: 0; padding: 0; list-style: none;">
+                            {% for client in available_clients %}
+                                <li class="autocomplete-item" 
+                                    data-value="{{ client.username }}" 
+                                    style="padding: var(--space-sm) var(--space-md); cursor: pointer; border-bottom: 1px solid var(--color-border); transition: background var(--transition-fast);">
+                                    {{ client.username }}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                <small class="form-help">Puede seleccionar un cliente existente de la lista o ingresar uno nuevo manualmente.</small>
               </div>
 
               <div class="form-group">
@@ -121,13 +151,8 @@
             <div id="records-container" style="overflow-x: auto;">
                 <table class="table" id="planningTable" style="width: 100%; border-collapse: collapse;">
                     <thead>
-                        <tr>
-                            <th style="min-width: 150px;">N° Contenedor</th>
-                            <th style="min-width: 120px;">Sello</th>
-                            <th style="min-width: 100px;">Tipo</th>
-                            <th style="min-width: 100px;">Peso (kg)</th>
-                            <th style="min-width: 180px;">Asignado a</th>
-                            <th style="width: 50px;"></th>
+                        <tr id="planningTableHeader">
+                            {# Headers will be dynamically rendered by JS based on Template choice #}
                         </tr>
                     </thead>
                     <tbody id="planningTableBody">

@@ -103,12 +103,16 @@ def create_planning():
         assignable_users = User.query.filter(
             User.role.in_(["worker", "planner"])
         ).order_by(User.username).all()
+
+        # Fetch existing clients from database for search suggestions
+        available_clients = User.query.filter_by(role="client").order_by(User.username).all()
         
         return render_template(
             "plannings/create_plannings.html",
             forms=active_forms,
             planning_templates=planning_templates,
-            assignable_users=assignable_users
+            assignable_users=assignable_users,
+            available_clients=available_clients
         )
     
     data = request.get_json() if wants_json() else request.form
@@ -229,6 +233,8 @@ def create_template():
                     field_label=f.get("field_label"),
                     field_type=f.get("field_type", "text"),
                     is_required=f.get("is_required", True),
+                    # Ensure is_row_field is extracted correctly
+                    is_row_field=f.get("is_row_field", False),
                     options=f.get("options", {}),
                     order=idx
                 )

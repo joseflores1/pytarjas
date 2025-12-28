@@ -19,6 +19,57 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     /**
+     * Handles the dynamic UI for multiple options fields
+     */
+    function toggleOptionsEditor(selectElement, card) {
+        const optionsContainer = card.querySelector('.options-editor-container');
+        if (selectElement.value === 'select') {
+            optionsContainer.style.display = 'block';
+        } else {
+            optionsContainer.style.display = 'none';
+            optionsContainer.querySelector('.options-list').innerHTML = '';
+        }
+    }
+
+    /**
+     * Adds an option tag to the list
+     */
+    function addOptionTag(list, value) {
+        const val = value.trim();
+        if (!val) {
+            return;
+        }
+
+        const existing = Array.from(list.querySelectorAll('.option-tag-text'))
+            .map(span => span.textContent);
+        
+        if (existing.includes(val)) {
+            return;
+        }
+
+        const tag = document.createElement('div');
+        tag.className = 'option-tag';
+        tag.style.display = 'inline-flex';
+        tag.style.alignItems = 'center';
+        tag.style.background = 'var(--color-bg-secondary)';
+        tag.style.padding = 'var(--space-xs) var(--space-sm)';
+        tag.style.margin = '2px';
+        tag.style.borderRadius = 'var(--radius-sm)';
+        tag.style.border = '1px solid var(--color-border)';
+
+        tag.innerHTML = `
+            <span class="option-tag-text" style="font-size: 0.85rem; margin-right: var(--space-xs);">${val}</span>
+            <span class="remove-option" style="cursor: pointer; font-weight: bold; color: var(--color-danger);">&times;</span>
+        `;
+
+        tag.querySelector('.remove-option').addEventListener('click', function() {
+            tag.remove();
+        });
+
+        list.appendChild(tag);
+    }
+
+    /**
      * Adds a new metadata field configuration card to the container
      */
     function addField() {
@@ -30,11 +81,11 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="fields-grid">
                 <div class="form-group">
                     <label class="form-label">Etiqueta (Label)</label>
-                    <input type="text" class="form-control field-label" placeholder="Ej: Nombre de Nave" required>
+                    <input type="text" class="form-control field-label" placeholder="Ej: N° Contenedor" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Nombre Interno (Key)</label>
-                    <input type="text" class="form-control field-name" placeholder="Ej: vessel_name" required>
+                    <input type="text" class="form-control field-name" placeholder="Ej: container_no" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Tipo</label>
@@ -43,6 +94,14 @@ document.addEventListener('DOMContentLoaded', function () {
                         <option value="number">Número</option>
                         <option value="date">Fecha</option>
                         <option value="boolean">Sí/No</option>
+                        <option value="select">Selección Múltiple</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ubicación</label>
+                    <select class="form-control field-location">
+                        <option value="false">Cabecera (Información General)</option>
+                        <option value="true">Fila (Registro de Tarea)</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -53,15 +112,44 @@ document.addEventListener('DOMContentLoaded', function () {
                     </select>
                 </div>
             </div>
+
+            <div class="options-editor-container" style="display: none; margin-top: var(--space-md); border-top: 1px solid var(--color-border); padding-top: var(--space-sm);">
+                <label class="form-label">Opciones disponibles</label>
+                <div class="input-group" style="display: flex; gap: var(--space-xs); margin-bottom: var(--space-xs);">
+                    <input type="text" class="form-control option-input" placeholder="Nueva opción...">
+                    <button type="button" class="btn btn-secondary btn-sm add-option-btn">Añadir</button>
+                </div>
+                <div class="options-list" style="display: flex; flex-wrap: wrap; gap: var(--space-xs);"></div>
+            </div>
         `;
 
-        // Removal logic
+        const typeSelect = fieldDiv.querySelector('.field-type');
+        const optionInput = fieldDiv.querySelector('.option-input');
+        const addOptionBtn = fieldDiv.querySelector('.add-option-btn');
+        const optionsList = fieldDiv.querySelector('.options-list');
+
+        typeSelect.addEventListener('change', function() {
+            toggleOptionsEditor(this, fieldDiv);
+        });
+
+        addOptionBtn.addEventListener('click', function() {
+            addOptionTag(optionsList, optionInput.value);
+            optionInput.value = '';
+            optionInput.focus();
+        });
+
+        optionInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addOptionBtn.click();
+            }
+        });
+
         fieldDiv.querySelector('.remove-field').addEventListener('click', function () {
             fieldDiv.remove();
             updateEmptyState();
         });
 
-        // "Slugify" logic: automatically generate the internal key from the label
         const labelInput = fieldDiv.querySelector('.field-label');
         const nameInput = fieldDiv.querySelector('.field-name');
 
@@ -70,14 +158,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 nameInput.value = e.target.value
                     .toLowerCase()
                     .normalize("NFD")
-                    .replace(/[\u0300-\u036f]/g, "") // Remove accents
+                    .replace(/[\u0300-\u036f]/g, "")
                     .replace(/[^a-z0-9]/g, '_')
                     .replace(/__+/g, '_')
                     .replace(/^_|_$/g, '');
             }
         });
 
-        // If the user manually edits the internal name, stop the auto-generation
         nameInput.addEventListener('input', function () {
             nameInput.dataset.manual = "true";
         });
@@ -86,7 +173,6 @@ document.addEventListener('DOMContentLoaded', function () {
         updateEmptyState();
     }
 
-    // Event Listeners
     if (addFieldBtn) {
         addFieldBtn.addEventListener('click', addField);
     }
@@ -96,22 +182,31 @@ document.addEventListener('DOMContentLoaded', function () {
             e.preventDefault();
 
             const fieldCards = fieldsContainer.querySelectorAll('.field-card');
-
             if (fieldCards.length === 0) {
                 alert('Debe agregar al menos un campo a la plantilla.');
                 return;
             }
 
-            // Change UI state
             saveBtn.disabled = true;
             saveBtn.textContent = 'Guardando...';
 
             const fields = Array.from(fieldCards).map(function (card) {
+                const type = card.querySelector('.field-type').value;
+                const options = {};
+                
+                if (type === 'select') {
+                    const optionTags = Array.from(card.querySelectorAll('.option-tag-text'))
+                        .map(span => span.textContent);
+                    options.choices = optionTags;
+                }
+
                 return {
                     field_label: card.querySelector('.field-label').value,
                     field_name: card.querySelector('.field-name').value,
-                    field_type: card.querySelector('.field-type').value,
-                    is_required: card.querySelector('.field-required').value === 'true'
+                    field_type: type,
+                    is_row_field: card.querySelector('.field-location').value === 'true',
+                    is_required: card.querySelector('.field-required').value === 'true',
+                    options: options
                 };
             });
 
@@ -122,7 +217,6 @@ document.addEventListener('DOMContentLoaded', function () {
             };
 
             try {
-                // The URL is hardcoded here to match the blueprint route
                 const response = await fetch('/plannings/templates/create', {
                     method: 'POST',
                     headers: {
@@ -150,6 +244,5 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Initial check
     updateEmptyState();
 });

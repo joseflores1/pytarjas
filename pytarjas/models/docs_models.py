@@ -109,6 +109,7 @@ class PlanningMetadataField(db.Model):
         default=True,
     )
 
+    # This determines if the field is in the header or in the task table
     is_row_field: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
@@ -417,7 +418,7 @@ class Task(db.Model):
         index=True,
     )
     
-    # Task-specific input metadata
+    # Task-specific input metadata (stores dynamic columns from record_data)
     record_data: Mapped[dict] = mapped_column(
         JSON,
         nullable=False,
@@ -445,7 +446,6 @@ class Task(db.Model):
         index=True,
     )
     
-    # Worker's answers to the Form questions
     responses: Mapped[dict | None] = mapped_column(
         JSON,
         nullable=True,
