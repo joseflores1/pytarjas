@@ -1,5 +1,6 @@
 -- scripts/create_objects.sql
 -- Inserts a full demo Form, a Planning Template, and an actual Planning instance with tasks.
+-- Updated to include worker verification fields without removing original questions.
 
 DO $$ 
 DECLARE 
@@ -81,25 +82,24 @@ INSERT INTO planning_template (
     NOW() AT TIME ZONE 'UTC'
 );
 
--- Metadata Fields for the Planning Template
--- Note: 'is_row_field' is FALSE for header fields and TRUE for table row fields.
+-- Metadata Fields for the Planning Template (Added is_verifiable)
 
--- Header Fields (Global information)
-INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, is_row_field, "order", options, created_at)
-VALUES (gen_random_uuid(), planning_template_uuid, 'Nombre de la Nave', 'vessel_name', 'text', TRUE, FALSE, 1, '{}'::jsonb, NOW() AT TIME ZONE 'UTC');
+-- Header Fields
+INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, is_row_field, is_verifiable, "order", options, created_at)
+VALUES (gen_random_uuid(), planning_template_uuid, 'Nombre de la Nave', 'vessel_name', 'text', TRUE, FALSE, FALSE, 1, '{}'::jsonb, NOW() AT TIME ZONE 'UTC');
 
-INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, is_row_field, "order", options, created_at)
-VALUES (gen_random_uuid(), planning_template_uuid, 'Terminal de Operación', 'terminal', 'select', TRUE, FALSE, 2, '{"choices": ["TPS", "DP World", "SVTI", "ATI"]}'::jsonb, NOW() AT TIME ZONE 'UTC');
+INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, is_row_field, is_verifiable, "order", options, created_at)
+VALUES (gen_random_uuid(), planning_template_uuid, 'Terminal de Operación', 'terminal', 'select', TRUE, FALSE, FALSE, 2, '{"choices": ["TPS", "DP World", "SVTI", "ATI"]}'::jsonb, NOW() AT TIME ZONE 'UTC');
 
--- Row Fields (Dynamic columns in the task table)
-INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, is_row_field, "order", options, created_at)
-VALUES (gen_random_uuid(), planning_template_uuid, 'N° Contenedor', 'container_number', 'text', TRUE, TRUE, 3, '{}'::jsonb, NOW() AT TIME ZONE 'UTC');
+-- Row Fields
+INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, is_row_field, is_verifiable, "order", options, created_at)
+VALUES (gen_random_uuid(), planning_template_uuid, 'N° Contenedor', 'container_number', 'text', TRUE, TRUE, FALSE, 3, '{}'::jsonb, NOW() AT TIME ZONE 'UTC');
 
-INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, is_row_field, "order", options, created_at)
-VALUES (gen_random_uuid(), planning_template_uuid, 'Sello', 'seal', 'text', FALSE, TRUE, 4, '{}'::jsonb, NOW() AT TIME ZONE 'UTC');
+INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, is_row_field, is_verifiable, "order", options, created_at)
+VALUES (gen_random_uuid(), planning_template_uuid, 'Sello', 'seal', 'text', FALSE, TRUE, TRUE, 4, '{}'::jsonb, NOW() AT TIME ZONE 'UTC');
 
-INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, is_row_field, "order", options, created_at)
-VALUES (gen_random_uuid(), planning_template_uuid, 'Tipo de Unidad', 'type', 'select', TRUE, TRUE, 5, '{"choices": ["20GP", "40HC", "40RF", "20RF"]}'::jsonb, NOW() AT TIME ZONE 'UTC');
+INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, is_row_field, is_verifiable, "order", options, created_at)
+VALUES (gen_random_uuid(), planning_template_uuid, 'Tipo de Unidad', 'type', 'select', TRUE, TRUE, TRUE, 5, '{"choices": ["20GP", "40HC", "40RF", "20RF"]}'::jsonb, NOW() AT TIME ZONE 'UTC');
 
 
 -- ============================================================================
@@ -112,6 +112,7 @@ INSERT INTO planning (
     form_id, 
     template_id, 
     metadata_values, 
+    verification_config,
     client_name, 
     status, 
     total_tasks, 
@@ -122,9 +123,13 @@ INSERT INTO planning (
     form_uuid, 
     planning_template_uuid, 
     '{
-        "vessel_name": "MS Explorer",
-        "terminal": "TPS"
+        "Nombre de la Nave": "MS Explorer",
+        "Terminal de Operación": "TPS"
     }'::jsonb, 
+    '{
+        "seal": {"label": "Sello", "is_row_field": true},
+        "type": {"label": "Tipo de Unidad", "is_row_field": true}
+    }'::jsonb,
     'Importaciones ABC S.A.', 
     'uploaded', 
     2, 
@@ -132,7 +137,7 @@ INSERT INTO planning (
 );
 
 -- ============================================================================
--- 4. ASSOCIATED TASKS (Using dynamic record_data)
+-- 4. ASSOCIATED TASKS
 -- ============================================================================
 
 INSERT INTO task (

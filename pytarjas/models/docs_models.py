@@ -116,6 +116,13 @@ class PlanningMetadataField(db.Model):
         default=False,
     )
 
+    # New: Indicates if the worker must verify this value upon starting the task
+    is_verifiable: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
     order: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
@@ -325,6 +332,14 @@ class Planning(db.Model):
     )
 
     metadata_values: Mapped[dict | None] = mapped_column(
+        JSON,
+        nullable=True,
+        default=dict,
+    )
+
+    # New: Stores which fields from metadata or record_data require worker verification
+    # Format: {"field_name": {"label": "...", "is_row_field": bool}}
+    verification_config: Mapped[dict | None] = mapped_column(
         JSON,
         nullable=True,
         default=dict,

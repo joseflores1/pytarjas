@@ -104,7 +104,6 @@ def create_planning():
             User.role.in_(["worker", "planner"])
         ).order_by(User.username).all()
 
-        # Fetch existing clients from database for search suggestions
         available_clients = User.query.filter_by(role="client").order_by(User.username).all()
         
         return render_template(
@@ -120,6 +119,7 @@ def create_planning():
     form_id = data.get("form_id")
     template_id = data.get("template_id")
     metadata_values = data.get("metadata_values", {})
+    verification_config = data.get("verification_config", {})
     records = data.get("records", [])
 
     if not client_name or not form_id:
@@ -136,6 +136,7 @@ def create_planning():
             form_id=form_id,
             template_id=template_id if template_id else None,
             metadata_values=metadata_values,
+            verification_config=verification_config,
             client_name=client_name,
             status="uploaded",
             total_tasks=len(records),
@@ -233,8 +234,8 @@ def create_template():
                     field_label=f.get("field_label"),
                     field_type=f.get("field_type", "text"),
                     is_required=f.get("is_required", True),
-                    # Ensure is_row_field is extracted correctly
                     is_row_field=f.get("is_row_field", False),
+                    is_verifiable=f.get("is_verifiable", False),
                     options=f.get("options", {}),
                     order=idx
                 )
@@ -258,7 +259,6 @@ def delete_template(template_id):
     """
     template = PlanningTemplate.query.get_or_404(template_id)
     
-    # Check if template is in use
     if Planning.query.filter_by(template_id=template_id).first():
         flash("No se puede eliminar la plantilla porque está en uso por planificaciones.", "error")
         return redirect(url_for("plannings.list_templates"))

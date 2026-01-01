@@ -13,7 +13,7 @@
     
     <div style="margin-bottom: var(--space-xl);">
         <h1 style="margin-bottom: var(--space-xs);">📅 Nueva Planificación</h1>
-        <p style="color: var(--color-text-secondary);">Configure la cabecera de la faena y cargue los registros de tareas.</p>
+        <p style="color: var(--color-text-secondary);">Configure la cabecera de la faena, defina las columnas de tareas y asigne trabajadores.</p>
     </div>
 
     {# HIDDEN DATA FOR JAVASCRIPT #}
@@ -41,6 +41,7 @@
                             "type": "{{ field.field_type }}",
                             "required": {{ field.is_required | lower }},
                             "is_row_field": {{ field.is_row_field | lower }},
+                            "is_verifiable": {{ field.is_verifiable | lower }},
                             "options": {{ (field.options or {}) | tojson | safe }}
                         }{% if not loop.last %},{% endif %}
                         {% endfor %}
@@ -112,10 +113,10 @@
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
           <div>
             <h2 class="card-title">📌 Información de Cabecera</h2>
-            <p class="card-subtitle">Datos generales que aplicarán a toda la planificación.</p>
+            <p class="card-subtitle">Datos generales de la faena. Marque campos para que el trabajador los verifique en terreno.</p>
           </div>
           <div style="display: flex; gap: var(--space-sm);">
-              <select id="template_id" class="form-control form-control-sm" style="width: auto;">
+              <select id="template_id_header" class="form-control form-control-sm template-selector" style="width: auto;">
                   <option value="">Cargar Plantilla...</option>
                   {% for temp in planning_templates %}
                     <option value="{{ temp.id }}">{{ temp.name }}</option>
@@ -126,7 +127,7 @@
         </div>
         <div class="card-body">
           <div id="headerFieldsContainer">
-              {# Field rows (Label, Type, Value) will be rendered here by JS #}
+              {# Field rows (Label, Type, Value, Verify) will be rendered here by JS #}
           </div>
           
           <div id="emptyHeaderState" style="text-align: center; padding: var(--space-xl); background: var(--color-bg-secondary); border-radius: var(--radius-md); color: var(--color-text-secondary);">
@@ -138,10 +139,31 @@
       {# SECTION 3: REGISTROS DE TAREAS #}
       <div class="card" style="margin-bottom: var(--space-lg);">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-          <h2 class="card-title">📄 Registros de Tareas</h2>
-          <button type="button" id="addRowBtn" class="btn btn-secondary btn-sm">+ Agregar Fila</button>
+          <div>
+            <h2 class="card-title">📄 Registros de Tareas</h2>
+            <p class="card-subtitle">Defina las columnas de la tabla y marque cuáles deben ser validadas por el asignado.</p>
+          </div>
+          <div style="display: flex; gap: var(--space-sm);">
+              <select id="template_id_tasks" class="form-control form-control-sm template-selector" style="width: auto;">
+                  <option value="">Cargar Plantilla...</option>
+                  {% for temp in planning_templates %}
+                    <option value="{{ temp.id }}">{{ temp.name }}</option>
+                  {% endfor %}
+              </select>
+              <button type="button" id="addRowFieldBtn" class="btn btn-secondary btn-sm">+ Agregar Columna</button>
+              <button type="button" id="addRowBtn" class="btn btn-primary btn-sm">+ Agregar Fila</button>
+          </div>
         </div>
         <div class="card-body">
+
+            {# Row Columns Definition Area #}
+            <div id="rowFieldsContainer" style="margin-bottom: var(--space-md); border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-md);">
+                {# Row field definitions (Label, Type, Verify) will be rendered here by JS #}
+            </div>
+            
+            <div id="emptyRowFieldsState" style="text-align: center; padding: var(--space-md); background: var(--color-bg-secondary); border-radius: var(--radius-md); color: var(--color-text-secondary); margin-bottom: var(--space-md);">
+                <p style="margin: 0;">No se han definido columnas para las tareas. Agregue columnas manualmente o use una plantilla.</p>
+            </div>
             
             <div id="drop-zone" class="upload-zone" style="border: 2px dashed var(--color-border); padding: var(--space-lg); text-align: center; border-radius: var(--radius-md); background-color: var(--color-bg-secondary); margin-bottom: var(--space-md);">
                 <p style="margin: 0;">Arrastre un archivo Excel/CSV para carga masiva</p>
@@ -152,7 +174,7 @@
                 <table class="table" id="planningTable" style="width: 100%; border-collapse: collapse;">
                     <thead>
                         <tr id="planningTableHeader">
-                            {# Headers will be dynamically rendered by JS based on Template choice #}
+                            {# Headers will be dynamically rendered by JS based on defined row fields #}
                         </tr>
                     </thead>
                     <tbody id="planningTableBody">

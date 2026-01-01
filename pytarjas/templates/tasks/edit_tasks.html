@@ -1,4 +1,4 @@
-{# pytarjas/templates/tasks/task_detail.html #}
+{# pytarjas/templates/tasks/edit_tasks.html #}
 {% extends 'base.html' %}
 
 {% block title %}{{ task.form.display_name }}{% endblock %}
@@ -17,17 +17,58 @@
       'file': '📁', 'client_select': '🏢'
     } %}
     
+    {# NEW: VERIFICATION MODAL #}
+    {% if verification_prompts %}
+    <div id="verificationModal" class="modal-overlay" style="display: flex; z-index: 2000;">
+      <div class="modal-content card" style="max-width: 600px; width: 95%; border-top: 5px solid var(--color-warning);">
+        <div class="card-header">
+          <h2 class="card-title">⚠️ Verificación Obligatoria</h2>
+          <p class="card-subtitle">Confirme que los datos de la planificación coinciden con la realidad en terreno.</p>
+        </div>
+        <div class="card-body">
+          <div id="verificationItemsContainer">
+            {% for prompt in verification_prompts %}
+            <div class="verification-item" style="padding: var(--space-md); border-bottom: 1px solid var(--color-border); margin-bottom: var(--space-sm);">
+                <p>¿Es el valor de <strong>{{ prompt.label }}</strong> igual a <code>{{ prompt.expected_value }}</code>?</p>
+                
+                <div style="display: flex; gap: var(--space-md); margin-top: var(--space-sm);">
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                        <input type="radio" name="verify_{{ prompt.field_name }}" value="yes" required class="verify-radio"> Sí, coincide
+                    </label>
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                        <input type="radio" name="verify_{{ prompt.field_name }}" value="no" class="verify-radio"> No coincide
+                    </label>
+                </div>
+
+                <div class="correction-area" id="correction_area_{{ prompt.field_name }}" style="display: none; margin-top: var(--space-md);">
+                    <label class="form-label" style="color: var(--color-danger);">Ingrese el valor real detectado:</label>
+                    <input type="text" id="actual_{{ prompt.field_name }}" class="form-control" placeholder="Valor real...">
+                </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="card-footer" style="text-align: right; padding: var(--space-md);">
+          <button type="button" id="confirmVerificationBtn" class="btn btn-primary">Validar y Continuar</button>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     {# Header #}
     <div class="task-header">
       <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: var(--space-md);">
         <div>
-          {# UPDATED: Now uses display_name to show the version (e.g., "Consolidado (v2)") #}
           <h1 class="task-header-title">{{ task.form.display_name }}</h1>
           <div class="task-meta">
             <span>📝 {{ task.form.form_type or 'General' }}</span>
             {% if task.worker %}
               <span>👤 {{ task.worker.username }}</span>
             {% endif %}
+            {# FRIENDLY DATE: Added for creation time #}
+            <span class="friendly-date" title="Fecha de creación">
+                📅 {{ task.created_at.strftime('%d/%m/%Y %H:%M') }}
+            </span>
           </div>
         </div>
         <span class="status-badge status-{{ task.status }}">
@@ -42,12 +83,38 @@
       </div>
     </div>
 
+    {# NEW: PLANNING & RECORD INFO SECTION #}
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); margin-bottom: var(--space-lg);">
+        {# Planning Header Info #}
+        <div class="card">
+            <div class="card-header"><h3 class="card-title" style="font-size: 1rem;">📌 Información de Faena</h3></div>
+            <div class="card-body" style="font-size: 0.9rem;">
+                <p><strong>Cliente:</strong> {{ task.planning.client_name if task.planning else 'N/A' }}</p>
+                {% if task.planning %}
+                    {% for label, val in task.planning.metadata_values.items() %}
+                        <p><strong>{{ label }}:</strong> {{ val }}</p>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+        {# Task Row Record Info #}
+        <div class="card">
+            <div class="card-header"><h3 class="card-title" style="font-size: 1rem;">📄 Datos del Registro</h3></div>
+            <div class="card-body" style="font-size: 0.9rem;">
+                {% for key, val in task.record_data.items() %}
+                    <p><strong>{{ key.replace('_', ' ').capitalize() }}:</strong> {{ val }}</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
     {# Form #}
     <form id="taskForm" 
           data-task-id="{{ task.id }}" 
           data-total-questions="{{ task.form.questions|length }}"
           data-task-status="{{ task.status }}"
-          data-can-override-edit="{{ can_override_edit | tojson }}"> 
+          data-can-override-edit="{{ can_override_edit | tojson }}"
+          {% if verification_prompts %}style="opacity: 0.5; pointer-events: none;"{% endif %}> 
       
       {% set is_finalized = task.status in ['completed', 'reviewed', 'approved'] %}
       {% set is_pending = task.status == 'pending' %}
@@ -81,7 +148,6 @@
 
           {% set q_type = question.question_type|default('')|string|trim %}
           
-          {# TEXT/NUMBER/DATE INPUTS #}
           {% if q_type == 'text' %}
             <input type="text" name="response_{{ question.id }}" id="response_{{ question.id }}"
                    class="form-control response-input" value="{{ current_answer if current_answer is not none else '' }}"
@@ -112,7 +178,6 @@
                    {% if question.is_required %}required{% endif %} 
                    {% if is_input_disabled %}disabled{% endif %}>
 
-          {# SELECT #}
           {% elif q_type == 'select' %}
             <select name="response_{{ question.id }}" id="response_{{ question.id }}"
                     class="form-control response-input"
@@ -126,7 +191,6 @@
               {% endif %}
             </select>
 
-          {# BOOLEAN #}
           {% elif q_type == 'boolean' %}
             {% set saved_bool = current_answer|default('')|string %}
             <div class="radio-group">
@@ -146,45 +210,31 @@
               </label>
             </div>
             
-          {# CLIENT SELECT #}
           {% elif q_type == 'client_select' %}
             {% set pre_assigned_client = task.record_data.get('client_name', '') %}
-            
             <select name="response_{{ question.id }}" id="response_{{ question.id }}"
                     class="form-control response-input"
                     {% if question.is_required %}required{% endif %} 
                     {% if is_input_disabled %}disabled{% endif %}>
-              
               <option value="" {% if current_answer is none or current_answer == '' %}selected{% endif %}>-- Seleccionar Cliente --</option>
-
-              {% if pre_assigned_client and current_answer is none %}
+              {% if pre_assigned_client %}
+                {% if current_answer is none %}
                   <option value="{{ pre_assigned_client }}" disabled style="color: var(--color-text-tertiary);">
-                      🏢 Cliente (Sugerido de Faena): {{ pre_assigned_client }}
+                      🏢 Cliente (Sugerido): {{ pre_assigned_client }}
                   </option>
+                {% endif %}
               {% endif %}
-
               {% for client in all_clients %}
                 <option value="{{ client.username }}" 
                         {% if client.username == current_answer %}selected{% endif %}>
                   🏢 {{ client.username }}
                 </option>
               {% endfor %}
-              
-              {% if current_answer and (all_clients|map(attribute='username')|list).count(current_answer) == 0 %}
-                  <option value="{{ current_answer }}" selected>🏢 Cliente (Dato Guardado): {{ current_answer }}</option>
-              {% endif %}
-
             </select>
-            <small class="form-help">
-              Seleccione el cliente final para esta tarea. El valor pre-asignado se usa como sugerencia.
-            </small>
 
-          {# FILE UPLOAD TYPES #}
           {% elif q_type == 'photo' or q_type == 'file' %}
-              
               {% set accepted_types = 'image/*' if q_type == 'photo' else '.pdf,.doc,.docx,.jpg,.jpeg,.png' %}
-              {% set display_placeholder = 'Seleccionar o tomar fotografía(s)' if q_type == 'photo' else 'Seleccionar archivo(s) (PDF, DOC, Imagen)' %}
-
+              {% set display_placeholder = 'Seleccionar fotografía(s)' if q_type == 'photo' else 'Seleccionar archivo(s)' %}
               <input type="hidden" 
                      name="response_{{ question.id }}" 
                      id="path-input-{{ question.id }}"
@@ -193,9 +243,7 @@
                      data-question-id="{{ question.id }}"
                      {% if is_input_disabled %}disabled{% endif %}
                      {% if question.is_required %}data-required="true"{% endif %}>
-
               <div class="file-display-box mb-md {% if current_paths == '[]' %} hidden-by-jinja{% endif %}" id="file-display-{{ question.id }}"></div>
-              
               <input type="file" 
                      name="file-upload-{{ question.id }}" 
                      id="file-upload-{{ question.id }}" 
@@ -205,49 +253,25 @@
                      accept="{{ accepted_types }}" 
                      {% if is_input_disabled %}disabled{% endif %}
                      multiple>
-                     
-              <small class="form-help" id="file-placeholder-{{ question.id }}" style="font-style: italic;">
-                  {{ display_placeholder }}
-              </small>
-
-          {% else %}
-             <input type="text" 
-                    class="form-control" 
-                    value="Tipo no soportado: {{ question.id }} ({{ q_type or 'Vacío/Desconocido' }})" 
-                    disabled>
           {% endif %}
         </div>
       {% endfor %}
     </form>
 
-    {# Action Bar #}
-    {% set can_transition = task.status not in ['completed', 'reviewed', 'approved'] %}
-    {% set show_action_bar = can_transition or can_override_edit %}
-    
     <div class="action-bar">
       <a href="{{ url_for('tasks.list_tasks') }}" class="btn btn-secondary" id="backBtn">Volver</a>
-      
       {% if task.status != 'pending' %}
         <a href="{{ url_for('tasks.download_task_pdf', task_id=task.id) }}" class="btn btn-warning" target="_blank" style="margin-left: 10px;">
             📄 Descargar PDF
         </a>
       {% endif %}
-
-      {% if show_action_bar %}
+      {% if can_transition or can_override_edit %}
         <button type="button" class="btn btn-primary" id="startBtn">▶️ Iniciar Tarea</button>
         <button type="button" class="btn btn-secondary" id="saveBtn">💾 Guardar Progreso</button>
-        <button type="button" 
-                class="btn btn-success" 
-                id="completeBtn"
+        <button type="button" class="btn btn-success" id="completeBtn"
                 {% if task.status != 'in_progress' %}style="display:none;" disabled{% endif %}>
             ✓ Completar Tarea
         </button>
-
-        {% if is_finalized and can_override_edit and task.status != 'in_progress' %}
-          <button type="button" class="btn btn-primary" id="saveBtnOverride" style="margin-left: 20px;">
-            💾 Guardar (Admin Override)
-          </button>
-        {% endif %}
       {% endif %}
     </div>
     
@@ -257,23 +281,14 @@
     
     <div id="validationModal" class="modal-overlay" style="display:none;">
       <div class="modal-content">
-        <div class="modal-header">
-            <span>⚠️</span>
-            <h3>Faltan Respuestas</h3>
-        </div>
-        <div class="modal-body">
-            <p>Por favor, complete los siguientes campos obligatorios antes de finalizar:</p>
-            <ul id="missingQuestionsList" class="missing-list"></ul>
-        </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-primary" id="closeValidationModalBtn">Entendido</button>
-        </div>
+        <div class="modal-header"><span>⚠️</span><h3>Faltan Respuestas</h3></div>
+        <div class="modal-body"><ul id="missingQuestionsList" class="missing-list"></ul></div>
+        <div class="modal-footer"><button type="button" class="btn btn-primary" id="closeValidationModalBtn">Entendido</button></div>
       </div>
     </div>
-    
   </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/tasks/detail.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/tasks/detail.js') }}"></script>
 {% endblock %}

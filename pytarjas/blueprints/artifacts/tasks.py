@@ -2,6 +2,7 @@
 """
 Complete Tasks API blueprint.
 Updated to support hybrid metadata: merging predefined planning fields with ad-hoc dynamic fields.
+Includes verification logic that persists corrections to task record_data and only triggers once.
 """
 
 from flask import Blueprint, request, jsonify, render_template, g, abort, redirect, url_for, flash, send_file
@@ -42,8 +43,9 @@ def upload_file_temp(task_id):
     is_admin_or_planner = g.user.role in ["admin", "planner"]
     is_finalized = task.status in ["completed", "reviewed", "approved"]
     
-    if is_finalized and not is_admin_or_planner:
-        return jsonify({"success": False, "error": "Cannot upload files to finalized task."}), 403
+    if is_finalized:
+        if not is_admin_or_planner:
+            return jsonify({"success": False, "error": "Cannot upload files to finalized task."}), 403
 
     try:
         saved_path = save_file_to_disk(file, task_id, question_id) 
@@ -67,7 +69,6 @@ def create_task():
     if request.method == "GET":
         active_forms = Form.query.filter_by(is_active=True).order_by(Form.name).all()
         
-        # Fetch Plannings with their Templates and Fields for dynamic rendering
         existing_plannings = Planning.query.options(
             joinedload(Planning.form),
             joinedload(Planning.template).joinedload(PlanningTemplate.fields)
@@ -115,35 +116,32 @@ def create_task():
             user=g.user
         )
     
-    # --- POST Logic ---
     data = request.get_json() if wants_json() else request.form
     form_id = data.get("form_id")
     worker_id = data.get("worker_id") or g.user.id
     planning_id = data.get("planning_id")
     
     record_data = {}
-
-    # 1. Process Predefined Metadata (from selected planning template)
     metadata_values = data.get("metadata_values", {})
     if isinstance(metadata_values, dict):
         record_data.update(metadata_values)
 
-    # 2. Process Ad-hoc Dynamic Metadata
     ad_hoc_definitions = data.get("ad_hoc_metadata", [])
-    
-    # Handle stringified JSON from non-JSON requests
-    if not wants_json() and isinstance(ad_hoc_definitions, str):
-        try:
-            ad_hoc_definitions = json.loads(ad_hoc_definitions)
-        except json.JSONDecodeError:
-            ad_hoc_definitions = []
+    if not wants_json():
+        if isinstance(ad_hoc_definitions, str):
+            try:
+                ad_hoc_definitions = json.loads(ad_hoc_definitions)
+            except json.JSONDecodeError:
+                ad_hoc_definitions = []
                 
     if isinstance(ad_hoc_definitions, list):
         for item in ad_hoc_definitions:
             key = item.get('key')
             val = item.get('value')
-            if key and isinstance(key, str) and key.strip():
-                record_data[key.strip()] = val
+            if key:
+                if isinstance(key, str):
+                    if key.strip():
+                        record_data[key.strip()] = val
 
     if not form_id:
         if wants_json():
@@ -217,13 +215,13 @@ def list_tasks():
     if worker_id_filter:
         query = query.filter(Task.worker_id == worker_id_filter)
 
-    # Dynamic Questions Filters
     dynamic_filters = {}
     for key, value in request.args.items():
-        if key.startswith('q_') and value:
-            question_id = key[2:]
-            query = query.filter(cast(Task.responses[question_id], Text).ilike(f"%{value}%"))
-            dynamic_filters[key] = value
+        if key.startswith('q_'):
+            if value:
+                question_id = key[2:]
+                query = query.filter(cast(Task.responses[question_id], Text).ilike(f"%{value}%"))
+                dynamic_filters[key] = value
 
     def apply_date_filter(q, field, val_min, val_max):
         if val_min:
@@ -287,28 +285,53 @@ def list_tasks():
 @login_required
 @task_access_required
 def get_task(task_id):
-    """Task detail view."""
+    """Task detail and filling entry point."""
     task = Task.query.options(
+        joinedload(Task.planning),
         joinedload(Task.form).joinedload(Form.questions),
         joinedload(Task.worker)
     ).get_or_404(task_id)
 
     can_override_edit = g.user.role in ["admin", "planner"]
     all_clients = User.query.filter_by(role='client').all()
+
+    verification_prompts = []
+    planning = task.planning
+    
+    # Logic: Only show verification if the task is still 'pending'
+    if planning:
+        if planning.verification_config:
+            if task.status == "pending":
+                for field_name, config in planning.verification_config.items():
+                    expected_value = None
+                    is_row_field = config.get("is_row_field", False)
+                    
+                    if is_row_field:
+                        expected_value = task.record_data.get(field_name)
+                    else:
+                        expected_value = planning.metadata_values.get(config.get("label"))
+
+                    if expected_value is not None:
+                        verification_prompts.append({
+                            "field_name": field_name,
+                            "label": config.get("label"),
+                            "expected_value": expected_value
+                        })
     
     return render_template(
         "tasks/edit_tasks.html", 
         task=task, 
         can_override_edit=can_override_edit, 
         all_clients=all_clients,
-        user=g.user
+        user=g.user,
+        verification_prompts=verification_prompts
     )
 
 @bp.route("/<task_id>/update", methods=["PUT", "PATCH"])
 @login_required
 @task_access_required
 def update_task(task_id):
-    """Updates task responses and status."""
+    """Updates task responses, metadata verifications, and status."""
     task = Task.query.get_or_404(task_id)
     if not request.is_json:
         return jsonify({"success": False, "error": "JSON required"}), 400
@@ -316,13 +339,26 @@ def update_task(task_id):
     data = request.get_json()
     is_admin = g.user.role in ["admin", "planner"]
     
-    if task.status in ["completed", "reviewed", "approved"] and not is_admin:
-        return jsonify({"success": False, "error": "Task is finalized"}), 403
+    if task.status in ["completed", "reviewed", "approved"]:
+        if not is_admin:
+            return jsonify({"success": False, "error": "Task is finalized"}), 403
     
+    # PERSISTENCE: Save worker corrections to the actual task record_data
+    if "verifications" in data:
+        verifications = data["verifications"]
+        for field_name, v_info in verifications.items():
+            if not v_info.get("matches"):
+                actual_val = v_info.get("actual_value")
+                if actual_val:
+                    task.record_data[field_name] = actual_val
+        
+        flag_modified(task, "record_data")
+
     if "status" in data:
         new_status = data["status"]
-        if new_status == "in_progress" and task.status == "pending":
-            task.started_at = datetime.now(timezone.utc)
+        if new_status == "in_progress":
+            if task.status == "pending":
+                task.started_at = datetime.now(timezone.utc)
         elif new_status == "completed":
             task.completed_at = datetime.now(timezone.utc)
         task.status = new_status
@@ -339,7 +375,7 @@ def update_task(task_id):
 @login_required
 @task_access_required
 def download_task_pdf(task_id):
-    """Generates PDF."""
+    """Generates and downloads the task tarja PDF."""
     task = Task.query.get_or_404(task_id)
     try:
         pdf_bytes = generate_tarja_pdf(task)
@@ -347,5 +383,5 @@ def download_task_pdf(task_id):
         return send_file(io.BytesIO(pdf_bytes), mimetype='application/pdf', as_attachment=True, download_name=filename)
         
     except Exception as e:
-        flash(f"Error: {str(e)}", "error")
+        flash(f"Error al generar PDF: {str(e)}", "error")
         return redirect(url_for('tasks.get_task', task_id=task.id))

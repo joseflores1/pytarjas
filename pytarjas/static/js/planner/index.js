@@ -3,16 +3,22 @@
 document.addEventListener('DOMContentLoaded', function () {
     const addRowBtn = document.getElementById('addRowBtn');
     const tableBody = document.getElementById('planningTableBody');
-    const tableHeader = document.querySelector('#planningTable thead tr');
+    const tableHeader = document.querySelector('#planningTableHeader');
     const emptyState = document.getElementById('emptyState');
     const planningForm = document.getElementById('createPlanningForm');
     const fileInput = document.getElementById('fileInput');
 
     // Header Metadata Elements
-    const templateSelect = document.getElementById('template_id');
+    const headerTemplateSelect = document.getElementById('template_id_header');
     const addHeaderFieldBtn = document.getElementById('addHeaderFieldBtn');
     const headerFieldsContainer = document.getElementById('headerFieldsContainer');
     const emptyHeaderState = document.getElementById('emptyHeaderState');
+
+    // Row Fields (Columns) Elements
+    const tasksTemplateSelect = document.getElementById('template_id_tasks');
+    const addRowFieldBtn = document.getElementById('addRowFieldBtn');
+    const rowFieldsContainer = document.getElementById('rowFieldsContainer');
+    const emptyRowFieldsState = document.getElementById('emptyRowFieldsState');
 
     // Client Autocomplete Elements
     const clientInput = document.getElementById('client_name');
@@ -36,9 +42,6 @@ document.addEventListener('DOMContentLoaded', function () {
             console.error("Error parsing planning templates data", e);
         }
     }
-
-    // Stores fields marked as is_row_field = true from the selected template
-    let activeRowFields = [];
 
     // --- 2. Client Autocomplete & Toggle Logic ---
     if (clientInput && clientResults && clientList) {
@@ -96,21 +99,51 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // --- 3. Dynamic Table Header Management ---
+    // --- 3. Dynamic Column Logic ---
 
-    /**
-     * Rebuilds the thead of the planning table based on activeRowFields.
-     */
-    function updateTableHeader() {
+    function getActiveRowFields() {
+        const fields = [];
+        rowFieldsContainer.querySelectorAll('.adhoc-row-field-setup').forEach(row => {
+            const labelInput = row.querySelector('.row-field-label');
+            const label = labelInput.value.trim();
+            const type = row.querySelector('.row-field-type').value;
+            const isVerifiable = row.querySelector('.row-field-verify').checked;
+            
+            let options = {};
+            if (row.dataset.options) {
+                try {
+                    options = JSON.parse(row.dataset.options);
+                } catch (e) {
+                    options = {};
+                }
+            }
+
+            if (label) {
+                fields.push({
+                    label: label,
+                    name: label.toLowerCase().replace(/\s+/g, '_'),
+                    type: type,
+                    id: row.dataset.fieldId,
+                    isVerifiable: isVerifiable,
+                    options: options
+                });
+            }
+        });
+        return fields;
+    }
+
+    function syncTableWithColumns() {
         if (!tableHeader) {
             return;
         }
 
+        const fields = getActiveRowFields();
+        
         tableHeader.innerHTML = '';
-
-        activeRowFields.forEach(function (field) {
+        fields.forEach(field => {
             const th = document.createElement('th');
             th.textContent = field.label;
+            th.dataset.columnId = field.id;
             th.style.minWidth = '140px';
             tableHeader.appendChild(th);
         });
@@ -123,57 +156,93 @@ document.addEventListener('DOMContentLoaded', function () {
         const actionsTh = document.createElement('th');
         actionsTh.style.width = '50px';
         tableHeader.appendChild(actionsTh);
+
+        const rows = tableBody.querySelectorAll('tr');
+        rows.forEach(tr => {
+            const existingCells = Array.from(tr.querySelectorAll('td.dynamic-cell'));
+            const workerCell = tr.querySelector('td.worker-cell');
+
+            existingCells.forEach(cell => {
+                const stillExists = fields.some(f => f.id === cell.dataset.columnId);
+                if (!stillExists) {
+                    cell.remove();
+                }
+            });
+
+            fields.forEach(field => {
+                let cell = tr.querySelector(`td[data-column-id="${field.id}"]`);
+                if (!cell) {
+                    cell = document.createElement('td');
+                    cell.className = 'dynamic-cell';
+                    cell.dataset.columnId = field.id;
+                    const input = createInputForField(field);
+                    cell.appendChild(input);
+                } else {
+                    const input = cell.querySelector('.form-control');
+                    if (input) {
+                        input.name = field.name;
+                    }
+                }
+                tr.insertBefore(cell, workerCell);
+            });
+        });
+        
+        updateEmptyState();
     }
 
-    // --- 4. Header Metadata Management (Ad-hoc) ---
-
-    function updateHeaderEmptyState() {
-        if (!headerFieldsContainer) {
-            return;
-        }
-
-        const rows = headerFieldsContainer.querySelectorAll('.adhoc-header-row');
-        let headerLabelRow = document.getElementById('headerColumnLabels');
-
-        if (rows.length === 0) {
-            if (emptyHeaderState) {
-                emptyHeaderState.style.display = 'block';
-            }
-            if (headerLabelRow) {
-                headerLabelRow.remove();
+    function createInputForField(field, value = '') {
+        let input;
+        if (field.type === 'select') {
+            input = document.createElement('select');
+            input.className = 'form-control';
+            input.name = field.name;
+            input.add(new Option('-- Seleccione --', ''));
+            
+            const choices = field.options?.choices || [];
+            choices.forEach(c => {
+                const opt = new Option(c, c);
+                if (c === value) {
+                    opt.selected = true;
+                }
+                input.appendChild(opt);
+            });
+        } else if (field.type === 'boolean') {
+            input = document.createElement('select');
+            input.className = 'form-control';
+            input.name = field.name;
+            input.add(new Option('No', 'false'));
+            input.add(new Option('Sí', 'true'));
+            if (value === 'true' || value === true) {
+                input.value = 'true';
             }
         } else {
-            if (emptyHeaderState) {
-                emptyHeaderState.style.display = 'none';
+            input = document.createElement('input');
+            input.className = 'form-control';
+            input.name = field.name;
+            input.value = value;
+            if (field.type === 'number') {
+                input.type = 'number';
+            } else if (field.type === 'date') {
+                input.type = 'date';
+            } else if (field.type === 'datetime') {
+                input.type = 'datetime-local';
+            } else {
+                input.type = 'text';
             }
-
-            if (!headerLabelRow) {
-                headerLabelRow = document.createElement('div');
-                headerLabelRow.id = 'headerColumnLabels';
-                headerLabelRow.style.display = 'grid';
-                headerLabelRow.style.gridTemplateColumns = '1.5fr 1.2fr 2fr 40px';
-                headerLabelRow.style.gap = 'var(--space-sm)';
-                headerLabelRow.style.marginBottom = 'var(--space-xs)';
-                headerLabelRow.style.padding = '0 var(--space-xs)';
-                headerLabelRow.style.fontSize = '0.75rem';
-                headerLabelRow.style.fontWeight = 'bold';
-                headerLabelRow.style.color = 'var(--color-text-secondary)';
-                headerLabelRow.style.textTransform = 'uppercase';
-
-                headerLabelRow.innerHTML = `
-                    <div>Etiqueta</div>
-                    <div>Tipo de Dato</div>
-                    <div>Valor actual</div>
-                    <div></div>
-                `;
-                headerFieldsContainer.prepend(headerLabelRow);
-            }
+            input.placeholder = field.label;
         }
+        input.required = true;
+        return input;
     }
 
-    function createHeaderFieldRow(initialLabel = '', initialType = 'text', initialValue = '', initialOptions = {}) {
+    // --- 4. Setup Row Creator ---
+
+    function createFieldSetupRow(container, isHeaderField = true, initialLabel = '', initialType = 'text', initialValue = '', initialOptions = {}, initialVerify = false) {
         const row = document.createElement('div');
-        row.className = 'adhoc-header-row';
+        row.className = isHeaderField ? 'adhoc-header-row' : 'adhoc-row-field-setup';
+        row.dataset.fieldId = 'field_' + Math.random().toString(36).substr(2, 9);
+        row.dataset.options = JSON.stringify(initialOptions || {});
+        
         row.style.display = 'flex';
         row.style.flexDirection = 'column';
         row.style.gap = 'var(--space-xs)';
@@ -185,19 +254,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const mainControls = document.createElement('div');
         mainControls.style.display = 'grid';
-        mainControls.style.gridTemplateColumns = '1.5fr 1.2fr 2fr 40px';
+        mainControls.style.gridTemplateColumns = isHeaderField ? '1.5fr 1.2fr 2fr 100px 40px' : '1.5fr 1.2fr 100px 40px';
         mainControls.style.gap = 'var(--space-sm)';
         mainControls.style.alignItems = 'center';
 
         const labelInput = document.createElement('input');
         labelInput.type = 'text';
-        labelInput.className = 'form-control header-label';
-        labelInput.placeholder = 'Ej: Sello';
+        labelInput.className = isHeaderField ? 'form-control header-label' : 'form-control row-field-label';
+        labelInput.placeholder = isHeaderField ? 'Ej: Sello' : 'Ej: Cubicaje';
         labelInput.value = initialLabel;
         labelInput.required = true;
+        
+        if (!isHeaderField) {
+            labelInput.addEventListener('input', function() {
+                syncTableWithColumns();
+            });
+        }
 
         const typeSelect = document.createElement('select');
-        typeSelect.className = 'form-control header-type';
+        typeSelect.className = isHeaderField ? 'form-control header-type' : 'form-control row-field-type';
         const types = [
             { val: 'text', label: 'Texto Corto' },
             { val: 'textarea', label: 'Texto Largo' },
@@ -207,71 +282,37 @@ document.addEventListener('DOMContentLoaded', function () {
             { val: 'boolean', label: 'Booleano (Sí/No)' },
             { val: 'select', label: 'Selección Múltiple' }
         ];
-        types.forEach(function (t) {
-            const opt = document.createElement('option');
-            opt.value = t.val;
-            opt.textContent = t.label;
+        types.forEach(t => {
+            const opt = new Option(t.label, t.val);
             if (t.val === initialType) {
                 opt.selected = true;
             }
             typeSelect.appendChild(opt);
         });
 
-        const valueContainer = document.createElement('div');
-        valueContainer.className = 'header-value-container';
-
-        function renderValueInput(type, value = '', options = {}) {
-            valueContainer.innerHTML = '';
-            let input;
-
-            if (type === 'boolean') {
-                input = document.createElement('select');
-                input.className = 'form-control header-value';
-                input.add(new Option('No', 'false'));
-                input.add(new Option('Sí', 'true'));
-                if (value === 'true' || value === true) {
-                    input.value = 'true';
-                }
-            } else if (type === 'select') {
-                input = document.createElement('select');
-                input.className = 'form-control header-value';
-                input.add(new Option('-- Seleccione --', ''));
-                const choices = options.choices || [];
-                choices.forEach(function (c) {
-                    const opt = new Option(c, c);
-                    if (c === value) {
-                        opt.selected = true;
-                    }
-                    input.appendChild(opt);
-                });
-            } else if (type === 'textarea') {
-                input = document.createElement('textarea');
-                input.className = 'form-control header-value';
-                input.rows = 1;
-                input.value = value;
-                input.style.minHeight = '38px';
-            } else {
-                input = document.createElement('input');
-                input.className = 'form-control header-value';
-                input.value = value;
-                if (type === 'number') {
-                    input.type = 'number';
-                } else if (type === 'date') {
-                    input.type = 'date';
-                } else if (type === 'datetime') {
-                    input.type = 'datetime-local';
-                } else {
-                    input.type = 'text';
-                }
-            }
-            input.required = true;
-            valueContainer.appendChild(input);
+        if (!isHeaderField) {
+            typeSelect.addEventListener('change', function() {
+                syncTableWithColumns();
+            });
         }
 
-        renderValueInput(initialType, initialValue, initialOptions);
-        typeSelect.addEventListener('change', function () {
-            renderValueInput(this.value);
-        });
+        // Verification Toggle
+        const verifyContainer = document.createElement('div');
+        verifyContainer.style.display = 'flex';
+        verifyContainer.style.alignItems = 'center';
+        verifyContainer.style.gap = '5px';
+        verifyContainer.style.fontSize = '0.8rem';
+        
+        const verifyCheck = document.createElement('input');
+        verifyCheck.type = 'checkbox';
+        verifyCheck.className = isHeaderField ? 'header-field-verify' : 'row-field-verify';
+        verifyCheck.checked = initialVerify;
+        
+        const verifyLabel = document.createElement('label');
+        verifyLabel.textContent = 'Verificable';
+        
+        verifyContainer.appendChild(verifyCheck);
+        verifyContainer.appendChild(verifyLabel);
 
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
@@ -279,65 +320,69 @@ document.addEventListener('DOMContentLoaded', function () {
         removeBtn.innerHTML = '✕';
         removeBtn.addEventListener('click', function () {
             row.remove();
-            updateHeaderEmptyState();
+            if (isHeaderField) {
+                updateHeaderEmptyState();
+            } else {
+                updateRowFieldsEmptyState();
+                syncTableWithColumns();
+            }
         });
 
         mainControls.appendChild(labelInput);
         mainControls.appendChild(typeSelect);
-        mainControls.appendChild(valueContainer);
+
+        if (isHeaderField) {
+            const valueContainer = document.createElement('div');
+            valueContainer.className = 'header-value-container';
+
+            function renderValueInput(type, value = '', options = {}) {
+                valueContainer.innerHTML = '';
+                const input = createInputForField({ type: type, options: options, label: 'Valor' }, value);
+                input.className = 'form-control header-value';
+                valueContainer.appendChild(input);
+            }
+
+            renderValueInput(initialType, initialValue, initialOptions);
+            typeSelect.addEventListener('change', function () {
+                renderValueInput(this.value);
+            });
+            mainControls.appendChild(valueContainer);
+        }
+
+        mainControls.appendChild(verifyContainer);
         mainControls.appendChild(removeBtn);
         row.appendChild(mainControls);
+        container.appendChild(row);
 
-        if (headerFieldsContainer) {
-            headerFieldsContainer.appendChild(row);
+        if (isHeaderField) {
+            updateHeaderEmptyState();
+        } else {
+            updateRowFieldsEmptyState();
+            syncTableWithColumns();
         }
-        updateHeaderEmptyState();
     }
 
-    if (addHeaderFieldBtn) {
-        addHeaderFieldBtn.addEventListener('click', function () {
-            createHeaderFieldRow();
-        });
+    // --- 5. Empty State Handlers ---
+
+    function updateHeaderEmptyState() {
+        if (!headerFieldsContainer) {
+            return;
+        }
+        const rows = headerFieldsContainer.querySelectorAll('.adhoc-header-row');
+        if (emptyHeaderState) {
+            emptyHeaderState.style.display = (rows.length === 0) ? 'block' : 'none';
+        }
     }
 
-    if (templateSelect) {
-        templateSelect.addEventListener('change', function () {
-            const templateId = this.value;
-            if (!templateId) {
-                return;
-            }
-
-            const template = planningTemplates.find(function (t) {
-                return t.id === templateId;
-            });
-
-            if (template) {
-                // Determine row-level dynamic columns vs header-level metadata
-                activeRowFields = template.fields.filter(function (f) {
-                    return f.is_row_field === true;
-                });
-                const headerFields = template.fields.filter(function (f) {
-                    return f.is_row_field === false;
-                });
-
-                // Update Table Header with Template Labels
-                updateTableHeader();
-                
-                // Clear existing tasks because the schema changed
-                tableBody.innerHTML = '';
-
-                // Populate Header Fields
-                headerFields.forEach(function (field) {
-                    createHeaderFieldRow(field.label, field.type, '', field.options);
-                });
-            }
-
-            this.value = '';
-            updateEmptyState();
-        });
+    function updateRowFieldsEmptyState() {
+        if (!rowFieldsContainer) {
+            return;
+        }
+        const rows = rowFieldsContainer.querySelectorAll('.adhoc-row-field-setup');
+        if (emptyRowFieldsState) {
+            emptyRowFieldsState.style.display = (rows.length === 0) ? 'block' : 'none';
+        }
     }
-
-    // --- 5. Table Row Management (Tasks) ---
 
     function updateEmptyState() {
         const table = document.getElementById('planningTable');
@@ -350,62 +395,69 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    /**
-     * Creates a new task row where columns are mapped to activeRowFields.
-     */
+    // --- 6. Interaction Listeners ---
+
+    if (addHeaderFieldBtn) {
+        addHeaderFieldBtn.addEventListener('click', function() {
+            createFieldSetupRow(headerFieldsContainer, true);
+        });
+    }
+
+    if (addRowFieldBtn) {
+        addRowFieldBtn.addEventListener('click', function() {
+            createFieldSetupRow(rowFieldsContainer, false);
+        });
+    }
+
+    if (headerTemplateSelect) {
+        headerTemplateSelect.addEventListener('change', function () {
+            const templateId = this.value;
+            if (!templateId) {
+                return;
+            }
+            const template = planningTemplates.find(t => t.id === templateId);
+            if (template) {
+                template.fields.filter(f => !f.is_row_field).forEach(f => {
+                    createFieldSetupRow(headerFieldsContainer, true, f.label, f.type, '', f.options, f.is_verifiable);
+                });
+            }
+            this.value = '';
+        });
+    }
+
+    if (tasksTemplateSelect) {
+        tasksTemplateSelect.addEventListener('change', function () {
+            const templateId = this.value;
+            if (!templateId) {
+                return;
+            }
+            const template = planningTemplates.find(t => t.id === templateId);
+            if (template) {
+                template.fields.filter(f => f.is_row_field).forEach(f => {
+                    createFieldSetupRow(rowFieldsContainer, false, f.label, f.type, '', f.options, f.is_verifiable);
+                });
+            }
+            this.value = '';
+        });
+    }
+
+    // --- 7. Task Table Row Management ---
+
     function createRow(data = {}) {
         const tr = document.createElement('tr');
+        const fields = getActiveRowFields();
 
-        activeRowFields.forEach(function (field) {
+        fields.forEach(field => {
             const td = document.createElement('td');
-            let input;
-
-            if (field.type === 'select') {
-                input = document.createElement('select');
-                input.className = 'form-control';
-                input.name = field.name;
-                input.add(new Option('--', ''));
-                const choices = field.options.choices || [];
-                choices.forEach(function (c) {
-                    const opt = new Option(c, c);
-                    if (c === data[field.name]) {
-                        opt.selected = true;
-                    }
-                    input.appendChild(opt);
-                });
-            } else if (field.type === 'boolean') {
-                input = document.createElement('select');
-                input.className = 'form-control';
-                input.name = field.name;
-                input.add(new Option('No', 'false'));
-                input.add(new Option('Sí', 'true'));
-                if (data[field.name] === 'true' || data[field.name] === true) {
-                    input.value = 'true';
-                }
-            } else {
-                input = document.createElement('input');
-                input.className = 'form-control';
-                input.name = field.name;
-                input.value = data[field.name] || '';
-                if (field.type === 'number') {
-                    input.type = 'number';
-                } else if (field.type === 'date') {
-                    input.type = 'date';
-                } else {
-                    input.type = 'text';
-                }
-                input.placeholder = field.label;
-            }
-
-            if (field.required) {
-                input.required = true;
-            }
+            td.className = 'dynamic-cell';
+            td.dataset.columnId = field.id;
+            const input = createInputForField(field, data[field.name]);
             td.appendChild(input);
             tr.appendChild(td);
         });
 
-        // Worker column
         const workerTd = document.createElement('td');
+        workerTd.className = 'worker-cell';
         const workerSelect = document.createElement('select');
         workerSelect.className = 'form-control';
         workerSelect.name = 'worker_id';
@@ -420,9 +472,8 @@ document.addEventListener('DOMContentLoaded', function () {
         workerTd.appendChild(workerSelect);
         tr.appendChild(workerTd);
 
-        // Actions column
         const actionTd = document.createElement('td');
-        actionTd.className = 'text-center';
+        actionTd.className = 'text-center action-cell';
         const remBtn = document.createElement('button');
         remBtn.type = 'button';
         remBtn.className = 'btn btn-sm btn-danger remove-row-btn';
@@ -440,59 +491,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (addRowBtn) {
         addRowBtn.addEventListener('click', function () {
-            if (activeRowFields.length === 0) {
-                alert('Debe seleccionar una plantilla para habilitar los registros de tareas.');
+            if (getActiveRowFields().length === 0) {
+                alert('Debe definir al menos una columna de tarea.');
                 return;
             }
             createRow();
         });
     }
 
-    // --- 6. CSV Processing ---
-
-    if (fileInput) {
-        fileInput.addEventListener('change', function (e) {
-            const file = e.target.files[0];
-            if (!file) {
-                return;
-            }
-            if (activeRowFields.length === 0) {
-                alert('Debe seleccionar una plantilla antes de cargar un archivo.');
-                e.target.value = '';
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = function (event) {
-                const text = event.target.result;
-                processData(text);
-            };
-            reader.readAsText(file);
-        });
-    }
-
-    function processData(csvText) {
-        const lines = csvText.split('\n');
-        // Assumes first line is header and column order matches template order
-        for (let i = 1; i < lines.length; i++) {
-            const cols = lines[i].split(',');
-            if (cols.length >= activeRowFields.length) {
-                const rowData = {};
-                activeRowFields.forEach(function (field, index) {
-                    rowData[field.name] = cols[index].trim();
-                });
-                createRow(rowData);
-            }
-        }
-    }
-
-    // --- 7. Form Submission ---
+    // --- 8. Form Submission ---
 
     if (planningForm) {
         planningForm.addEventListener('submit', async function (e) {
             e.preventDefault();
-
+            const fields = getActiveRowFields();
             const rows = tableBody.querySelectorAll('tr');
+
             if (rows.length === 0) {
                 alert('Debe agregar al menos una tarea.');
                 return;
@@ -503,10 +517,11 @@ document.addEventListener('DOMContentLoaded', function () {
             submitBtn.textContent = '⏳ Enviando...';
 
             const records = [];
-            rows.forEach(function (tr) {
+            rows.forEach(tr => {
                 const task = {};
-                activeRowFields.forEach(function (field) {
-                    const input = tr.querySelector(`[name="${field.name}"]`);
+                fields.forEach(field => {
+                    const cell = tr.querySelector(`td[data-column-id="${field.id}"]`);
+                    const input = cell.querySelector('.form-control');
                     let val = input.value;
                     if (field.type === 'boolean') {
                         val = (val === 'true');
@@ -518,36 +533,56 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             const metadataValues = {};
-            headerFieldsContainer.querySelectorAll('.adhoc-header-row').forEach(function (row) {
+            const verificationConfig = {};
+
+            // Collect Header Verifications
+            headerFieldsContainer.querySelectorAll('.adhoc-header-row').forEach(row => {
                 const label = row.querySelector('.header-label').value.trim();
                 const type = row.querySelector('.header-type').value;
+                const isVerify = row.querySelector('.header-field-verify').checked;
+                const fieldName = label.toLowerCase().replace(/\s+/g, '_');
+                
                 let val = row.querySelector('.header-value').value;
                 if (type === 'boolean') {
                     val = (val === 'true');
                 }
+                
                 if (label) {
                     metadataValues[label] = val;
+                    if (isVerify) {
+                        verificationConfig[fieldName] = {
+                            label: label,
+                            is_row_field: false
+                        };
+                    }
+                }
+            });
+
+            // Collect Row Verifications
+            fields.forEach(f => {
+                if (f.isVerifiable) {
+                    verificationConfig[f.name] = {
+                        label: f.label,
+                        is_row_field: true
+                    };
                 }
             });
 
             const payload = {
                 client_name: clientInput.value,
                 form_id: document.getElementById('form_id').value,
-                template_id: document.getElementById('template_id').value || null,
+                template_id: null,
                 metadata_values: metadataValues,
+                verification_config: verificationConfig,
                 records: records
             };
 
             try {
                 const response = await fetch(window.location.href, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-
                 const result = await response.json();
                 if (result.success) {
                     window.location.href = '/plannings/';
@@ -557,7 +592,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     submitBtn.textContent = '🚀 Crear Planificación';
                 }
             } catch (error) {
-                console.error('Submit Error:', error);
                 alert('Ocurrió un error de red.');
                 submitBtn.disabled = false;
                 submitBtn.textContent = '🚀 Crear Planificación';
@@ -567,4 +601,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     updateEmptyState();
     updateHeaderEmptyState();
+    updateRowFieldsEmptyState();
+    syncTableWithColumns();
 });

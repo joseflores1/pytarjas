@@ -42,41 +42,41 @@ def get_absolute_path(web_path):
 def format_value(value):
     """
     Helper to format dates, times, and booleans into friendly strings.
-    Ensures dates always show hours and minutes.
+    Ensures dates always show hours and minutes as requested.
     """
     if value is None:
-        return ""
+        return "---"
+    
+    if value == "":
+        return "---"
     
     # Handle Booleans
-    if str(value).lower() == 'true': 
-        return 'Sí'
-        
-    if str(value).lower() == 'false': 
-        return 'No'
+    if isinstance(value, bool):
+        if value:
+            return 'Sí'
+        else:
+            return 'No'
     
     # Handle Datetime Objects (Native)
     if isinstance(value, datetime):
-        return value.strftime('%d/%m/%Y %H:%M')
+        return value.strftime('%d-%m-%Y %H:%M')
         
-    # Handle Date Strings (ISO format detection)
+    # Handle Date/Datetime Strings (ISO format detection)
     if isinstance(value, str):
         try:
-            # Check for basic date format (YYYY-MM-DD)
-            if len(value) == 10 and value[4] == '-' and value[7] == '-':
-                dt = datetime.strptime(value, '%Y-%m-%d')
-                # Even for simple dates, we keep consistency if needed, 
-                # but usually day/month/year is enough for a "date-only" field.
-                return dt.strftime('%d/%m/%Y')
-            
-            # Check for datetime format (YYYY-MM-DDTHH:MM...)
-            if len(value) > 10 and value[4] == '-' and value[7] == '-':
-                 dt = datetime.fromisoformat(value)
-                 return dt.strftime('%d/%m/%Y %H:%M')
+            # Check for basic date format (YYYY-MM-DD) or ISO strings
+            if len(value) >= 10 and value[4] == '-' and value[7] == '-':
+                if len(value) == 10:
+                    dt = datetime.strptime(value, '%Y-%m-%d')
+                    return dt.strftime('%d-%m-%Y %H:%M')
+                else:
+                    dt = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                    return dt.strftime('%d-%m-%Y %H:%M')
         except ValueError:
-            # Not a date, return as is
+            # Not a parsable date, return as is
             pass
             
-    return value
+    return str(value)
 
 def calculate_duration(task: Task) -> str:
     """Calculates formatted duration between start and completion."""
@@ -100,13 +100,15 @@ def calculate_duration(task: Task) -> str:
 def generate_tarja_pdf(task: Task) -> bytes:
     """
     Generates a PDF for a specific completed Task using WeasyPrint.
+    Processes dynamic metadata from planning and record data.
     """
     form_type = 'generic'
     if task.form:
         form_type = task.form.form_type
         
-    template_name = 'pdfs/tarja_consolidado.html'
+    template_name = 'pdfs/tarja_template.html'
 
+    # 1. Process Form Responses (Observations and Control)
     table_rows = []
     gallery_groups = []
     
@@ -154,28 +156,58 @@ def generate_tarja_pdf(task: Task) -> bytes:
                     'value': formatted_val
                 })
 
-    # Prepare Context
-    formatted_record_data = {}
-    for k, v in task.record_data.items():
-        formatted_record_data[k] = format_value(v)
-    
-    duration_str = calculate_duration(task)
+    # 2. Process Dynamic Metadata (Información Faena & Datos del Registro)
+    informacion_faena = []
+    datos_registro = []
 
+    if task.planning and task.planning.template:
+        sorted_fields = sorted(task.planning.template.fields, key=lambda x: x.order)
+        for field in sorted_fields:
+            if field.is_row_field:
+                # Value comes from Task.record_data (Row fields like Container, Seal)
+                raw_val = task.record_data.get(field.field_name, "---")
+                datos_registro.append({
+                    'label': field.field_label,
+                    'value': format_value(raw_val)
+                })
+            else:
+                # Value comes from Planning.metadata_values (Header fields like Nave, Terminal)
+                raw_val = task.planning.metadata_values.get(field.field_name, "---")
+                informacion_faena.append({
+                    'label': field.field_label,
+                    'value': format_value(raw_val)
+                })
+
+    # 3. Add system fields to Información Faena list
+    informacion_faena.append({
+        'label': 'Tarjador', 
+        'value': task.worker.username if task.worker else 'Sin Asignar'
+    })
+    
+    informacion_faena.append({
+        'label': 'Fecha Faena', 
+        'value': format_value(task.completed_at)
+    })
+    
+    informacion_faena.append({
+        'label': 'Duración Faena', 
+        'value': calculate_duration(task)
+    })
+
+    # 4. Prepare Context
     context = {
         'task_id': task.id,
         'created_at': format_value(task.created_at),
-        'completed_at': task.completed_at or datetime.now(),
         'worker_name': task.worker.username if task.worker else "Sin Asignar",
         'form_name': task.form.name if task.form else "Formulario",
         'form_type': form_type,
-        'now': datetime.now(),
-        'duration': duration_str,
+        'now_str': datetime.now().strftime('%d-%m-%Y %H:%M'),
+        'duration': calculate_duration(task),
         'table_rows': table_rows,
-        'gallery_groups': gallery_groups
+        'gallery_groups': gallery_groups,
+        'informacion_faena': informacion_faena,
+        'datos_registro': datos_registro
     }
-    
-    # Merge formatted record data into context
-    context.update(formatted_record_data)
 
     html_string = render_template(template_name, **context)
 
