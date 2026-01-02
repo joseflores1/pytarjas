@@ -88,6 +88,16 @@ class Config:
     
     # CSRF token field name (default is 'csrf_token')
     WTF_CSRF_FIELD_NAME = 'csrf_token'
+
+    # -------------------------------------------------------------------------
+    # Azure Blob Storage Configuration (Production)
+    # -------------------------------------------------------------------------
+
+    # Connection string for Azure Storage Account
+    AZURE_STORAGE_CONNECTION_STRING = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
+
+    # Container name for uploads
+    AZURE_CONTAINER_NAME = os.getenv('AZURE_CONTAINER_NAME', 'uploads')
     
     # -------------------------------------------------------------------------
     # File Upload Configuration (for field work attachments)
@@ -96,11 +106,12 @@ class Config:
     # Maximum file size: 16MB (in bytes)
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024
     
-    # Upload folder (relative to instance folder)
+    # Upload folder (relative to instance folder) - Used as fallback/local dev
     UPLOAD_FOLDER = 'uploads'
     
     # Allowed file extensions for uploads
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx', 'xlsx', 'xls', 'txt'}
+
     # -------------------------------------------------------------------------
     # PWA Configuration (Progressive Web App)
     # -------------------------------------------------------------------------
@@ -172,11 +183,6 @@ class DevelopmentConfig(Config):
     """
     
     # Enable Flask debug mode
-    # This provides:
-    # - Interactive debugger in browser when errors occur
-    # - Automatic reloading when code changes
-    # - Detailed error pages
-    # WARNING: Never enable in production - exposes sensitive information!
     DEBUG = True
     
     # Show SQL queries in console (helpful for debugging)
@@ -201,21 +207,15 @@ class TestingConfig(Config):
     
     Used during pytest runs. Disables CSRF protection for easier testing,
     uses a separate test database, and enables testing mode.
-    
-    This config is automatically applied by conftest.py fixtures.
     """
     
     # Enable Flask testing mode
-    # This disables error catching during request handling so you get
-    # better error reports when performing test requests
     TESTING = True
     
     # Disable CSRF protection for easier testing
-    # In tests, you don't want to deal with CSRF tokens
     WTF_CSRF_ENABLED = False
     
     # Use separate test database
-    # CRITICAL: Never use production database for tests!
     SQLALCHEMY_DATABASE_URI = os.getenv(
         'TEST_DATABASE_URI',
         'postgresql://josei:03e+_U#hS9AT@localhost:5432/pytarjas_test'
@@ -226,29 +226,14 @@ class TestingConfig(Config):
     
     # Use a simple secret key for testing
     SECRET_KEY = 'testing-secret-key-not-secure'
-    
-    # Faster password hashing in tests (bcrypt rounds)
-    # Note: This requires Flask-Bcrypt configuration
-    # BCRYPT_LOG_ROUNDS = 4
 
 
 class ProductionConfig(Config):
     """
     Production environment configuration.
     
-    Used when deployed to production server. Enforces security settings,
-    disables debug mode, and uses production-grade settings.
-    
-    To use this config:
-        export FLASK_ENV=production
-        gunicorn "pytarjas:create_app()" --bind 0.0.0.0:8000
-    
-    IMPORTANT: Before deploying to production:
-    1. Set a strong SECRET_KEY in environment
-    2. Configure production database URI
-    3. Set SESSION_COOKIE_SECURE=True (requires HTTPS)
-    4. Configure proper logging
-    5. Set up database backups
+    Used when deployed to production server (e.g., Azure App Service).
+    Enforces security settings, disables debug mode, and uses production-grade settings.
     """
     
     # Disable debug mode (CRITICAL for security)
@@ -257,15 +242,11 @@ class ProductionConfig(Config):
     # Disable SQL query logging (reduces overhead)
     SQLALCHEMY_ECHO = False
     
-    # Require HTTPS for session cookies (REQUIRES SSL/TLS)
-    # Only enable this when you have HTTPS configured!
+    # Require HTTPS for session cookies (Azure App Service provides HTTPS)
     SESSION_COOKIE_SECURE = True
     
     # Production database should be set via environment variable
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        'SQLALCHEMY_DATABASE_URI',
-        # No default - force explicit configuration in production
-    )
+    SQLALCHEMY_DATABASE_URI = os.getenv('SQLALCHEMY_DATABASE_URI')
     
     # Stricter session timeout in production (4 hours)
     PERMANENT_SESSION_LIFETIME = timedelta(hours=4)
@@ -283,21 +264,10 @@ config = {
 }
 
 
-def get_config(config_name: str =None) -> (
+def get_config(config_name: str = None) -> (
         DevelopmentConfig | TestingConfig | ProductionConfig):
     """
     Get configuration class based on name.
-    
-    Args:
-        config_name: Name of config ('development', 'testing', 'production')
-                    If None, uses FLASK_ENV environment variable
-    
-    Returns:
-        Configuration class
-        
-    Example:
-        config_class = get_config('production')
-        app.config.from_object(config_class)
     """
     if config_name is None:
         config_name = os.getenv('FLASK_ENV', 'development')

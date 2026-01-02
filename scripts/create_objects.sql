@@ -1,6 +1,6 @@
 -- scripts/create_objects.sql
 -- Inserts a full demo Form, a Planning Template, and an actual Planning instance with tasks.
--- Updated to include worker verification fields without removing original questions.
+-- Updated to use technical field names in metadata_values for correct PDF rendering.
 
 DO $$ 
 DECLARE 
@@ -82,7 +82,7 @@ INSERT INTO planning_template (
     NOW() AT TIME ZONE 'UTC'
 );
 
--- Metadata Fields for the Planning Template (Added is_verifiable)
+-- Metadata Fields for the Planning Template
 
 -- Header Fields
 INSERT INTO planning_metadata_field (id, template_id, field_label, field_name, field_type, is_required, is_row_field, is_verifiable, "order", options, created_at)
@@ -123,8 +123,8 @@ INSERT INTO planning (
     form_uuid, 
     planning_template_uuid, 
     '{
-        "Nombre de la Nave": "MS Explorer",
-        "Terminal de Operación": "TPS"
+        "vessel_name": "MS Explorer",
+        "terminal": "TPS"
     }'::jsonb, 
     '{
         "seal": {"label": "Sello", "is_row_field": true},

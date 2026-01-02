@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Tarja {{ form_type|capitalize }} - {{ task_id }}</title>
+    <title>Tarja {{ form_name }} - {{ task_id }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pdfs/tarja.css', _external=True) }}">
 </head>
 <body>
@@ -13,7 +13,7 @@
                 <img src="{{ url_for('static', filename='icons/HGT-Logo-greyblue-orange-RGB.svg', _external=True) }}" class="header-logo" alt="HGT Logo">
             </td>
             <td class="header-title">
-                <h1>Documento de {{ form_type|capitalize }}</h1>
+                <h1>{{ form_name }}</h1>
                 <span>ID Tarea: #{{ task_id }}</span><br>
                 <span>Generado: {{ now_str }}</span>
             </td>

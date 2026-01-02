@@ -1,25 +1,15 @@
-from flask import Flask, request
+# main.py
+"""
+Entry point for the Pytarjas application on Azure App Service.
+This file imports the app factory and exposes the 'app' object for Gunicorn.
+"""
 
-app = Flask(__name__)
+from pytarjas import create_app
 
-@app.route('/')
-def hello():
-    print('during view')
-    return 'Hello, World!'
+# Create the application instance using the factory
+# Azure App Service (Linux) looks for an object named 'app' or 'application'
+app = create_app()
 
-@app.teardown_request
-def show_teardown(exception):
-    print('after with block')
-
-with app.test_request_context():
-    print('during with block')
-
-# teardown functions are called after the context with block exits
-
-with app.test_client() as client:
-    client.get('/')
-    # the contexts are not popped even though the request ended
-    print(request.path)
-
-# the contexts are popped and teardown functions are called after
-# the client with block exits
+if __name__ == "__main__":
+    # This block is used for local testing; in production, Gunicorn handles the execution
+    app.run()
