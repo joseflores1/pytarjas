@@ -5,6 +5,10 @@
 # This script initializes the database schema and demo data.
 # It dynamically extracts credentials from environment variables to avoid hardcoding.
 
+# Ensure the root project directory is in the PYTHONPATH
+# This prevents ModuleNotFoundError: No module named 'pytarjas'
+export PYTHONPATH=$PYTHONPATH:.
+
 # Function to safely parse the connection URI using Python
 get_db_config() {
     python3 <<EOF

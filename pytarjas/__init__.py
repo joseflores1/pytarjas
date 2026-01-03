@@ -2,9 +2,10 @@
 import os
 import logging
 from flask import Flask, redirect, url_for, session, send_from_directory
+from dotenv import load_dotenv
 from .models.user_models import User
 
-# Configure logging for Azure environment
+# Configure logging for Azure and Local environments
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -12,24 +13,41 @@ def create_app(test_config=None):
     """
     Create and configure the Flask application.
     """
+    # -------------------------------------------------------------------------
+    # Environment Configuration
+    # -------------------------------------------------------------------------
+    
+    # Define the base directory (project root)
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    
+    # Explicitly load .env.development if it exists to override standard .env
+    # This is critical for local development to prevent picking up production vars
+    dev_env = os.path.join(base_dir, '.env.development')
+    if os.path.exists(dev_env):
+        load_dotenv(dev_env, override=True)
+        logger.info("Loaded configuration from .env.development")
+
     # Create Flask app instance
     app = Flask(__name__, instance_relative_config=True)
     
     if test_config is None:
         # Check both FLASK_ENV and APP_ENV to be safe in Azure
+        # Priority: FLASK_ENV > APP_ENV > development
         app_env = os.getenv('FLASK_ENV') or os.getenv('APP_ENV') or 'development'
         config_class_path = f'config.{app_env.capitalize()}Config'
         
         try:
             app.config.from_object(config_class_path)
+            # Load additional settings from instance/config.py if it exists
             app.config.from_pyfile('config.py', silent=True)
             logger.info(f"Application starting in {app_env} mode.")
         except Exception as e:
             logger.error(f"Failed to load configuration: {e}")
+            
     else:
         app.config.from_mapping(test_config)
     
-    # Ensure instance path exists
+    # Ensure the instance path exists for local storage/uploads
     try:
         os.makedirs(app.instance_path)
     except OSError:
@@ -44,11 +62,11 @@ def create_app(test_config=None):
     except OSError:
         pass
     
-    # Initialize Flask-SQLAlchemy
+    # Initialize Flask-SQLAlchemy extension
     from .models.user_models import db
     db.init_app(app)
     
-    # Import models for SQLAlchemy
+    # Import all models so SQLAlchemy knows about them
     from .models import user_models, docs_models  # noqa
     
     with app.app_context():
@@ -58,10 +76,11 @@ def create_app(test_config=None):
             logger.info("Database synchronization complete.")
         except Exception as e:
             logger.error("Critical: Could not connect to the database.")
-            # We don't log the full URI to avoid leaking credentials in logs
+            # Masking password for safety in logs
             db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
             if '@' in db_uri:
                 logger.error(f"Target Database Host: {db_uri.split('@')[-1]}")
+            
             raise e
     
     # Register blueprints
@@ -80,23 +99,29 @@ def create_app(test_config=None):
     app.register_blueprint(users.bp)
     app.register_blueprint(plannings.bp)
 
-    # File serving route (local/fallback)
+    # ============================================================================
+    # SERVE UPLOADED FILES FROM INSTANCE PATH
+    # ============================================================================
     @app.route('/uploads/<path:filename>')
     def serve_uploaded_file(filename):
+        """Serves files from the local instance upload directory."""
         return send_from_directory(
             app.config['UPLOAD_PATH'], 
             filename
         )
     
-    # Prevent browser caching
+    # Security: Disable Browser Cache (BFCACHE)
     @app.after_request
     def set_secure_headers(response):
+        """Adds headers to prevent page caching by the browser."""
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
         return response
 
-    # Root route redirection
+    # ============================================================================
+    # ROOT ROUTE: Redirect to appropriate page based on authentication
+    # ============================================================================
     @app.route("/")
     def index():
         if "user_id" not in session:
@@ -108,16 +133,21 @@ def create_app(test_config=None):
             session.clear()
             return redirect(url_for("auth.login"))
         
+        # Route based on user role
         if user.role == "admin":
             return redirect(url_for("admin.index"))
+        
         elif user.role == "planner":
             return redirect(url_for("planner.index")) 
+        
         elif user.role == "worker":
             return redirect(url_for("worker.index"))
+        
         elif user.role == "client":
             return redirect(url_for("client.index")) 
         
-        session.clear()
-        return redirect(url_for("auth.login"))
+        else:
+            session.clear()
+            return redirect(url_for("auth.login"))
     
     return app
