@@ -176,10 +176,6 @@ class DevelopmentConfig(Config):
     
     Used when developing locally. Enables debug mode, detailed error pages,
     and SQL query logging for easier debugging.
-    
-    To use this config:
-        export FLASK_ENV=development
-        flask run
     """
     
     # Enable Flask debug mode
@@ -270,6 +266,14 @@ def get_config(config_name: str = None) -> (
     Get configuration class based on name.
     """
     if config_name is None:
-        config_name = os.getenv('FLASK_ENV', 'development')
+        # Priority 1: FLASK_ENV, Priority 2: APP_ENV, Fallback: development
+        config_name = os.getenv('FLASK_ENV')
+        
+        if config_name is None:
+            config_name = os.getenv('APP_ENV')
+            
+            if config_name is None:
+                config_name = 'development'
     
-    return config.get(config_name, DevelopmentConfig)
+    # Ensure lowercase for dictionary lookup
+    return config.get(config_name.lower(), DevelopmentConfig)

@@ -1,7 +1,12 @@
 # pytarjas/__init__.py
 import os
-from flask import Flask, redirect, url_for, session, send_from_directory # NEW: Import send_from_directory
+import logging
+from flask import Flask, redirect, url_for, session, send_from_directory
 from .models.user_models import User
+
+# Configure logging for Azure environment
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def create_app(test_config=None):
     """
@@ -11,92 +16,89 @@ def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
     
     if test_config is None:
-        # FIX: Load configuration dynamically based on FLASK_ENV
-        app_env = os.getenv('FLASK_ENV', 'development')
+        # Check both FLASK_ENV and APP_ENV to be safe in Azure
+        app_env = os.getenv('FLASK_ENV') or os.getenv('APP_ENV') or 'development'
         config_class_path = f'config.{app_env.capitalize()}Config'
         
-        app.config.from_object(config_class_path)
-        app.config.from_pyfile('config.py', silent=True)
+        try:
+            app.config.from_object(config_class_path)
+            app.config.from_pyfile('config.py', silent=True)
+            logger.info(f"Application starting in {app_env} mode.")
+        except Exception as e:
+            logger.error(f"Failed to load configuration: {e}")
     else:
         app.config.from_mapping(test_config)
     
+    # Ensure instance path exists
     try:
         os.makedirs(app.instance_path)
     except OSError:
         pass
     
+    # Configure upload paths
     try:
-        upload_path = os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'])
-        os.makedirs(upload_path, exist_ok=True) # Ensure exist_ok=True is set
-        app.config['UPLOAD_PATH'] = upload_path # NEW: Store the full path for serving
+        upload_folder = app.config.get('UPLOAD_FOLDER', 'uploads')
+        upload_path = os.path.join(app.instance_path, upload_folder)
+        os.makedirs(upload_path, exist_ok=True)
+        app.config['UPLOAD_PATH'] = upload_path
     except OSError:
         pass
     
-    # Initialize Flask-SQLAlchemy extension
+    # Initialize Flask-SQLAlchemy
     from .models.user_models import db
     db.init_app(app)
     
-    # Import all models so SQLAlchemy knows about them
+    # Import models for SQLAlchemy
     from .models import user_models, docs_models  # noqa
     
     with app.app_context():
-        db.create_all()
+        try:
+            # Attempt to create tables. The DB must already exist.
+            db.create_all()
+            logger.info("Database synchronization complete.")
+        except Exception as e:
+            logger.error("Critical: Could not connect to the database.")
+            # We don't log the full URI to avoid leaking credentials in logs
+            db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+            if '@' in db_uri:
+                logger.error(f"Target Database Host: {db_uri.split('@')[-1]}")
+            raise e
     
-    # Register blueprints (UPDATED PATHS and REGISTRATION)
+    # Register blueprints
     from . import auth
     app.register_blueprint(auth.bp)
     
-    # Blueprints from blueprints/roles
-    from .blueprints.roles import admin 
+    from .blueprints.roles import admin, worker, planner, client
     app.register_blueprint(admin.bp)
-    from .blueprints.roles import worker 
     app.register_blueprint(worker.bp)
-    from .blueprints.roles import planner 
     app.register_blueprint(planner.bp)
-    from .blueprints.roles import client 
     app.register_blueprint(client.bp)
 
-    # Blueprints from blueprints/artifacts
-    from .blueprints.artifacts import tasks 
+    from .blueprints.artifacts import tasks, forms, users, plannings
     app.register_blueprint(tasks.bp)
-    from .blueprints.artifacts import forms 
     app.register_blueprint(forms.bp)
-    from .blueprints.artifacts import users 
     app.register_blueprint(users.bp)
-    from .blueprints.artifacts import plannings # <-- NEW REGISTRATION
-    app.register_blueprint(plannings.bp) # <-- NEW REGISTRATION
+    app.register_blueprint(plannings.bp)
 
-    # ============================================================================
-    # CRITICAL FIX: SERVE UPLOADED FILES FROM INSTANCE PATH
-    # ============================================================================
+    # File serving route (local/fallback)
     @app.route('/uploads/<path:filename>')
     def serve_uploaded_file(filename):
-        # We serve the file directly from the instance/uploads path.
-        # This handles the /uploads/uuid.ext URL structure used in the DB/Template.
-        # Note: This is an insecure default; in production, Azure Blob Storage should handle this.
         return send_from_directory(
             app.config['UPLOAD_PATH'], 
             filename
         )
     
-    # FIX DE SEGURIDAD: DESHABILITAR CACHÉ DEL NAVEGADOR (BFCACHE)
+    # Prevent browser caching
     @app.after_request
     def set_secure_headers(response):
-        """Añade cabeceras para prevenir caching de la página por el navegador."""
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
         return response
 
-    # ============================================================================
-    # ROOT ROUTE: Redirect to appropriate page based on authentication
-    # ============================================================================
+    # Root route redirection
     @app.route("/")
     def index():
-        """
-        Root route handler.
-        """
-        
         if "user_id" not in session:
             return redirect(url_for("auth.login"))
         
@@ -106,7 +108,6 @@ def create_app(test_config=None):
             session.clear()
             return redirect(url_for("auth.login"))
         
-        # Route based on user role (Using direct blueprint root URLs)
         if user.role == "admin":
             return redirect(url_for("admin.index"))
         elif user.role == "planner":
@@ -115,8 +116,8 @@ def create_app(test_config=None):
             return redirect(url_for("worker.index"))
         elif user.role == "client":
             return redirect(url_for("client.index")) 
-        else:
-            session.clear()
-            return redirect(url_for("auth.login"))
+        
+        session.clear()
+        return redirect(url_for("auth.login"))
     
     return app
