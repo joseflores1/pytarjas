@@ -3,49 +3,19 @@
 
 # --- Production Ready Setup Script ---
 # This script initializes the database schema and demo data.
-# It dynamically extracts credentials from environment variables to avoid hardcoding.
+# It uses Python to execute SQL files to avoid dependencies on external tools like psql.
 
 # Ensure the root project directory is in the PYTHONPATH
 # This prevents ModuleNotFoundError: No module named 'pytarjas'
 export PYTHONPATH=$PYTHONPATH:.
 
-# Function to safely parse the connection URI using Python
-get_db_config() {
-    python3 <<EOF
-from urllib.parse import urlparse, unquote
-import os
-uri = os.getenv('SQLALCHEMY_DATABASE_URI')
-if uri:
-    p = urlparse(uri)
-    if '$1' == 'username':
-        print(unquote(p.username or ''))
-    elif '$1' == 'password':
-        print(unquote(p.password or ''))
-    elif '$1' == 'hostname':
-        print(unquote(p.hostname or ''))
-    elif '$1' == 'port':
-        print(p.port or '5432')
-    elif '$1' == 'dbname':
-        # Remove the leading slash from the path to get the DB name
-        print(unquote(p.path[1:]))
-EOF
-}
-
-# Determine if we use environment variables or local defaults
+# Determine the database connection string
 if [ -n "$SQLALCHEMY_DATABASE_URI" ]; then
     echo "Configuring database connection from SQLALCHEMY_DATABASE_URI..."
-    DB_USER=$(get_db_config "username")
-    DB_PASS=$(get_db_config "password")
-    DB_HOST=$(get_db_config "hostname")
-    DB_PORT=$(get_db_config "port")
-    DB_NAME=$(get_db_config "dbname")
+    DATABASE_URL="$SQLALCHEMY_DATABASE_URI"
 else
     echo "WARNING: SQLALCHEMY_DATABASE_URI not set. Using local development defaults."
-    DB_NAME="pytarjas"
-    DB_USER="josei"
-    DB_PASS="03e+_U#hS9AT"
-    DB_HOST="localhost"
-    DB_PORT="5432"
+    DATABASE_URL="postgresql://josei:03e+_U#hS9AT@localhost:5432/pytarjas"
 fi
 
 # File paths relative to the project root
@@ -53,33 +23,59 @@ SQL_DELETE="scripts/delete_tables.sql"
 PYTHON_USER_CREATE="scripts/create_users.py" 
 SQL_OBJECTS_CREATE="scripts/create_objects.sql" 
 
-# Export the password so psql does not prompt for manual input
-export PGPASSWORD="$DB_PASS"
-
 # Helper function to check for errors and halt execution
 check_error() {
     if [ $? -ne 0 ]; then
         echo "ERROR: Step $1 failed. Aborting script execution."
-        unset PGPASSWORD
         exit 1
     fi
 }
 
+# Helper function to execute a SQL file using SQLAlchemy
+# This replaces the need for the 'psql' command line tool
+execute_sql() {
+    local file_path=$1
+    echo "Running SQL: $file_path"
+    
+    python3 - <<EOF
+import sys
+from sqlalchemy import create_engine, text
+
+db_uri = "$DATABASE_URL"
+file_to_run = "$file_path"
+
+if not db_uri:
+    print("Error: No database URI provided.")
+    sys.exit(1)
+
+try:
+    # Initialize engine using the project's URI
+    engine = create_engine(db_uri)
+    with engine.connect() as connection:
+        with open(file_to_run, 'r') as f:
+            sql_content = f.read()
+            # Wrap in text() to ensure SQLAlchemy handles raw SQL strings correctly
+            # especially for DO blocks and complex inserts
+            connection.execute(text(sql_content))
+            connection.commit()
+    print(f"Successfully executed {file_to_run}")
+except Exception as e:
+    print(f"Failed to execute {file_to_run}: {e}")
+    sys.exit(1)
+EOF
+}
+
 echo "--- 1. Cleaning Database (Dropping Tables) ---"
-# Azure Database for PostgreSQL requires host (-h) and port (-p) flags for remote access
-psql -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -U "$DB_USER" -f "$SQL_DELETE" -v ON_ERROR_STOP=1
+execute_sql "$SQL_DELETE"
 check_error "Cleanup"
 
 echo "--- 2. Creating Schema and Initial Users ---"
-# This script uses SQLAlchemy and will pick up the production config automatically via APP_ENV
+# This script uses SQLAlchemy and will pick up the production config automatically
 python3 "$PYTHON_USER_CREATE"
 check_error "User/Schema Creation"
 
 echo "--- 3. Inserting Demo Forms, Templates, and Objects ---"
-psql -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -U "$DB_USER" -f "$SQL_OBJECTS_CREATE" -v ON_ERROR_STOP=1
+execute_sql "$SQL_OBJECTS_CREATE"
 check_error "Objects Creation"
 
 echo "--- Setup finished successfully. ---"
-
-# Security: Remove the sensitive password from the environment variables
-unset PGPASSWORD
