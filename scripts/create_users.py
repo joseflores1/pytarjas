@@ -1,4 +1,5 @@
 # scripts/create_users.py
+import os
 from pytarjas import create_app
 from pytarjas.models.user_models import db, User
 
@@ -9,14 +10,19 @@ with app.app_context():
     db.create_all()
     print("Database schema created successfully.")
 
+    # Fetch initial passwords from environment variables with safe defaults for dev
+    admin_pw = os.getenv('INITIAL_ADMIN_PASSWORD', 'admin123')
+    worker_pw = os.getenv('INITIAL_WORKER_PASSWORD', 'worker123')
+    planner_pw = os.getenv('INITIAL_PLANNER_PASSWORD', 'planner123')
+    client_pw = os.getenv('INITIAL_CLIENT_PASSWORD', 'client123')
+
     # Create Admin
     admin = User(
         username="admin",
-        email="admin@example.com",
+        email="joseflores@alumnos.uai.cl",
         role="admin"
     )
-    # Corrected method name based on your user_models.py
-    admin.reset_password("admin123") 
+    admin.reset_password(admin_pw) 
     db.session.add(admin)
 
     # Create Worker
@@ -25,7 +31,7 @@ with app.app_context():
         email="worker@example.com",
         role="worker"
     )
-    worker.reset_password("worker123")
+    worker.reset_password(worker_pw)
     db.session.add(worker)
 
     # Create Planner
@@ -34,7 +40,7 @@ with app.app_context():
         email="planner@example.com",
         role="planner"
     )
-    planner.reset_password("planner123")
+    planner.reset_password(planner_pw)
     db.session.add(planner)
 
     # Create Client
@@ -43,8 +49,12 @@ with app.app_context():
         email="client@example.com",
         role="client"
     )
-    client.reset_password("client123")
+    client.reset_password(client_pw)
     db.session.add(client)
 
-    db.session.commit()
-    print(f"Created users: {admin.username}, {worker.username}, {planner.username}, {client.username}")
+    try:
+        db.session.commit()
+        print(f"Created users: {admin.username}, {worker.username}, {planner.username}, {client.username}")
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error creating users: {e}")
