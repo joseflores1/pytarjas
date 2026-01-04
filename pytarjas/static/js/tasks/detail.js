@@ -17,8 +17,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function formatFriendlyDates() {
         document.querySelectorAll('.friendly-date').forEach(el => {
             const rawDate = el.textContent.trim();
+            
             if (rawDate) {
                 const dateObj = new Date(rawDate);
+                
                 if (!isNaN(dateObj.getTime())) {
                     const options = { 
                         year: 'numeric', 
@@ -44,6 +46,7 @@ document.addEventListener('DOMContentLoaded', function() {
             radio.addEventListener('change', function() {
                 const fieldName = this.name.replace('verify_', '');
                 const correctionArea = document.getElementById(`correction_area_${fieldName}`);
+                
                 if (correctionArea) {
                     if (this.value === 'no') {
                         correctionArea.style.display = 'block';
@@ -62,6 +65,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 items.forEach(item => {
                     const radios = item.querySelectorAll('.verify-radio');
                     const isChecked = Array.from(radios).some(r => r.checked);
+                    
                     if (!isChecked) {
                         allAnswered = false;
                     }
@@ -83,13 +87,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const icon = qType === 'photo' ? '📷' : '📄';
         const isImage = qType === 'photo' || path.match(/\.(jpg|jpeg|png|gif|webp)$/i);
         
+        // FIX: Detect if path is already absolute (Azure) or already has a leading slash (Local)
+        const finalUrl = (path.startsWith('http') || path.startsWith('/')) ? path : `/${path}`;
+        
         let html = `<div class="file-item-container" data-path="${path}">`;
         
         if (isImage) {
             html += `
               <div class="image-wrapper">
-                  <a href="/${path}" target="_blank" title="Ver imagen en tamaño completo">
-                      <img src="/${path}" alt="Foto adjunta" class="uploaded-image">
+                  <a href="${finalUrl}" target="_blank" title="Ver imagen en tamaño completo">
+                      <img src="${finalUrl}" alt="Foto adjunta" class="uploaded-image">
                   </a>
               </div>
             `;
@@ -100,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
               <span class="file-link-text">
                   <span style="font-size: var(--font-size-xl); margin-right: var(--space-sm);">${icon}</span>
                   Archivo subido: 
-                  <a href="/${path}" target="_blank" title="Ver archivo">${filename}</a>
+                  <a href="${finalUrl}" target="_blank" title="Ver archivo">${filename}</a>
               </span>
               <button type="button" class="btn btn-sm btn-danger remove-file-btn" 
                       data-qid="${questionId}" data-path="${path}">
@@ -114,6 +121,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function renderFileItems(questionId, paths, qType) {
         const displayBox = document.getElementById(`file-display-${questionId}`);
+        
         if (!displayBox) {
             return;
         }
@@ -139,6 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     window.removeFile = function(questionId, pathToRemove) {
         const pathInput = document.getElementById(`path-input-${questionId}`);
+        
         if (!pathInput) {
             return;
         }
@@ -164,9 +173,11 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const qId = input.dataset.questionId;
             const uploader = document.getElementById(`file-upload-${qId}`);
+            
             if (uploader) {
                 const qType = uploader.dataset.qType;
                 const paths = JSON.parse(input.value || '[]');
+                
                 if (paths.length > 0) {
                     renderFileItems(qId, paths, qType);
                 }
@@ -254,6 +265,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateProgress() {
         const inputs = document.querySelectorAll('.response-input');
         const answered = new Set();
+        
         inputs.forEach(i => {
            if (i.disabled || i.readOnly) {
                return;
@@ -280,6 +292,7 @@ document.addEventListener('DOMContentLoaded', function() {
            }
            
            const trimmedValue = i.value.trim();
+           
            if (i.type === 'number' && trimmedValue === '0') {
                return;
            } 
@@ -293,10 +306,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         const pct = (answered.size / totalQuestions) * 100;
         const progressBar = document.getElementById('progressBar');
+        
         if (progressBar) {
             progressBar.style.width = pct + '%';
         }
         const progressText = document.getElementById('progressText');
+        
         if (progressText) {
             progressText.textContent = `${answered.size} / ${totalQuestions}`;
         }
@@ -322,9 +337,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function collectVerifications() {
         const verifications = {};
         const items = document.querySelectorAll('.verification-item');
+        
         items.forEach(item => {
             const radios = item.querySelectorAll('.verify-radio');
             const checkedRadio = Array.from(radios).find(r => r.checked);
+            
             if (checkedRadio) {
                 const fieldName = checkedRadio.name.replace('verify_', '');
                 verifications[fieldName] = {
@@ -400,6 +417,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateUiForStatusChange(newStatus) {
         taskStatus = newStatus;
         const statusBadge = document.querySelector('.status-badge');
+        
         if (statusBadge) {
             statusBadge.className = `status-badge status-${newStatus}`;
             statusBadge.textContent = newStatus.replace('_', ' ');
@@ -526,6 +544,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('backBtn').addEventListener('click', function(e) {
         e.preventDefault();
         const targetUrl = this.href;
+        
         if (hasUnsavedChanges) {
             showConfirm('Hay cambios sin guardar. ¿Seguro que deseas salir?', 
                 () => { 
@@ -597,6 +616,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (isRequired && !isAnswered) {
                      const textSpan = card.querySelector('.q-text-content');
                      let qText = 'Pregunta sin texto';
+                     
                      if (textSpan && textSpan.innerText.trim()) {
                          qText = textSpan.innerText.trim();
                      }
