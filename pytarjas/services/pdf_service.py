@@ -9,6 +9,7 @@ system-level library dependencies.
 import os
 import json
 import logging
+import requests
 from datetime import datetime
 from io import BytesIO
 from reportlab.lib import colors
@@ -25,15 +26,28 @@ from pytarjas.models.docs_models import Task
 # Configure logger
 logger = logging.getLogger(__name__)
 
-def get_absolute_path(web_path):
+def get_image_resource(path):
     """
-    Converts a web path to an absolute system path for image embedding.
-    Ensures compatibility between Local and Azure environments.
+    Resolves an image path into a resource ReportLab can use.
+    Handles absolute URLs (Azure) by downloading them and local paths 
+    by resolving them on the filesystem.
     """
-    if not web_path:
+    if not path:
         return None
     
-    clean_path = web_path.lstrip('/')
+    # Handle Azure Blob Storage URLs
+    if path.startswith('http'):
+        try:
+            response = requests.get(path, timeout=10)
+            if response.status_code == 200:
+                return BytesIO(response.content)
+        except Exception as e:
+            logger.error(f"Error downloading image from {path}: {e}")
+        
+        return None
+    
+    # Handle local filesystem paths
+    clean_path = path.lstrip('/')
     abs_path = os.path.join(current_app.instance_path, clean_path)
     
     if not os.path.exists(abs_path):
@@ -73,8 +87,10 @@ def format_value(value):
             
             if value.lower() == 'true': 
                 return 'Sí'
+            
             if value.lower() == 'false': 
                 return 'No'
+                
         except (ValueError, TypeError):
             pass
             
@@ -87,10 +103,12 @@ def calculate_duration(task: Task) -> str:
         seconds = int(diff.total_seconds())
         h = seconds // 3600
         m = (seconds % 3600) // 60
+        
         if h > 0:
             return f"{h} hrs {m} min"
         else:
             return f"{m} min"
+            
     return "---"
 
 # --- CONSTANTS ---
@@ -108,15 +126,13 @@ def draw_header(canvas, doc):
     """
     canvas.saveState()
     
-    logo_path = get_absolute_path('static/icons/HGT-Logo-greyblue-orange-RGB-512x512.png')
+    logo_path = get_image_resource('static/icons/HGT-Logo-greyblue-orange-RGB-512x512.png')
     
     if logo_path:
         try:
-            # COMPACT POSITIONING:
             draw_x = 0.8 * cm
             draw_w = 12.0 * cm 
             draw_h = 5.0 * cm
-            # Shifted up: Bottom of logo at 5.1cm from top instead of 5.5cm
             draw_y = A4[1] - 6 * cm 
             
             canvas.drawImage(
@@ -132,7 +148,6 @@ def draw_header(canvas, doc):
         except Exception as e:
             logger.error(f"Logo drawing error: {e}")
     
-    # Metadata shifted UP to reduce header height
     canvas.setFont('Helvetica-Bold', 18)
     canvas.setFillColor(DARK_BLUE)
     canvas.drawRightString(
@@ -155,7 +170,6 @@ def draw_header(canvas, doc):
         f"Generado: {datetime.now().strftime('%d-%m-%Y %H:%M')}"
     )
     
-    # Orange line pulled UP right under the logo
     canvas.setStrokeColor(ORANGE)
     canvas.setLineWidth(2.5)
     canvas.line(doc.leftMargin, A4[1] - 5.3 * cm, A4[0] - doc.rightMargin, A4[1] - 5.3 * cm)
@@ -172,7 +186,7 @@ def generate_tarja_pdf(task: Task) -> bytes:
         pagesize=A4, 
         rightMargin=1.2*cm, 
         leftMargin=1.2*cm, 
-        topMargin=5.8*cm, # Reduced from 6.5cm to start content higher
+        topMargin=5.8*cm,
         bottomMargin=1.5*cm
     )
     
@@ -181,7 +195,6 @@ def generate_tarja_pdf(task: Task) -> bytes:
     
     styles = getSampleStyleSheet()
     
-    # Section title style (Explicit Orange text, no borders)
     title_style = ParagraphStyle(
         'SectionTitle',
         parent=styles['Heading2'],
@@ -261,6 +274,7 @@ def generate_tarja_pdf(task: Task) -> bytes:
 
     # --- 2. DATOS DEL REGISTRO ---
     reg_items = []
+    
     if task.planning and task.planning.template:
         for f in sorted(task.planning.template.fields, key=lambda x: x.order):
             if f.is_row_field:
@@ -299,8 +313,10 @@ def generate_tarja_pdf(task: Task) -> bytes:
                         paths = [res]
                     else:
                         paths = res
+                        
                     if paths: 
                         gallery.append({'l': q.question_text, 'p': paths})
+                        
                 except Exception: 
                     pass
             else:
@@ -327,11 +343,13 @@ def generate_tarja_pdf(task: Task) -> bytes:
             elements.append(Spacer(1, 8))
             row = []
             for path in g['p']:
-                abs_p = get_absolute_path(path)
-                if abs_p:
+                img_resource = get_image_resource(path)
+                
+                if img_resource:
                     try:
-                        img = Image(abs_p, width=8.8*cm, height=6.6*cm, kind='proportional')
+                        img = Image(img_resource, width=8.8*cm, height=6.6*cm, kind='proportional')
                         row.append(img)
+                        
                         if len(row) == 2:
                             elements.append(Table([row], colWidths=[9.2*cm, 9.2*cm], style=[
                                 ('ALIGN',(0,0),(-1,-1),'CENTER'),
@@ -344,6 +362,7 @@ def generate_tarja_pdf(task: Task) -> bytes:
             
             if row: 
                 elements.append(Table([row+[""]], colWidths=[9.2*cm, 9.2*cm]))
+                
             elements.append(Spacer(1, 20))
 
     doc.build(elements, onFirstPage=draw_header, onLaterPages=draw_header)
