@@ -17,7 +17,8 @@ from sqlalchemy.orm.attributes import flag_modified
 from pytarjas.auth import login_required, task_access_required
 from pytarjas.models.user_models import User, db
 from pytarjas.models.docs_models import Task, Form, Planning, PlanningTemplate
-from pytarjas.helper import wants_json, save_file_to_disk 
+from pytarjas.helper import wants_json, allowed_file
+from pytarjas.services.storage_service import StorageService
 from pytarjas.services.pdf_service import generate_tarja_pdf
 
 bp = Blueprint("tasks", __name__, url_prefix="/tasks")
@@ -28,6 +29,7 @@ bp = Blueprint("tasks", __name__, url_prefix="/tasks")
 def upload_file_temp(task_id):
     """Handles immediate file upload separately from form data."""
     task = Task.query.get(task_id)
+    
     if not task:
         return jsonify({"success": False, "error": "Task not found"}), 404
 
@@ -39,6 +41,9 @@ def upload_file_temp(task_id):
 
     if not question_id:
         return jsonify({"success": False, "error": "Missing question ID for file naming."}), 400
+        
+    if not allowed_file(file.filename):
+        return jsonify({"success": False, "error": "File type not allowed"}), 400
 
     is_admin_or_planner = g.user.role in ["admin", "planner"]
     is_finalized = task.status in ["completed", "reviewed", "approved"]
@@ -48,15 +53,22 @@ def upload_file_temp(task_id):
             return jsonify({"success": False, "error": "Cannot upload files to finalized task."}), 403
 
     try:
-        saved_path = save_file_to_disk(file, task_id, question_id) 
-        if saved_path:
+        # StorageService handles the logic for Azure vs Local storage automatically
+        filename = StorageService.upload_file(file)
+        
+        if filename:
+            # Generate the correct URL (Azure blob URL or local /uploads/ URL)
+            file_url = StorageService.get_file_url(filename)
+            
             return jsonify({
                 "success": True,
                 "message": "File uploaded successfully",
-                "path": saved_path
+                "path": file_url,
+                "filename": filename
             }), 200
+            
         else:
-            raise Exception("File save failed.")
+            raise Exception("File storage operation failed.")
             
     except Exception as e:
         return jsonify({"success": False, "error": f"Upload failed: {str(e)}"}), 500
@@ -75,6 +87,7 @@ def create_task():
         ).order_by(Planning.created_at.desc()).all()
 
         assignable_users = []
+        
         if g.user.role == "worker":
             assignable_users = [g.user]
         elif g.user.role == "planner":
@@ -123,10 +136,12 @@ def create_task():
     
     record_data = {}
     metadata_values = data.get("metadata_values", {})
+    
     if isinstance(metadata_values, dict):
         record_data.update(metadata_values)
 
     ad_hoc_definitions = data.get("ad_hoc_metadata", [])
+    
     if not wants_json():
         if isinstance(ad_hoc_definitions, str):
             try:
@@ -204,14 +219,17 @@ def list_tasks():
         query = query.filter(Task.status == status)
     
     form_id_filter = request.args.get('form_id_filter')
+    
     if form_id_filter:
         query = query.filter(Task.form_id == form_id_filter)
 
     created_by_id_filter = request.args.get('created_by_id')
+    
     if created_by_id_filter:
         query = query.filter(Task.created_by_id == created_by_id_filter)
 
     worker_id_filter = request.args.get('worker_id')
+    
     if worker_id_filter:
         query = query.filter(Task.worker_id == worker_id_filter)
 
@@ -298,7 +316,6 @@ def get_task(task_id):
     verification_prompts = []
     planning = task.planning
     
-    # Logic: Only show verification if the task is still 'pending'
     if planning:
         if planning.verification_config:
             if task.status == "pending":
@@ -333,6 +350,7 @@ def get_task(task_id):
 def update_task(task_id):
     """Updates task responses, metadata verifications, and status."""
     task = Task.query.get_or_404(task_id)
+    
     if not request.is_json:
         return jsonify({"success": False, "error": "JSON required"}), 400
         
@@ -343,7 +361,6 @@ def update_task(task_id):
         if not is_admin:
             return jsonify({"success": False, "error": "Task is finalized"}), 403
     
-    # PERSISTENCE: Save worker corrections to the actual task record_data
     if "verifications" in data:
         verifications = data["verifications"]
         for field_name, v_info in verifications.items():
@@ -377,6 +394,7 @@ def update_task(task_id):
 def download_task_pdf(task_id):
     """Generates and downloads the task tarja PDF."""
     task = Task.query.get_or_404(task_id)
+    
     try:
         pdf_bytes = generate_tarja_pdf(task)
         filename = f"Tarja_{task.id[:8]}.pdf"
