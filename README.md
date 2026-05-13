@@ -24,8 +24,8 @@ Field operations in logistics often occur in environments with intermittent or n
 
 1. **Clone the repository:**
    ```bash
-   git clone <repository-url>
-   cd pytarjas_hgt
+   git clone https://github.com/joseflores1/pytarjas
+   cd pytarjas
    ```
 
 2. **Install dependencies:**
