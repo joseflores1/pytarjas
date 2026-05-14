@@ -131,3 +131,6 @@ Pytarjas is built using:
 - **Migrations:** Alembic (Flask-Migrate)
 - **Frontend:** HTML5, CSS3 (Vanilla), JavaScript (Vanilla)
 - **Services:** Specialized services for PDF generation and File Storage.
+
+## Contributing
+This project is **NOT** accepting pull requests of any kind.
