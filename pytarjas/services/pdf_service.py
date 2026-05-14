@@ -126,7 +126,7 @@ def draw_header(canvas, doc):
     """
     canvas.saveState()
     
-    logo_path = get_image_resource('static/icons/HGT-Logo-greyblue-orange-RGB-512x512.png')
+    logo_path = get_image_resource('static/icons/')
     
     if logo_path:
         try:

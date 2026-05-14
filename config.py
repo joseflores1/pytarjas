@@ -117,10 +117,10 @@ class Config:
     # -------------------------------------------------------------------------
     
     # Application name displayed when installed
-    PWA_APP_NAME = os.getenv('PWA_APP_NAME', 'HGT Data Collector')
+    PWA_APP_NAME = os.getenv('PWA_APP_NAME', 'Data Collector')
     
     # Short name for home screen icon
-    PWA_SHORT_NAME = os.getenv('PWA_SHORT_NAME', 'HGT Collector')
+    PWA_SHORT_NAME = os.getenv('PWA_SHORT_NAME', 'Collector')
     
     # Application description
     PWA_DESCRIPTION = os.getenv(

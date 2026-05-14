@@ -1,6 +1,6 @@
 {
-  "name": "HGT Data Collector",
-  "short_name": "HGT Collector",
+  "name": "Data Collector",
+  "short_name": "Collector",
   "description": "Aplicación para recolectar datos faenas en tiempo real",
   "start_url": "/",
   "scope": "/",
@@ -10,13 +10,13 @@
   "background_color": "#ff6600",
   "icons": [
     {
-      "src": "/static/icons/HGT-Logo-greyblue-orange-RGB.svg",
+      "src": "/static/icons/",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     }, 
     {
-      "src": "/static/icons/HGT-Logo-white-orange-RGB.svg",
+      "src": "/static/icons/",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
